@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_avid_mxf.c,v 1.1 2006/12/20 15:45:52 john_f Exp $
+ * $Id: test_write_avid_mxf.c,v 1.2 2007/01/18 15:27:23 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -454,9 +454,9 @@ static void usage(const char* cmd)
 {
     fprintf(stderr, "Usage: %s <<options>> <<inputs>>\n", cmd);
     fprintf(stderr, "\n");
-    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "Options: (options marked with * are required)\n");
     fprintf(stderr, "  -h, --help               display this usage message\n");
-    fprintf(stderr, "  --prefix <filename>      (Required) output filename prefix\n");
+    fprintf(stderr, "* --prefix <filename>      output filename prefix\n");
     fprintf(stderr, "  --clip <name>            clip (MaterialPackage) name.\n");
     fprintf(stderr, "  --project <name>         Avid project name.\n");
     fprintf(stderr, "  --tape <name>            tape name.\n");
@@ -841,12 +841,20 @@ int main(int argc, const char* argv[])
         }
     }
     
+    if (filenamePrefix == NULL)
+    {
+        usage(argv[0]);
+        fprintf(stderr, "--prefix is required\n");
+        return 1;
+    }
+    
     if (inputIndex == 0)
     {
         usage(argv[0]);
         fprintf(stderr, "No inputs\n");
         return 1;
     }
+
 
     /* calculate frame sizes, ... */
     for (i = 0; i < inputIndex; i++)
