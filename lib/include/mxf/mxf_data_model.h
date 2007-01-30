@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.h,v 1.1 2006/12/20 15:40:19 john_f Exp $
+ * $Id: mxf_data_model.h,v 1.2 2007/01/30 14:21:56 john_f Exp $
  *
  * MXF header metadata data model
  *
@@ -195,9 +195,6 @@ typedef enum
 
 #include <mxf/mxf_baseline_data_model.h>
 
-#undef MXF_SET_DEFINITION
-#undef MXF_ITEM_DEFINITION
-#undef MXF_LABEL
 
 
 int mxf_load_data_model(MXFDataModel** dataModel);
@@ -206,12 +203,14 @@ void mxf_free_data_model(MXFDataModel** dataModel);
 int mxf_register_set_def(MXFDataModel* dataModel, const char* name, const mxfKey* parentKey, const mxfKey* key);
 int mxf_register_item_def(MXFDataModel* dataModel, const char* name, const mxfKey* setKey, const mxfKey* key, mxfLocalTag tag, unsigned int typeId);
 
-/* these functions will return the type id if successfull, or 0 if fails */
-/* if the id parameter is 0 then a new id is created and returned */
-unsigned int mxf_register_basic_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int size);
-unsigned int mxf_register_array_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int elementTypeId, unsigned int fixedSize);
-unsigned int mxf_register_compound_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, const MXFCompoundTypeMemberInfo* members);
-unsigned int mxf_register_interpret_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int interpretedTypeId, unsigned int fixedArraySize);
+/* if the typeId parameter is 0 in the following functions, then a new id is created */
+MXFItemType* mxf_register_basic_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int size);
+MXFItemType* mxf_register_array_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int elementTypeId, unsigned int fixedSize);
+MXFItemType* mxf_register_compound_type(MXFDataModel* dataModel, const char* name, unsigned int typeId);
+/* adds a member to the end of the list */
+int mxf_register_compound_type_member(MXFItemType* type, const char* memberName, unsigned int memberTypeId);
+MXFItemType* mxf_register_interpret_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int interpretedTypeId, unsigned int fixedArraySize);
+
 
 int mxf_finalise_data_model(MXFDataModel* dataModel);
 int mxf_check_data_model(MXFDataModel* dataModel);
@@ -220,7 +219,7 @@ int mxf_find_set_def(MXFDataModel* dataModel, const mxfKey* key, MXFSetDef** set
 int mxf_find_item_def(MXFDataModel* dataModel, const mxfKey* key, MXFItemDef** itemDef);
 int mxf_find_item_def_in_set_def(const mxfKey* key, const MXFSetDef* setDef, MXFItemDef** itemDef);
 
-const MXFItemType* mxf_get_item_def_type(MXFDataModel* dataModel, unsigned int typeId);
+MXFItemType* mxf_get_item_def_type(MXFDataModel* dataModel, unsigned int typeId);
 
 int mxf_is_subclass_of(MXFDataModel* dataModel, const mxfKey* setKey, const mxfKey* parentSetKey);
 

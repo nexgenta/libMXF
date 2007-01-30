@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.c,v 1.1 2006/12/20 15:40:27 john_f Exp $
+ * $Id: mxf_data_model.c,v 1.2 2007/01/30 14:21:56 john_f Exp $
  *
  * MXF header metadata data model
  *
@@ -27,141 +27,6 @@
 
 #include <mxf/mxf.h>
 
-
-static const MXFItemType g_builtinTypes[] = 
-{
-    /* basic */
-    {MXF_BASIC_TYPE_CAT, MXF_INT8_TYPE, "Int8", 
-        .info.basic = { 1 } },
-    {MXF_BASIC_TYPE_CAT, MXF_INT16_TYPE, "Int16", 
-        .info.basic = { 2 } },
-    {MXF_BASIC_TYPE_CAT, MXF_INT32_TYPE, "Int32", 
-        .info.basic = { 3 } },
-    {MXF_BASIC_TYPE_CAT, MXF_INT64_TYPE, "Int64", 
-        .info.basic = { 4 } },
-    {MXF_BASIC_TYPE_CAT, MXF_UINT8_TYPE, "UInt8", 
-        .info.basic = { 1 } },
-    {MXF_BASIC_TYPE_CAT, MXF_UINT16_TYPE, "UInt16", 
-        .info.basic = { 2 } },
-    {MXF_BASIC_TYPE_CAT, MXF_UINT32_TYPE, "UInt32", 
-        .info.basic = { 3 } },
-    {MXF_BASIC_TYPE_CAT, MXF_UINT64_TYPE, "UInt64", 
-        .info.basic = { 4 } },
-    {MXF_BASIC_TYPE_CAT, MXF_RAW_TYPE, "Raw", 
-        .info.basic = { 0 } },
-
-    /* array */
-    {MXF_ARRAY_TYPE_CAT, MXF_UTF16STRING_TYPE, "UTF16String", 
-        .info.array = { MXF_UTF16_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_INT32ARRAY_TYPE, "Int32Array",
-        .info.array = { MXF_INT32_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_UINT32ARRAY_TYPE, "UInt32Array",
-        .info.array = { MXF_UINT32_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_INT64ARRAY_TYPE, "Int64Array",
-        .info.array = { MXF_INT64_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_UINT8ARRAY_TYPE, "UInt8Array",
-        .info.array = { MXF_UINT8_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_ISO7STRING_TYPE, "ISO7String",
-        .info.array = { MXF_ISO7_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_INT32BATCH_TYPE, "Int32Batch",
-        .info.array = { MXF_INT32_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_UINT32BATCH_TYPE, "UInt32Batch",
-        .info.array = { MXF_UINT32_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_AUIDARRAY_TYPE, "AUIDArray",
-        .info.array = { MXF_AUID_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_ULBATCH_TYPE, "ULBatch",
-        .info.array = { MXF_UL_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_STRONGREFARRAY_TYPE, "StrongRefArray",
-        .info.array = { MXF_STRONGREF_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_STRONGREFBATCH_TYPE, "StrongRefBatch",
-        .info.array = { MXF_STRONGREF_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_WEAKREFARRAY_TYPE, "WeakRefArray",
-        .info.array = { MXF_WEAKREF_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_WEAKREFBATCH_TYPE, "WeakRefBatch",
-        .info.array = { MXF_WEAKREF_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_RATIONALARRAY_TYPE, "RationalArray",
-        .info.array = { MXF_RATIONAL_TYPE, 0 } },
-    {MXF_ARRAY_TYPE_CAT, MXF_RGBALAYOUT_TYPE, "RGBALayout",
-        .info.array = { MXF_RGBALAYOUTCOMPONENT_TYPE, 0 } },
-
-    /* compound */
-    {MXF_COMPOUND_TYPE_CAT, MXF_RATIONAL_TYPE, "Rational", 
-        .info.compound = {{
-            {"Numerator", MXF_INT32_TYPE}, 
-            {"Denominator", MXF_INT32_TYPE} 
-        }} },
-    {MXF_COMPOUND_TYPE_CAT, MXF_TIMESTAMP_TYPE, "Timestamp", 
-        .info.compound = {{
-            {"Year", MXF_UINT16_TYPE}, 
-            {"Month", MXF_UINT8_TYPE} ,
-            {"Day", MXF_UINT8_TYPE}, 
-            {"Hours", MXF_UINT8_TYPE}, 
-            {"Minutes", MXF_UINT8_TYPE}, 
-            {"Seconds", MXF_UINT8_TYPE},
-            {"QMSec", MXF_UINT8_TYPE} 
-        }} },
-    {MXF_COMPOUND_TYPE_CAT, MXF_PRODUCTVERSION_TYPE, "ProductVersion", 
-        .info.compound = {{
-            {"Major", MXF_UINT16_TYPE}, 
-            {"Minor", MXF_UINT16_TYPE}, 
-            {"Patch", MXF_UINT16_TYPE}, 
-            {"Build", MXF_UINT16_TYPE}, 
-            {"Release", MXF_UINT16_TYPE} 
-        }} },
-    {MXF_COMPOUND_TYPE_CAT, MXF_INDIRECT_TYPE, "Indirect", 
-        .info.compound = {{
-            {"Type", MXF_UL_TYPE}, 
-            {"Value", MXF_UINT8ARRAY_TYPE} 
-        }} },
-    {MXF_COMPOUND_TYPE_CAT, MXF_RGBALAYOUTCOMPONENT_TYPE, "RGBALayoutComponent", 
-        .info.compound = {{
-            {"Code", MXF_RGBACODE_TYPE}, 
-            {"Depth", MXF_UINT8_TYPE} 
-        }} },
-
-    /* interpreted */
-    {MXF_INTERPRET_TYPE_CAT, MXF_VERSIONTYPE_TYPE, "VersionType", 
-        .info.interpret = { MXF_UINT16_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_UTF16_TYPE, "UTF16", 
-        .info.interpret = { MXF_UINT16_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_BOOLEAN_TYPE, "Boolean", 
-        .info.interpret = { MXF_UINT8_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_ISO7_TYPE, "ISO7", 
-        .info.interpret = { MXF_UINT8_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_LENGTH_TYPE, "Length", 
-        .info.interpret = { MXF_INT64_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_POSITION_TYPE, "Position", 
-        .info.interpret = { MXF_INT64_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_RGBACODE_TYPE, "RGBACode", 
-        .info.interpret = { MXF_UINT8_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_STREAM_TYPE, "Stream", 
-        .info.interpret = { MXF_RAW_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_DATAVALUE_TYPE, "DataValue", 
-        .info.interpret = { MXF_UINT8ARRAY_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_IDENTIFIER_TYPE, "Identifier", 
-        .info.interpret = { MXF_UINT8ARRAY_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_OPAQUE_TYPE, "Opaque", 
-        .info.interpret = { MXF_UINT8ARRAY_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_UMID_TYPE, "UMID", 
-        .info.interpret = { MXF_IDENTIFIER_TYPE, 32 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_UID_TYPE, "UID", 
-        .info.interpret = { MXF_IDENTIFIER_TYPE, 16 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_UL_TYPE, "UL", 
-        .info.interpret = { MXF_IDENTIFIER_TYPE, 16 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_UUID_TYPE, "UUID", 
-        .info.interpret = { MXF_IDENTIFIER_TYPE, 16 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_AUID_TYPE, "AUID", 
-        .info.interpret = { MXF_UL_TYPE, 16 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_PACKAGEID_TYPE, "PackageID", 
-        .info.interpret = { MXF_UMID_TYPE, 32 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_STRONGREF_TYPE, "StrongRef", 
-        .info.interpret = { MXF_UUID_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_WEAKREF_TYPE, "WeakRef", 
-        .info.interpret = { MXF_UUID_TYPE, 0 } },
-    {MXF_INTERPRET_TYPE_CAT, MXF_ORIENTATION_TYPE, "Orientation", 
-        .info.interpret = { MXF_UINT8_TYPE, 0 } },
-    
-};
 
 
 static void clear_type(MXFItemType* type)
@@ -289,7 +154,7 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
     {
         if (dataModel->types[i].typeId == 0)
         {
-            typeId = i;
+            typeId = (unsigned int)i;
             break;
         }
     }
@@ -301,7 +166,7 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
         {
             if (dataModel->types[i].typeId == 0)
             {
-                typeId = i;
+                typeId = (unsigned int)i;
                 break;
             }
         }
@@ -311,7 +176,22 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
 }
 
 
+#define MXF_BASIC_TYPE_DEF(id, name, size) \
+    CHK_OFAIL(mxf_register_basic_type(newDataModel, name, id, size));    
 
+#define MXF_ARRAY_TYPE_DEF(id, name, elementTypeId, fixedSize) \
+    CHK_OFAIL(mxf_register_array_type(newDataModel, name, id, elementTypeId, fixedSize));    
+
+#define MXF_COMPOUND_TYPE_DEF(id, name) \
+    CHK_OFAIL(itemType = mxf_register_compound_type(newDataModel, name, id));    
+
+#define MXF_COMPOUND_TYPE_MEMBER(name, typeId) \
+    CHK_OFAIL(mxf_register_compound_type_member(itemType, name, typeId));    
+
+#define MXF_INTERPRETED_TYPE_DEF(id, name, typeId, fixedSize) \
+    CHK_OFAIL(mxf_register_interpret_type(newDataModel, name, id, typeId, fixedSize));    
+
+    
 #define MXF_SET_DEFINITION(parentName, name, label) \
     CHK_OFAIL(mxf_register_set_def(newDataModel, #name, &MXF_SET_K(parentName), &MXF_SET_K(name)));
     
@@ -319,10 +199,11 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
     CHK_OFAIL(mxf_register_item_def(newDataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId));
     
 
+    
 int mxf_load_data_model(MXFDataModel** dataModel)
 {
     MXFDataModel* newDataModel;
-    size_t i;
+    MXFItemType* itemType = NULL;
     
     CHK_MALLOC_ORET(newDataModel, MXFDataModel);
     memset(newDataModel, 0, sizeof(MXFDataModel));
@@ -331,35 +212,6 @@ int mxf_load_data_model(MXFDataModel** dataModel)
     
 #include <mxf/mxf_baseline_data_model.h>
 
-    for (i = 0; i < sizeof(g_builtinTypes) / sizeof(MXFItemType); i++)
-    {
-        const MXFItemType* type = &g_builtinTypes[i];
-        
-        switch (type->category)
-        {
-            case MXF_BASIC_TYPE_CAT: 
-                CHK_OFAIL(mxf_register_basic_type(newDataModel, type->name, type->typeId, 
-                    type->info.basic.size));
-                break;
-            case MXF_ARRAY_TYPE_CAT: 
-                CHK_OFAIL(mxf_register_array_type(newDataModel, type->name, type->typeId, 
-                    type->info.array.elementTypeId, type->info.array.fixedSize));
-                break;
-            case MXF_COMPOUND_TYPE_CAT: 
-                CHK_OFAIL(mxf_register_compound_type(newDataModel, type->name, type->typeId, 
-                    type->info.compound.members));
-                break;
-            case MXF_INTERPRET_TYPE_CAT: 
-                CHK_OFAIL(mxf_register_interpret_type(newDataModel, type->name, type->typeId, 
-                    type->info.interpret.typeId, type->info.interpret.fixedArraySize));
-                break;
-            default: 
-                mxf_log(MXF_ELOG, "Unknown type category %d" 
-                    LOG_LOC_FORMAT, type->category, LOG_LOC_PARAMS); 
-                goto fail;
-        }
-    }
-
     *dataModel = newDataModel;
     return 1;
     
@@ -367,9 +219,6 @@ fail:
     mxf_free_data_model(&newDataModel);
     return 0;
 }
-
-#undef MXF_SET_DEFINITION
-#undef MXF_ITEM_DEFINITION
 
 
 void mxf_free_data_model(MXFDataModel** dataModel)
@@ -446,7 +295,7 @@ fail:
 }
 
 
-unsigned int mxf_register_basic_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int size)
+MXFItemType* mxf_register_basic_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int size)
 {
     MXFItemType* type;
     
@@ -467,32 +316,32 @@ unsigned int mxf_register_basic_type(MXFDataModel* dataModel, const char* name, 
     }
     type->info.basic.size = size;
     
-    return typeId;
+    return type;
 
 fail:  
     clear_type(type);
-    return 0;
+    return NULL;
 }
 
-unsigned int mxf_register_array_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int elementTypeId, unsigned int fixedSize)
+MXFItemType* mxf_register_array_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int elementTypeId, unsigned int fixedSize)
 {
-    unsigned int retTypeId;
+    unsigned int actualTypeId;
     MXFItemType* type;
     
     if (typeId <= 0)
     {
-        retTypeId = get_type_id(dataModel);
+        actualTypeId = get_type_id(dataModel);
     }
     else
     {
         /* check the type id is valid and free */
         CHK_ORET(typeId < sizeof(dataModel->types) / sizeof(MXFItemType) && 
             dataModel->types[typeId].typeId == 0);
-        retTypeId = typeId;
+        actualTypeId = typeId;
     }
     
-    type = &dataModel->types[retTypeId];
-    type->typeId = retTypeId; /* set first to indicate type is present */
+    type = &dataModel->types[actualTypeId];
+    type->typeId = actualTypeId; /* set first to indicate type is present */
     type->category = MXF_ARRAY_TYPE_CAT;
     if (name != NULL)
     {
@@ -502,91 +351,96 @@ unsigned int mxf_register_array_type(MXFDataModel* dataModel, const char* name, 
     type->info.array.elementTypeId = elementTypeId;
     type->info.array.fixedSize = fixedSize;
     
-    return retTypeId;
+    return type;
 
 fail:    
     clear_type(type);
-    return 0;
+    return NULL;
 }
 
-unsigned int mxf_register_compound_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, const MXFCompoundTypeMemberInfo* members)
+MXFItemType* mxf_register_compound_type(MXFDataModel* dataModel, const char* name, unsigned int typeId)
 {
-    unsigned int retTypeId;
+    unsigned int actualTypeId;
     MXFItemType* type = NULL;
-    size_t i;
     
     if (typeId == 0)
     {
-        retTypeId = get_type_id(dataModel);
+        actualTypeId = get_type_id(dataModel);
     }
     else
     {
         /* check the type id is valid and free */
         CHK_ORET(typeId < sizeof(dataModel->types) / sizeof(MXFItemType) && 
             dataModel->types[typeId].typeId == 0);
-        retTypeId = typeId;
+        actualTypeId = typeId;
     }
     
-    type = &dataModel->types[retTypeId];
-    type->typeId = retTypeId; /* set first to indicate type is present */
+    type = &dataModel->types[actualTypeId];
+    type->typeId = actualTypeId; /* set first to indicate type is present */
     type->category = MXF_COMPOUND_TYPE_CAT;
     if (name != NULL)
     {
         CHK_MALLOC_ARRAY_OFAIL(type->name, char, strlen(name) + 1); 
         strcpy(type->name, name);
     }
-    for (i = 0; i < sizeof(type->info.compound.members) / sizeof(MXFCompoundTypeMemberInfo); i++)
-    {
-        if (members[i].typeId == 0)
-        {
-            /* members array is terminated by typeId == 0 */
-            break;
-        }
-        else
-        {
-            if (members[i].name != NULL)
-            {
-                CHK_MALLOC_ARRAY_OFAIL(type->info.compound.members[i].name, char, strlen(members[i].name) + 1); 
-                strcpy(type->info.compound.members[i].name, members[i].name);
-            }
-            type->info.compound.members[i].typeId = members[i].typeId;
-        }
-    }
+    memset(type->info.compound.members, 0, sizeof(type->info.compound.members));
     
-    if (i == sizeof(type->info.compound.members) / sizeof(MXFCompoundTypeMemberInfo))
-    {
-        mxf_log(MXF_ELOG, "Number of compound item type members exceeds hardcoded maximum %d" 
-            LOG_LOC_FORMAT, sizeof(type->info.compound.members) / sizeof(MXFCompoundTypeMemberInfo), LOG_LOC_PARAMS);
-        return 0;
-    }
-    
-    return retTypeId;
+    return type;
     
 fail:
     clear_type(type);
-    return 0;
+    return NULL;
 }
 
-unsigned int mxf_register_interpret_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, 
+int mxf_register_compound_type_member(MXFItemType* type, const char* memberName, unsigned int memberTypeId)
+{
+    size_t memberIndex;
+    size_t maxMembers = sizeof(type->info.compound.members) / sizeof(MXFCompoundTypeMemberInfo) - 1;
+    
+    /* find null terminator (eg. typeId == 0) */
+    for (memberIndex = 0; memberIndex < maxMembers; memberIndex++)
+    {
+        if (type->info.compound.members[memberIndex].typeId == 0)
+        {
+            break;
+        }
+    }
+    if (memberIndex == maxMembers)
+    {
+        mxf_log(MXF_ELOG, "Number of compound item type members exceeds hardcoded maximum %d" 
+            LOG_LOC_FORMAT, maxMembers, LOG_LOC_PARAMS);
+        return 0;
+    }
+    
+    
+    /* set member info */
+    CHK_MALLOC_ARRAY_ORET(type->info.compound.members[memberIndex].name, char, strlen(memberName) + 1); 
+    strcpy(type->info.compound.members[memberIndex].name, memberName);
+    type->info.compound.members[memberIndex].typeId = memberTypeId; /* set last when everything ok */
+
+    return 1;    
+}
+
+MXFItemType* mxf_register_interpret_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, 
     unsigned int interpretedTypeId, unsigned int fixedArraySize)
 {
-    unsigned int retTypeId;
+    unsigned int actualTypeId;
     MXFItemType* type;
     
     if (typeId == 0)
     {
-        retTypeId = get_type_id(dataModel);
+        actualTypeId = get_type_id(dataModel);
     }
     else
     {
         /* check the type id is valid and free */
         CHK_ORET(typeId < sizeof(dataModel->types) / sizeof(MXFItemType) && 
             dataModel->types[typeId].typeId == 0);
-        retTypeId = typeId;
+        actualTypeId = typeId;
     }
     
-    type = &dataModel->types[retTypeId];
-    type->typeId = retTypeId; /* set first to indicate type is present */
+    type = &dataModel->types[actualTypeId];
+    type->typeId = actualTypeId; /* set first to indicate type is present */
     type->category = MXF_INTERPRET_TYPE_CAT;
     if (name != NULL)
     {
@@ -596,11 +450,11 @@ unsigned int mxf_register_interpret_type(MXFDataModel* dataModel, const char* na
     type->info.interpret.typeId = interpretedTypeId;
     type->info.interpret.fixedArraySize = fixedArraySize;
     
-    return retTypeId;
+    return type;
     
 fail:    
     clear_type(type);
-    return 0;
+    return NULL;
 }
 
 
@@ -775,7 +629,7 @@ int mxf_find_item_def_in_set_def(const mxfKey* key, const MXFSetDef* setDef, MXF
 }
 
 
-const MXFItemType* mxf_get_item_def_type(MXFDataModel* dataModel, unsigned int typeId)
+MXFItemType* mxf_get_item_def_type(MXFDataModel* dataModel, unsigned int typeId)
 {
     if (typeId == 0 || typeId >= sizeof(dataModel->types) / sizeof(MXFItemType))
     {

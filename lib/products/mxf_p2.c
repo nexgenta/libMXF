@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_p2.c,v 1.1 2006/12/20 16:01:11 john_f Exp $
+ * $Id: mxf_p2.c,v 1.2 2007/01/30 14:21:57 john_f Exp $
  *
  * P2 data model extensions
  *
@@ -43,9 +43,6 @@ int mxf_p2_load_extensions(MXFDataModel* dataModel)
 
     return 1;
 }
-
-#undef MXF_SET_DEFINITION
-#undef MXF_ITEM_DEFINITION
 
 
 

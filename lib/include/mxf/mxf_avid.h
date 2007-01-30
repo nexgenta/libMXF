@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.h,v 1.1 2006/12/20 15:40:19 john_f Exp $
+ * $Id: mxf_avid.h,v 1.2 2007/01/30 14:21:56 john_f Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -71,9 +71,6 @@ typedef MXFMetadataSet MXFAvidMetadataRootSet;
 
 #include <mxf/mxf_avid_extensions_data_model.h>
 
-#undef MXF_SET_DEFINITION
-#undef MXF_ITEM_DEFINITION
-#undef MXF_LABEL
 
 int mxf_avid_load_extensions(MXFDataModel* dataModel);
 
@@ -93,6 +90,9 @@ int mxf_avid_attach_mob_attribute(MXFHeaderMetadata* headerMetadata, MXFMetadata
     mxfUTF16Char* name, mxfUTF16Char* value);
 int mxf_avid_attach_user_comment(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* packageSet, 
     mxfUTF16Char* name, mxfUTF16Char* value);
+    
+int mxf_avid_read_string_mob_attributes(MXFMetadataSet* packageSet, MXFList** names, MXFList** values);
+int mxf_avid_read_string_user_comments(MXFMetadataSet* packageSet, MXFList** names, MXFList** values);
 
 
 #ifdef __cplusplus

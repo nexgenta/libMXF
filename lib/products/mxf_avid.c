@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.1 2006/12/20 16:01:10 john_f Exp $
+ * $Id: mxf_avid.c,v 1.2 2007/01/30 14:21:57 john_f Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -299,6 +299,120 @@ static int mxf_avid_fixup_dynamic_tags_in_blob(MXFPrimerPack* primerPack)
     return 1;
 }
 
+static int mxf_avid_get_indirect_string(MXFMetadataSet* set, const mxfKey* itemKey, mxfUTF16Char** value)
+{
+    /* prefix is 0x42 ('B') for big endian or 0x4c ('L') for little endian, followed by half-swapped key for String type */
+    const uint8_t prefix_BE[17] =
+        {0x42, 0x01, 0x10, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x0e, 0x2b, 0x34, 0x01, 0x04, 0x01, 0x01};
+    const uint8_t prefix_LE[17] =
+        {0x4C, 0x00, 0x02, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x06, 0x0e, 0x2b, 0x34, 0x01, 0x04, 0x01, 0x01};
+    int isBigEndian;
+    MXFMetadataItem* item;
+    mxfUTF16Char* newValue = NULL;
+    uint16_t i;
+    uint8_t* itemValuePtr;
+    uint16_t strSize;
+    
+    CHK_OFAIL(mxf_get_item(set, itemKey, &item));
+    
+    /* initial check */
+    if (item->length <= sizeof(prefix_BE) || 
+        (item->value[0] != 0x42 && item->value[0] != 0x4C))
+    {
+        return 0;
+    }
+    isBigEndian = item->value[0] == 0x42;
+
+    /* check string type label */
+    if ((isBigEndian && memcmp(&item->value[1], &prefix_BE[1], sizeof(prefix_BE) - 1) != 0) ||
+        (!isBigEndian && memcmp(&item->value[1], &prefix_LE[1], sizeof(prefix_LE) - 1) != 0))
+    {
+        return 0;
+    }
+    
+    strSize = (item->length - sizeof(prefix_BE)) / 2 ;
+    
+    CHK_MALLOC_ARRAY_OFAIL(newValue, mxfUTF16Char, strSize + 1 /* always have a null terminator */);
+    memset(newValue, 0, sizeof(mxfUTF16Char) * (strSize + 1));
+
+    itemValuePtr = &item->value[sizeof(prefix_BE)];
+    for (i = 0; i < strSize - 1; i++)
+    {
+        if (isBigEndian)
+        {
+            newValue[i] = ((*itemValuePtr) << 8) | (*(itemValuePtr + 1));
+        }
+        else
+        {
+            newValue[i] = (*itemValuePtr) | ((*(itemValuePtr + 1)) << 8);
+        }
+        if (newValue[i] == 0)
+        {
+            break;
+        }
+        itemValuePtr += 2;
+    }
+
+    *value = newValue;
+    return 1;
+    
+fail:
+    SAFE_FREE(&newValue);    
+    return 0;    
+}
+
+static int mxf_avid_read_package_string_tagged_values(MXFMetadataSet* packageSet, const mxfKey* itemKey, MXFList** names, MXFList** values)
+{
+    MXFMetadataSet* taggedValueSet;
+    uint32_t count;
+    uint32_t i;
+    uint8_t* element;
+    mxfUTF16Char* taggedValueName = NULL;
+    uint16_t taggedValueNameSize;
+    mxfUTF16Char* taggedValueValue = NULL;
+    MXFList* newNames = NULL;
+    MXFList* newValues = NULL;
+    
+    if (!mxf_have_item(packageSet, itemKey))
+    {
+        return 0;
+    }
+
+    CHK_OFAIL(mxf_create_list(&newNames, free));
+    CHK_OFAIL(mxf_create_list(&newValues, free));
+    
+    CHK_OFAIL(mxf_get_array_item_count(packageSet, itemKey, &count));
+    for (i = 0; i < count; i++)
+    {
+        CHK_OFAIL(mxf_get_array_item_element(packageSet, itemKey, i, &element));
+        CHK_OFAIL(mxf_get_strongref(packageSet->headerMetadata, element, &taggedValueSet));
+
+        if (mxf_avid_get_indirect_string(taggedValueSet, &MXF_ITEM_K(TaggedValue, Value), &taggedValueValue))
+        {
+            CHK_OFAIL(mxf_append_list_element(newValues, taggedValueValue));
+            taggedValueValue = NULL;
+
+            CHK_OFAIL(mxf_get_utf16string_item_size(taggedValueSet, &MXF_ITEM_K(TaggedValue, Name), &taggedValueNameSize));
+            CHK_MALLOC_ARRAY_OFAIL(taggedValueName, mxfUTF16Char, taggedValueNameSize);
+            CHK_OFAIL(mxf_get_utf16string_item(taggedValueSet, &MXF_ITEM_K(TaggedValue, Name), taggedValueName));
+            CHK_OFAIL(mxf_append_list_element(newNames, taggedValueName));
+            taggedValueName = NULL;
+        }
+    }
+
+    *names = newNames;
+    *values = newValues;
+    return 1;
+    
+fail:
+    mxf_free_list(&newNames);
+    mxf_free_list(&newValues);
+    SAFE_FREE(&taggedValueName);
+    SAFE_FREE(&taggedValueValue);
+    return 0;
+}
+
+
 
 
 #define MXF_SET_DEFINITION(parentName, name, label) \
@@ -314,8 +428,6 @@ int mxf_avid_load_extensions(MXFDataModel* dataModel)
     return 1;
 }
 
-#undef MXF_SET_DEFINITION
-#undef MXF_ITEM_DEFINITION
 
 
 
@@ -545,5 +657,16 @@ int mxf_avid_attach_user_comment(MXFHeaderMetadata* headerMetadata, MXFMetadataS
     
     return 1;
 }    
+
+int mxf_avid_read_string_mob_attributes(MXFMetadataSet* packageSet, MXFList** names, MXFList** values)
+{
+    return mxf_avid_read_package_string_tagged_values(packageSet, &MXF_ITEM_K(GenericPackage, MobAttributeList), names, values);
+}
+
+int mxf_avid_read_string_user_comments(MXFMetadataSet* packageSet, MXFList** names, MXFList** values)
+{
+    return mxf_avid_read_package_string_tagged_values(packageSet, &MXF_ITEM_K(GenericPackage, UserComments), names, values);
+}
+
 
 

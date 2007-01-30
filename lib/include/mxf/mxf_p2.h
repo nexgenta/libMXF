@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_p2.h,v 1.1 2006/12/20 15:40:24 john_f Exp $
+ * $Id: mxf_p2.h,v 1.2 2007/01/30 14:21:56 john_f Exp $
  *
  * P2 data model extensions
  *
@@ -41,9 +41,6 @@ extern "C"
 
 #include <mxf/mxf_p2_extensions_data_model.h>
 
-#undef MXF_SET_DEFINITION
-#undef MXF_ITEM_DEFINITION
-#undef MXF_LABEL
 
 
 int mxf_p2_load_extensions(MXFDataModel* dataModel);

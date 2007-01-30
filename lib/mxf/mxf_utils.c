@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_utils.c,v 1.1 2006/12/20 15:40:28 john_f Exp $
+ * $Id: mxf_utils.c,v 1.2 2007/01/30 14:21:56 john_f Exp $
  *
  * General purpose utilities
  *
@@ -28,6 +28,7 @@
 
 #if defined(_WIN32)
 
+#include <sys/timeb.h>
 #include <time.h>
 #include <windows.h>
 
@@ -125,31 +126,34 @@ void mxf_get_timestamp_now(mxfTimestamp* now)
 
     /* NOTE: gmtime is not thread safe (not reentrant) */
     
-    _timeb tb;
-    _ftime(&tb);
-    
+    struct _timeb tb;
     struct tm gmt;
+    
     memset(&gmt, 0, sizeof(struct tm));
+    
+    _ftime(&tb);
     memcpy(&gmt, gmtime(&tb.time), sizeof(struct tm)); /* memcpy does nothing if gmtime returns NULL */
     
-    now->year = gmt->tm_year + 1900;
-    now->month = gmt->tm_mon + 1;
-    now->day = gmt->tm_mday;
-    now->hour = gmt->tm_hour;
-    now->min = gmt->tm_min;
-    now->sec = gmt->tm_sec;
+    now->year = gmt.tm_year + 1900;
+    now->month = gmt.tm_mon + 1;
+    now->day = gmt.tm_mday;
+    now->hour = gmt.tm_hour;
+    now->min = gmt.tm_min;
+    now->sec = gmt.tm_sec;
     now->qmsec = (uint8_t)(tb.millitm / 4 + 0.5); /* 1/250th second */
     
 #elif defined(_MSC_VER)
 
+    struct _timeb tb;
+    struct tm gmt;
+    struct tm* gmtPtr = NULL;
+    
+    memset(&gmt, 0, sizeof(struct tm));
+    
     /* using the secure _ftime */
-    _timeb tb;
     _ftime_s(&tb);
     
     /* using the secure (and reentrant) gmtime */
-    struct tm gmt;
-    memset(&gmt, 0, sizeof(struct tm));
-    struct tm* gmtPtr = NULL;
     gmtime_s(&tb.time, &gmt);
 
     now->year = gmt.tm_year + 1900;

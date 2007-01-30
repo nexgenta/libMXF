@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.1 2006/12/20 15:45:52 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.2 2007/01/30 14:21:56 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -197,34 +197,30 @@ static const mxfKey MXF_EE_K(BWFClipWrapped) =
     MXF_AES3BWF_EE_K(0x01, MXF_BWF_CLIP_WRAPPED_EE_TYPE, 0x01);
 
 /* Avid MJPEG labels observed in files created by Media Composer 2.1.x */
+	/* CompressionId's */
 static const mxfUL MXF_CMDEF_L(AvidMJPEG21) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x08};
-
 static const mxfUL MXF_CMDEF_L(AvidMJPEG31) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x06};
-
-/* TODO */
 static const mxfUL MXF_CMDEF_L(AvidMJPEG101) = 
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x04};
 static const mxfUL MXF_CMDEF_L(AvidMJPEG151) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x02, 0x02};
-
-/* TODO */
 static const mxfUL MXF_CMDEF_L(AvidMJPEG201) = 
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x02};
 
+	/* EssenceContainer label */
 static const mxfUL MXF_EC_L(AvidMJPEGClipWrapped) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x01, 0x00, 0x00};
 
 static const mxfUL g_AvidAAFKLVEssenceContainer_ul = 
     {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x01, 0x01, 0xff, 0x4b, 0x46, 0x41, 0x41, 0x00, 0x0d, 0x4d, 0x4f};
     
-static const uint32_t g_AvidMJPEG21_ResolutionID = 0x4c;
-static const uint32_t g_AvidMJPEG31_ResolutionID = 0x4d;
-static const uint32_t g_AvidMJPEG101_ResolutionID = 0x00; /* TODO */
-static const uint32_t g_AvidMJPEG151_ResolutionID = 0x4e;
-static const uint32_t g_AvidMJPEG201_ResolutionID = 0x00; /* TODO */
+static const uint32_t g_AvidMJPEG21_ResolutionID = 0x4c;	/* 76 */
+static const uint32_t g_AvidMJPEG31_ResolutionID = 0x4d;	/* 77 */
+static const uint32_t g_AvidMJPEG101_ResolutionID = 0x4b;	/* 75 */
+static const uint32_t g_AvidMJPEG151_ResolutionID = 0x4e;	/* 78 */
+static const uint32_t g_AvidMJPEG201_ResolutionID = 0x52;	/* 82 */
 
 static const mxfKey MXF_EE_K(AvidMJPEGClipWrapped) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x01, 0x01};
@@ -1123,10 +1119,6 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->colorSiting = 4; /* Rec601 */
                         break;
                     case Res101:
-                        /* TODO */
-                        mxf_log(MXF_ELOG, "Avid MJPEG 10:1 not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
-                        assert(0);
-                        return 0;
                         newTrackWriter->resolutionID = g_AvidMJPEG101_ResolutionID;
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101);
                         newTrackWriter->videoLineMap[0] = 15;
@@ -1156,9 +1148,6 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->colorSiting = 4; /* Rec601 */
                         break;
                     case Res201:
-                        mxf_log(MXF_ELOG, "Avid MJPEG 20:1 not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
-                        assert(0);
-                        return 0;
                         newTrackWriter->resolutionID = g_AvidMJPEG201_ResolutionID;
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG201);
                         newTrackWriter->videoLineMap[0] = 15;
