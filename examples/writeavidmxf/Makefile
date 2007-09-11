@@ -8,7 +8,7 @@ AR = ar cr
 
 	
 .PHONY: all
-all: libMXF.a libwriteavidmxf.a test_write_avid_mxf
+all: libMXF.a libwriteavidmxf.a writeavidmxf
 
 
 .PHONY: libMXF.a
@@ -16,11 +16,11 @@ libMXF.a:
 	@cd $(LIBMXF_DIR) && $(MAKE) $@
 
 	
-test_write_avid_mxf: test_write_avid_mxf.o libMXF.a libwriteavidmxf.a
-	$(CC) test_write_avid_mxf.o -L$(LIBMXF_DIR) -L. -lwriteavidmxf -lMXF -luuid -o $@
+writeavidmxf: main.o libMXF.a libwriteavidmxf.a
+	$(CC) main.o -L$(LIBMXF_DIR) -L. -lwriteavidmxf -lMXF -luuid -o $@
 
-test_write_avid_mxf.o: test_write_avid_mxf.c write_avid_mxf.h
-	$(CC) -c $(INCLUDES) test_write_avid_mxf.c
+main.o: main.c write_avid_mxf.h
+	$(CC) -c $(INCLUDES) main.c
 	
 
 libwriteavidmxf.a: write_avid_mxf.o package_definitions.o
@@ -37,7 +37,7 @@ package_definitions.o: package_definitions.c package_definitions.h
 	
 .PHONY: clean
 clean:
-	@rm -f *~ *.o *.a test_write_avid_mxf
+	@rm -f *~ *.o *.a writeavidmxf
 	
 
 

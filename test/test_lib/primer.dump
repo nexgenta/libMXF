@@ -1,0 +1,28 @@
+
+[ K = Header ( 0000000000000000 )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.02.04.00, L =         88 (58), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000001
+       ThisPartition = 0000000000000000
+   PreviousPartition = 0000000000000000
+     FooterPartition = 0000000000000000
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000000
+          BodyOffset = 0000000000000000
+             BodySID = 00000000
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          0 ]
+
+[ K = Primer ( 0000000000000069 )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.05.01.00, L =         44 (2c), LL = 1 ]
+  [ Number of entries =          2,
+    Entry size        =         18 ]
+  Local Tag
+  UID
+  01.01     :
+    01.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+  ff.ff     :
+    02.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00

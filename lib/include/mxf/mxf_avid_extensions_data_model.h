@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_extensions_data_model.h,v 1.2 2007/01/30 14:21:56 john_f Exp $
+ * $Id: mxf_avid_extensions_data_model.h,v 1.3 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * Avid data model extension definitions
  *
@@ -48,7 +48,7 @@
 #define MXF_SET_DEFINITION(parentName, name, label)
 #endif
 #if !defined (MXF_ITEM_DEFINITION)
-#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId)
+#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired)
 #endif
 
 
@@ -56,19 +56,22 @@
 MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, ResolutionID,
     MXF_LABEL(0xa0, 0x24, 0x0, 0x60, 0x94, 0xeb, 0x75, 0xcb, 0xce, 0x2a, 0xca, 0x4d, 0x51, 0xab, 0x11, 0xd3),
     0x0000,
-    MXF_INT32_TYPE
+    MXF_INT32_TYPE,
+    0
 );
 					
 MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, FrameSampleSize,
     MXF_LABEL(0xa0, 0x24, 0x0, 0x60, 0x94, 0xeb, 0x75, 0xcb, 0xce, 0x2a, 0xca, 0x50, 0x51, 0xab, 0x11, 0xd3),
     0x0000,
-    MXF_INT32_TYPE
+    MXF_INT32_TYPE,
+    0
 );
 					
 MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, ImageSize,
     MXF_LABEL(0xa0, 0x24, 0x0, 0x60, 0x94, 0xeb, 0x75, 0xcb, 0xce, 0x2a, 0xca, 0x4f, 0x51, 0xab, 0x11, 0xd3),
     0x0000,
-    MXF_INT32_TYPE
+    MXF_INT32_TYPE,
+    0
 );
 					
 
@@ -81,7 +84,8 @@ MXF_SET_DEFINITION(InterchangeObject, DefinitionObject,
     MXF_ITEM_DEFINITION(DefinitionObject, Identification,
         MXF_LABEL(0x06, 0x0e, 0x2b, 0x34, 0x01, 0x01, 0x01, 0x02, 0x01, 0x01, 0x15, 0x03, 0x00, 0x00, 0x00, 0x00),
         0x1b02,
-        MXF_UL_TYPE
+        MXF_UL_TYPE,
+        1
     );
 
     
@@ -93,13 +97,15 @@ MXF_SET_DEFINITION(DefinitionObject, DataDefinition,
 MXF_ITEM_DEFINITION(Preface, ProjectName,
     MXF_LABEL(0xa5, 0xfb, 0x7b, 0x25, 0xf6, 0x15, 0x94, 0xb9, 0x62, 0xfc, 0x37, 0x17, 0x49, 0x2d, 0x42, 0xbf),
     0x0000,
-    MXF_UTF16STRING_TYPE
+    MXF_UTF16STRING_TYPE,
+    0
 );
 
 MXF_ITEM_DEFINITION(Preface, ProjectEditRate,
     MXF_LABEL(0x8c, 0x70, 0xa7, 0x18, 0x46, 0x7a, 0xe4, 0x86, 0xf3, 0x65, 0x46, 0xb1, 0x38, 0x7c, 0x4e, 0xe9),
     0x0000,
-    MXF_RATIONAL_TYPE
+    MXF_RATIONAL_TYPE,
+    0
 );
 
 
@@ -107,13 +113,15 @@ MXF_ITEM_DEFINITION(Preface, ProjectEditRate,
 MXF_ITEM_DEFINITION(GenericPackage, MobAttributeList,
     MXF_LABEL(0xa0, 0x1c, 0x00, 0x04, 0xac, 0x96, 0x9f, 0x50, 0x60, 0x95, 0x81, 0x83, 0x47, 0xb1, 0x11, 0xd4),
     0x0000,
-    MXF_STRONGREFARRAY_TYPE
+    MXF_STRONGREFARRAY_TYPE,
+    0
 );
 
 MXF_ITEM_DEFINITION(GenericPackage, UserComments,
     MXF_LABEL(0x06, 0x0e, 0x2b, 0x34, 0x01, 0x01, 0x01, 0x02, 0x03, 0x02, 0x01, 0x02, 0x0c, 0x00, 0x00, 0x00),
     0x4406,
-    MXF_STRONGREFARRAY_TYPE
+    MXF_STRONGREFARRAY_TYPE,
+    0
 );
 
 MXF_SET_DEFINITION(InterchangeObject, TaggedValue, 
@@ -123,13 +131,15 @@ MXF_SET_DEFINITION(InterchangeObject, TaggedValue,
     MXF_ITEM_DEFINITION(TaggedValue, Name,
         MXF_LABEL(0x06, 0x0e, 0x2b, 0x34, 0x01, 0x01, 0x01, 0x02, 0x03, 0x02, 0x01, 0x02, 0x09, 0x01, 0x00, 0x00),
         0x5001,
-        MXF_UTF16STRING_TYPE
+        MXF_UTF16STRING_TYPE,
+        1
     );
 
     MXF_ITEM_DEFINITION(TaggedValue, Value,
         MXF_LABEL(0x06, 0x0e, 0x2b, 0x34, 0x01, 0x01, 0x01, 0x02, 0x03, 0x02, 0x01, 0x02, 0x0a, 0x01, 0x00, 0x00),
         0x5003,
-        MXF_INDIRECT_TYPE
+        MXF_INDIRECT_TYPE,
+        1
     );
 
 MXF_SET_DEFINITION(GenericDescriptor, TapeDescriptor, 

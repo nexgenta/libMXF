@@ -1,0 +1,1385 @@
+/*
+ * $Id: d3_mxf_info.c,v 1.1 2007/09/11 13:24:46 stuart_hc Exp $
+ *
+ * 
+ *
+ * Copyright (C) 2006  Philip de Nier <philipn@users.sourceforge.net>
+ *               2007  Jim Easterbrook <easter@users.sourceforge.net>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+ 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <wchar.h>
+#include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <archive_types.h>
+#include <mxf/mxf.h>
+#include <mxf/mxf_uu_metadata.h>
+
+/* declare the BBC D3 extensions */
+
+#define MXF_LABEL(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15) \
+    {d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15}
+
+#define MXF_SET_DEFINITION(parentName, name, label) \
+    static const mxfUL MXF_SET_K(name) = label;
+    
+#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired) \
+    static const mxfUL MXF_ITEM_K(setName, name) = label;
+
+#include <../bbc_d3_extensions_data_model.h>
+
+
+typedef struct
+{
+    wchar_t* companyName;
+    wchar_t* productName;
+    wchar_t* versionString;
+    mxfTimestamp modificationDate;
+} WriterIdentification;
+
+typedef struct
+{
+} TimecodeReader;
+
+typedef struct
+{
+    /* info */
+    MXFList writerIdents;
+    uint32_t pseFailureCount;
+    uint32_t d3VTRErrorCount;
+    
+    int numVideoTracks;
+    int numAudioTracks;
+    mxfLength duration;
+    
+    MXFList pseFailures;
+    MXFList vtrErrors;
+    
+    InfaxData d3InfaxData;
+    InfaxData ltoInfaxData;
+    
+    mxfUTF16Char* tempWString;
+    
+    /* mxf file data */
+    const char* mxfFilename;
+    MXFFile* mxfFile;
+    MXFDataModel* dataModel;
+    MXFPartition* headerPartition;
+    MXFPartition* footerPartition;
+    MXFHeaderMetadata* headerMetadata;
+    MXFList* list;
+    
+    /* timecode reading data */
+    int timecodeReadingInitialised;
+    int64_t essenceDataStart;
+    
+    /* these are references and should not be free'd */
+    MXFMetadataSet* prefaceSet;
+    MXFMetadataSet* identSet;
+    MXFMetadataSet* contentStorageSet;
+    MXFMetadataSet* materialPackageSet;
+    MXFMetadataSet* sourcePackageSet;
+    MXFMetadataSet* fileSourcePackageSet;
+    MXFMetadataSet* tapeSourcePackageSet;
+    MXFMetadataSet* sourcePackageTrackSet;
+    MXFMetadataSet* materialPackageTrackSet;
+    MXFMetadataSet* sequenceSet;
+    MXFMetadataSet* sourceClipSet;
+    MXFMetadataSet* dmSet;
+    MXFMetadataSet* dmFrameworkSet;
+    MXFMetadataSet* timecodeComponentSet;    
+    MXFMetadataSet* essContainerDataSet;
+    MXFMetadataSet* multipleDescriptorSet;
+    MXFMetadataSet* descriptorSet;
+    MXFMetadataSet* cdciDescriptorSet;
+    MXFMetadataSet* bwfDescriptorSet;
+    MXFMetadataSet* tapeDescriptorSet;
+    MXFMetadataSet* videoMaterialPackageTrackSet;
+    MXFMetadataSet* videoSequenceSet;
+} Reader;
+
+
+static const mxfKey g_TimecodeSysItemElementKey = MXF_SS1_ELEMENT_KEY(0x01, 0x00);
+
+/* timecode element size + video element size + 4 * audio element size 
+= (16 + 4 + 28) + (16 + 4 + 720 * 576 * 2) + 4 * (16 + 4 + 1920 * 3)
+= 852628 */
+static const uint32_t g_ContentPackageSize = 852628;
+
+static const uint32_t g_timecodeElementLen = 28;
+
+
+
+/* functions for loading the BBC D3 extensions */
+
+#define MXF_LABEL(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15) \
+    {d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15}
+
+#define MXF_SET_DEFINITION(parentName, name, label) \
+    CHK_ORET(mxf_register_set_def(dataModel, #name, &MXF_SET_K(parentName), &MXF_SET_K(name)));
+    
+#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
+    CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
+    
+static int load_bbc_d3_extensions(MXFDataModel* dataModel)
+{
+#include <../bbc_d3_extensions_data_model.h>
+
+    return 1;
+}
+
+
+static void report_actual_frame_count(Reader* reader)
+{
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    int64_t essenceStartPos;
+    int64_t filePos;
+    struct stat statBuf;
+    int64_t frameCount;
+
+    /* record file pos which is restored later */
+    filePos = mxf_file_tell(reader->mxfFile);
+
+    
+    /* seek to the start of the essence */
+    CHK_OFAIL(mxf_file_seek(reader->mxfFile, 0, SEEK_SET));
+    while (1)
+    {
+        CHK_OFAIL(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
+
+        if (mxf_equals_key(&key, &g_TimecodeSysItemElementKey))
+        {
+            break;
+        }
+        else
+        {
+            CHK_OFAIL(mxf_skip(reader->mxfFile, len));
+        }
+    }
+    CHK_OFAIL(mxf_file_seek(reader->mxfFile, -(llen + mxfKey_extlen), SEEK_CUR));
+
+    /* calculate the number of frames present using the file size */
+    essenceStartPos = mxf_file_tell(reader->mxfFile);
+    CHK_OFAIL(stat(reader->mxfFilename, &statBuf) == 0);
+    if (statBuf.st_size - essenceStartPos > 0)
+    {
+        frameCount = (statBuf.st_size - essenceStartPos) / 852628 /* size of frame */;
+        
+        if (reader->headerPartition->footerPartition == 0 ||
+            essenceStartPos + frameCount * 852628 < (int64_t)reader->headerPartition->footerPartition)
+        {
+            mxf_log(MXF_WLOG, "%"PRId64" complete frames are present in the MXF file\n", frameCount);
+        }
+        else
+        {
+            mxf_log(MXF_WLOG, "All frames are present in the MXF file\n");
+        }
+    }
+    else
+    {
+        mxf_log(MXF_WLOG, "0 complete frames are present in the MXF file\n");
+    }
+
+    
+    /* restore file to the original position */
+    mxf_file_seek(reader->mxfFile, filePos, SEEK_SET);
+
+    return;
+
+    
+fail:
+    mxf_log(MXF_WLOG, "Failed to determine the number of frame actually present in the MXF file\n");
+
+    /* restore file to the original position */
+    mxf_file_seek(reader->mxfFile, filePos, SEEK_SET);
+}
+
+static int check_can_read_rip(Reader* reader)
+{
+    MXFRIP rip;
+    int result;
+    int64_t filePos;
+    
+    memset(&rip, 0, sizeof(rip));
+    
+    /* record file pos which is restored later */
+    filePos = mxf_file_tell(reader->mxfFile);
+    
+    /* try read the RIP */
+    result = mxf_read_rip(reader->mxfFile, &rip);
+    if (result)
+    {
+        mxf_clear_rip(&rip);
+    }
+    
+    /* restore file to the original position */
+    mxf_file_seek(reader->mxfFile, filePos, SEEK_SET);
+    
+    return result;
+}
+
+static void convert_12m_to_timecode(uint8_t* t12m, ArchiveTimecode* t)
+{
+    t->frame = ((t12m[0] >> 4) & 0x03) * 10 + (t12m[0] & 0xf);
+    t->sec = ((t12m[1] >> 4) & 0x07) * 10 + (t12m[1] & 0xf);
+    t->min = ((t12m[2] >> 4) & 0x07) * 10 + (t12m[2] & 0xf);
+    t->hour = ((t12m[3] >> 4) & 0x03) * 10 + (t12m[3] & 0xf);
+}
+
+static int initialise_timecode_reader(Reader* reader)
+{
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    
+    /* position the mxf file at the start of the essence data */
+    CHK_ORET(mxf_file_seek(reader->mxfFile, 0, SEEK_SET));
+    while (1)
+    {
+        CHK_ORET(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
+
+        if (mxf_equals_key(&key, &g_TimecodeSysItemElementKey))
+        {
+            break;
+        }
+        else
+        {
+            CHK_ORET(mxf_skip(reader->mxfFile, len));
+        }
+    }
+    CHK_ORET(mxf_file_seek(reader->mxfFile, -(llen + mxfKey_extlen), SEEK_CUR));
+
+    /* set the position */
+    CHK_ORET((reader->essenceDataStart = mxf_file_tell(reader->mxfFile)) >= 0);    
+    
+    reader->timecodeReadingInitialised = 1;
+    
+    return 1;
+}
+
+static int read_timecode_at_position(Reader* reader, mxfPosition position, 
+    ArchiveTimecode* vitc, ArchiveTimecode* ltc)
+{
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    uint8_t t12m[8];
+    uint16_t localTag;
+    uint16_t localItemLen;
+    
+    CHK_ORET(reader->timecodeReadingInitialised);
+    
+    /* position at frame */
+    CHK_ORET(mxf_file_seek(reader->mxfFile, 
+        reader->essenceDataStart + position * g_ContentPackageSize,
+        SEEK_SET));
+        
+    /* read and check the kl */
+    CHK_ORET(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
+    CHK_ORET(mxf_equals_key(&key, &g_TimecodeSysItemElementKey));
+    CHK_ORET(len == g_timecodeElementLen);
+    
+    /* read and check the local item tag and length */
+    CHK_ORET(mxf_read_uint16(reader->mxfFile, &localTag));
+    CHK_ORET(localTag == 0x0102);
+    CHK_ORET(mxf_read_uint16(reader->mxfFile, &localItemLen));
+    CHK_ORET(localItemLen == g_timecodeElementLen - 4);
+    
+    /* skip the array header */
+    CHK_ORET(mxf_skip(reader->mxfFile, 8));
+    
+    /* read the timecode */
+    CHK_ORET(mxf_file_read(reader->mxfFile, t12m, 8) == 8);
+    convert_12m_to_timecode(t12m, vitc);
+    CHK_ORET(mxf_file_read(reader->mxfFile, t12m, 8) == 8);
+    convert_12m_to_timecode(t12m, ltc);
+
+    return 1;
+}
+
+static int read_time_string_at_position(Reader* reader, mxfPosition position, char* vitcStr, char* ltcStr)
+{
+    ArchiveTimecode vitc;
+    ArchiveTimecode ltc;
+    
+    CHK_ORET(read_timecode_at_position(reader, position, &vitc, &ltc));
+    
+    sprintf(vitcStr, "%02d:%02d:%02d:%02d", vitc.hour, vitc.min, vitc.sec, vitc.frame);
+    sprintf(ltcStr, "%02d:%02d:%02d:%02d", ltc.hour, ltc.min, ltc.sec, ltc.frame);
+    
+    return 1;
+}
+
+static int convert_string(mxfUTF16Char* input, char* output, size_t size)
+{
+    CHK_ORET(wcstombs(output, input, size) != (size_t)(-1));
+    
+    return 1;
+}
+
+static void free_writer_ident_in_list(void* data)
+{
+    WriterIdentification* ident;
+    
+    if (data == NULL)
+    {
+        return;
+    }
+    
+    ident = (WriterIdentification*)data;
+    SAFE_FREE(&ident->companyName);
+    SAFE_FREE(&ident->productName);
+    SAFE_FREE(&ident->versionString);
+    
+    free(data);
+}
+
+static void free_vtr_error_in_list(void* data)
+{
+    VTRError* error;
+    
+    if (data == NULL)
+    {
+        return;
+    }
+    
+    error = (VTRError*)data;
+    
+    free(data);
+}
+
+static int create_pse_failure(Reader* reader, PSEFailure** failure)
+{
+    PSEFailure* newFailure = NULL;
+    
+    CHK_MALLOC_ORET(newFailure, PSEFailure);
+    memset(newFailure, 0, sizeof(PSEFailure));
+    CHK_OFAIL(mxf_append_list_element(&reader->pseFailures, newFailure));
+    
+    *failure = newFailure;
+    return 1;
+    
+fail:
+    SAFE_FREE(&newFailure);
+    return 0;
+}
+
+static int create_vtr_error(Reader* reader, VTRErrorAtPos** error)
+{
+    VTRErrorAtPos* newError = NULL;
+    
+    CHK_MALLOC_ORET(newError, VTRErrorAtPos);
+    memset(newError, 0, sizeof(VTRErrorAtPos));
+    CHK_OFAIL(mxf_append_list_element(&reader->vtrErrors, newError));
+    
+    *error = newError;
+    return 1;
+    
+fail:
+    SAFE_FREE(&newError);
+    return 0;
+}
+
+static int create_writer_ident(Reader* reader, WriterIdentification** ident)
+{
+    WriterIdentification* newIdent = NULL;
+    
+    CHK_MALLOC_ORET(newIdent, WriterIdentification);
+    memset(newIdent, 0, sizeof(WriterIdentification));
+    CHK_OFAIL(mxf_append_list_element(&reader->writerIdents, newIdent));
+    
+    *ident = newIdent;
+    return 1;
+    
+fail:
+    SAFE_FREE(&newIdent);
+    return 0;
+}
+
+static int create_reader(Reader** reader)
+{
+    Reader* newReader = NULL;
+    
+    CHK_MALLOC_ORET(newReader, Reader);
+    memset(newReader, 0, sizeof(Reader));
+    mxf_initialise_list(&newReader->writerIdents, free_writer_ident_in_list);
+    mxf_initialise_list(&newReader->pseFailures, free);
+    mxf_initialise_list(&newReader->vtrErrors, free_vtr_error_in_list);
+    
+    *reader = newReader;
+    return 1;
+}
+
+static void free_reader(Reader** reader)
+{
+    if (*reader == NULL)
+    {
+        return;
+    }
+    
+    SAFE_FREE(&(*reader)->tempWString);
+    
+    mxf_clear_list(&(*reader)->writerIdents);
+    mxf_clear_list(&(*reader)->pseFailures);
+    mxf_clear_list(&(*reader)->vtrErrors);
+    
+    mxf_free_list(&(*reader)->list);
+    mxf_free_partition(&(*reader)->headerPartition);
+    mxf_free_partition(&(*reader)->footerPartition);
+    mxf_free_header_metadata(&(*reader)->headerMetadata);
+    mxf_free_data_model(&(*reader)->dataModel);
+    
+    mxf_file_close(&(*reader)->mxfFile);
+    
+    SAFE_FREE(reader);
+}
+
+
+#define GET_STRING_ITEM(name, cName) \
+    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    { \
+        CHK_ORET(mxf_uu_get_utf16string_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &reader->tempWString)); \
+        CHK_ORET(convert_string(reader->tempWString, infaxData->cName, sizeof(infaxData->cName))); \
+        SAFE_FREE(&reader->tempWString); \
+    } 
+
+#define GET_DATE_ITEM(name, cName) \
+    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    { \
+        CHK_ORET(mxf_get_timestamp_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+        infaxData->cName.hour = 0; \
+        infaxData->cName.min = 0; \
+        infaxData->cName.sec = 0; \
+        infaxData->cName.qmsec = 0; \
+    } 
+
+#define GET_INT64_ITEM(name, cName) \
+    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    { \
+        CHK_ORET(mxf_get_int64_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+    } 
+
+static int get_infax_data(Reader* reader, InfaxData* infaxData)
+{
+    GET_STRING_ITEM(D3P_Format, format);
+    GET_STRING_ITEM(D3P_ProgrammeTitle, progTitle);
+    GET_STRING_ITEM(D3P_EpisodeTitle, epTitle);
+    GET_DATE_ITEM(D3P_TransmissionDate, txDate);
+    GET_STRING_ITEM(D3P_MagazinePrefix, magPrefix);
+    GET_STRING_ITEM(D3P_ProgrammeNumber, progNo);
+    GET_STRING_ITEM(D3P_SpoolStatus, spoolStatus);
+    GET_DATE_ITEM(D3P_StockDate, stockDate);
+    GET_STRING_ITEM(D3P_SpoolDescriptor, spoolDesc);
+    GET_STRING_ITEM(D3P_Memo, memo);
+    GET_INT64_ITEM(D3P_Duration, duration);
+    GET_STRING_ITEM(D3P_SpoolNumber, spoolNo);
+    GET_STRING_ITEM(D3P_AccessionNumber, accNo);
+    GET_STRING_ITEM(D3P_CatalogueDetail, catDetail);
+    
+    return 1;
+}
+
+static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
+{
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    MXFListIterator iter;
+    mxfUL* label;
+    WriterIdentification* writerIdent;
+    MXFArrayItemIterator arrayIter;
+    MXFArrayItemIterator arrayIter2;
+    mxfUL dataDef;
+    mxfLength duration;
+    mxfRational palEditRate = {25, 1};
+    uint32_t sequenceComponentCount;
+    uint8_t* arrayElement;
+    uint32_t arrayElementLen;
+    PSEFailure* pseFailure;
+    VTRErrorAtPos* vtrError;
+    int knownDMTrack;
+    uint64_t headerByteCount;
+    MXFListIterator setsIter;
+    int fileIsComplete;
+    
+    
+    /* read the header partition pack */
+    if (!mxf_read_header_pp_kl(reader->mxfFile, &key, &llen, &len))
+    {
+        mxf_log(MXF_ELOG, "Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        return 0;
+    }
+    if (!mxf_partition_is_complete(&key))
+    {
+        mxf_log(MXF_WLOG, "Header partition is incomplete" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+    }
+    CHK_ORET(mxf_read_partition(reader->mxfFile, &key, &reader->headerPartition));
+    
+    
+    /* check the operational pattern is OP 1A */
+    if (!is_op_1a(&reader->headerPartition->operationalPattern))
+    {
+        mxf_log(MXF_ELOG, "Input file is not OP 1A" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        return 0;
+    }
+    
+    
+    /* check the essence container labels */
+    mxf_initialise_list_iter(&iter, &reader->headerPartition->essenceContainers);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        label = (mxfUL*)mxf_get_iter_element(&iter);
+        if (!mxf_equals_ul(label, &MXF_EC_L(MultipleWrappings)) &&
+            !mxf_equals_ul(label, &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)) &&
+            !mxf_equals_ul(label, &MXF_EC_L(BWFFrameWrapped)))
+        {
+            mxf_log(MXF_ELOG, "Unexpected essence container label" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            return 0;
+        }
+    }
+    
+    
+    /* check the file is complete */
+    fileIsComplete = check_can_read_rip(reader);
+    if (!fileIsComplete)
+    {
+        mxf_log(MXF_WLOG, "Failed to read the MXF Random Index Pack - file is incomplete\n");
+    }
+    
+    
+    /* report number of frames actually present if the file is incomplete */
+    if (!fileIsComplete)
+    {
+        report_actual_frame_count(reader);
+    }
+    
+    
+    /* read the header metadata in the footer is showing PSE failures and/or D3 VTR errors */
+    if (showPSEFailures || showVTRErrors)
+    {
+        if (fileIsComplete)
+        {
+            CHK_ORET(mxf_file_seek(reader->mxfFile, reader->headerPartition->footerPartition, SEEK_SET));
+            CHK_ORET(mxf_read_next_nonfiller_kl(reader->mxfFile, &key, &llen, &len));
+            CHK_ORET(mxf_is_footer_partition_pack(&key));
+            CHK_ORET(mxf_read_partition(reader->mxfFile, &key, &reader->footerPartition));
+            headerByteCount = reader->footerPartition->headerByteCount;
+            
+            if (!mxf_partition_is_closed(&key))
+            {
+                mxf_log(MXF_WLOG, "Footer partition is open" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            }
+            if (!mxf_partition_is_complete(&key))
+            {
+                mxf_log(MXF_WLOG, "Footer partition is incomplete" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            }
+        }
+        else
+        {
+            mxf_log(MXF_WLOG, "Cannot show PSE failures or D3 VTR errors from an incomplete MXF file\n");
+            headerByteCount = reader->headerPartition->headerByteCount;
+        }
+    }
+    else
+    {
+        headerByteCount = reader->headerPartition->headerByteCount;
+    }
+
+    
+    /* load the data model  */
+    CHK_ORET(mxf_load_data_model(&reader->dataModel));
+    CHK_ORET(load_bbc_d3_extensions(reader->dataModel));
+    CHK_ORET(mxf_finalise_data_model(reader->dataModel));
+    
+    
+    /* create and read the header metadata */
+    CHK_ORET(mxf_create_header_metadata(&reader->headerMetadata, reader->dataModel));
+    CHK_ORET(mxf_read_next_nonfiller_kl(reader->mxfFile, &key, &llen, &len));
+    CHK_ORET(mxf_is_header_metadata(&key));
+    CHK_ORET(mxf_read_header_metadata(reader->mxfFile, reader->headerMetadata, headerByteCount, &key, llen, len));
+
+    
+    /* PSE failure and VTR error counts in the Preface */
+    CHK_ORET(mxf_find_singular_set_by_key(reader->headerMetadata, &MXF_SET_K(Preface), &reader->prefaceSet));
+    CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, D3P_D3ErrorCount), &reader->d3VTRErrorCount));
+    CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, D3P_PSEFailureCount), &reader->pseFailureCount));
+    
+    
+        
+    /* Writer identification info */
+    
+    CHK_ORET(mxf_find_set_by_key(reader->headerMetadata, &MXF_SET_K(Identification), &reader->list));
+    mxf_initialise_list_iter(&iter, reader->list);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        reader->identSet = (MXFMetadataSet*)mxf_get_iter_element(&iter);
+        CHK_ORET(create_writer_ident(reader, &writerIdent));
+        
+        CHK_ORET(mxf_uu_get_utf16string_item(reader->identSet, &MXF_ITEM_K(Identification, CompanyName), &writerIdent->companyName));
+        CHK_ORET(mxf_uu_get_utf16string_item(reader->identSet, &MXF_ITEM_K(Identification, ProductName), &writerIdent->productName));
+        CHK_ORET(mxf_uu_get_utf16string_item(reader->identSet, &MXF_ITEM_K(Identification, VersionString), &writerIdent->versionString));
+        CHK_ORET(mxf_get_timestamp_item(reader->identSet, &MXF_ITEM_K(Identification, ModificationDate), &writerIdent->modificationDate));
+    }
+    mxf_free_list(&reader->list);
+    
+    
+    /* file SourcePackage */    
+    
+    CHK_ORET(mxf_uu_get_top_file_package(reader->headerMetadata, &reader->fileSourcePackageSet));
+    CHK_ORET(mxf_uu_get_package_tracks(reader->fileSourcePackageSet, &arrayIter));
+    while (mxf_uu_next_track(reader->headerMetadata, &arrayIter, &reader->sourcePackageTrackSet))
+    {
+        CHK_ORET(mxf_uu_get_track_datadef(reader->sourcePackageTrackSet, &dataDef));
+
+        /* AV contents info */
+    
+        if (mxf_is_picture(&dataDef) || mxf_is_sound(&dataDef))
+        {
+            if (mxf_is_picture(&dataDef))
+            {
+                reader->numVideoTracks++;
+            }
+            else
+            {
+                reader->numAudioTracks++;
+            }
+            
+            CHK_ORET(mxf_uu_get_track_duration_at_rate(reader->sourcePackageTrackSet, &palEditRate, &duration));
+            if (reader->duration == 0)
+            {
+                reader->duration = duration;
+            }
+            else
+            {
+                if (reader->duration != duration)
+                {
+                    /* warn when durations differ - always choose the largest */
+                    mxf_log(MXF_WLOG, "Track durations differ: found %"PFi64" after %"PFi64
+                        " - will output the largest duration\n", reader->duration, duration);
+                    if (reader->duration < duration)
+                    {
+                        reader->duration = duration;
+                    }
+                }
+            }
+        }
+
+
+        /* PSE analysis, VTR error and BBC DMS */
+        
+        if (mxf_is_descriptive_metadata(&dataDef))
+        {
+            knownDMTrack = 0;
+            CHK_ORET(mxf_get_strongref_item(reader->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &reader->sequenceSet));
+            if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->sequenceSet->key, &MXF_SET_K(Sequence)))
+            {
+                CHK_ORET(mxf_get_array_item_count(reader->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &sequenceComponentCount));
+                if (sequenceComponentCount > 0)
+                {
+                    CHK_ORET(mxf_get_array_item_element(reader->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
+                    CHK_ORET(mxf_get_strongref(reader->headerMetadata, arrayElement, &reader->dmSet));
+                    if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmSet->key, &MXF_SET_K(DMSegment)))
+                    {
+                        if (mxf_have_item(reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
+                        {
+                            CHK_ORET(mxf_get_strongref_item(reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
+                            if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(D3P_PSEAnalysisFramework)))
+                            {
+                                /* PSE failures track */
+                                knownDMTrack = 1;
+                                if (showPSEFailures)
+                                {
+                                    initialise_sets_iter(reader->headerMetadata, &setsIter);
+                                    
+                                    mxf_initialise_array_item_iterator(reader->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                                    while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                                    {
+                                        CHK_ORET(create_pse_failure(reader, &pseFailure)); 
+                                        CHK_ORET(mxf_get_strongref_s(reader->headerMetadata, &setsIter, arrayElement, &reader->dmSet));
+                                        CHK_ORET(mxf_get_position_item(reader->dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &pseFailure->position));
+                                        CHK_ORET(mxf_get_strongref_item_s(&setsIter, reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
+                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_RedFlash), &pseFailure->redFlash));
+                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_SpatialPattern), &pseFailure->spatialPattern));
+                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_LuminanceFlash), &pseFailure->luminanceFlash));
+                                        CHK_ORET(mxf_get_boolean_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_ExtendedFailure), &pseFailure->extendedFailure));
+                                    }
+                                }
+                            }
+                            else if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(D3P_D3ReplayErrorFramework)))
+                            {
+                                /* VTR error track */
+                                knownDMTrack = 1;
+                                if (showVTRErrors)
+                                {
+                                    initialise_sets_iter(reader->headerMetadata, &setsIter);
+                                    
+                                    mxf_initialise_array_item_iterator(reader->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                                    while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                                    {
+                                        CHK_ORET(create_vtr_error(reader, &vtrError)); 
+                                        CHK_ORET(mxf_get_strongref_s(reader->headerMetadata, &setsIter, arrayElement, &reader->dmSet));
+                                        CHK_ORET(mxf_get_position_item(reader->dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &vtrError->position));
+                                        CHK_ORET(mxf_get_strongref_item_s(&setsIter, reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
+                                        CHK_ORET(mxf_get_uint8_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_D3ReplayErrorFramework, D3P_D3ErrorCode), &vtrError->errorCode));
+                                    }
+                                }
+                            }
+                            else if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(D3P_InfaxFramework)))
+                            {
+                                /* Infax data track */
+                                knownDMTrack = 1;
+                                CHK_ORET(mxf_get_strongref_item(reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
+                                CHK_ORET(get_infax_data(reader, &reader->ltoInfaxData));
+                            }
+                        }
+                    }
+                }
+            }
+            if (!knownDMTrack)
+            {
+                mxf_log(MXF_WLOG, "Unknown descriptive metadata track found in the file source package - info tool update required\n");
+            }
+        }
+    }
+    
+    
+    /* tape SourcePackage */
+    
+    CHK_ORET(mxf_find_set_by_key(reader->headerMetadata, &MXF_SET_K(SourcePackage), &reader->list));
+    mxf_initialise_list_iter(&iter, reader->list);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        reader->sourcePackageSet = (MXFMetadataSet*)(mxf_get_iter_element(&iter));
+        
+        /* it is the tape SourcePackage if it has a TapeDescriptor */
+        CHK_ORET(mxf_get_strongref_item(reader->sourcePackageSet, &MXF_ITEM_K(SourcePackage, Descriptor), &reader->descriptorSet));
+        if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->descriptorSet->key, &MXF_SET_K(TapeDescriptor)))
+        {
+            /* go through the tracks and find the DMS track */
+            CHK_ORET(mxf_uu_get_package_tracks(reader->sourcePackageSet, &arrayIter));
+            while (mxf_uu_next_track(reader->headerMetadata, &arrayIter, &reader->sourcePackageTrackSet))
+            {
+                CHK_ORET(mxf_uu_get_track_datadef(reader->sourcePackageTrackSet, &dataDef));
+        
+                if (mxf_is_descriptive_metadata(&dataDef))
+                {
+                    /* get to the single DMSegment */
+                    CHK_ORET(mxf_get_strongref_item(reader->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &reader->sequenceSet));
+                    if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->sequenceSet->key, &MXF_SET_K(Sequence)))
+                    {
+                        CHK_ORET(mxf_get_array_item_count(reader->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &sequenceComponentCount));
+                        if (sequenceComponentCount != 1)
+                        {
+                            /* Sequence of length 1 is expected for the DMS track */
+                            continue;
+                        }
+                        
+                        CHK_ORET(mxf_get_array_item_element(reader->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
+                        CHK_ORET(mxf_get_strongref(reader->headerMetadata, arrayElement, &reader->dmSet));
+                    }
+                    else
+                    {
+                        reader->dmSet = reader->sequenceSet;
+                    }
+                    
+                    /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
+                    if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmSet->key, &MXF_SET_K(DMSegment)))
+                    {
+                        if (mxf_have_item(reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
+                        {
+                            CHK_ORET(mxf_get_strongref_item(reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
+                            
+                            CHK_ORET(get_infax_data(reader, &reader->d3InfaxData));
+                            break;
+                        }
+                    }
+                }
+            }
+                    
+            break;
+        }
+    }
+    
+    mxf_free_list(&reader->list);
+
+    
+    return 1;
+}
+
+static void write_d3_vtr_errors(Reader* reader, int noSourceTimecode)
+{
+    MXFListIterator iter;
+    VTRErrorAtPos* vtrError;
+    uint64_t count;
+    char vitcStr[12];
+    char ltcStr[12];
+    
+    printf("\nVTR error results:\n");
+    printf("    %d errors detected\n", reader->d3VTRErrorCount);
+    if (mxf_get_list_length(&reader->vtrErrors) > 0)
+    {
+        if (noSourceTimecode)
+        {
+            printf("    %10s:%10s %10s    %s\n", 
+                "num", "frame", "code", "description");
+        }
+        else
+        {
+            printf("    %10s:%10s%16s%16s %10s    %s\n", 
+                "num", "frame", "vitc", "ltc", "code", "description");
+        }
+        
+        count = 0;
+        mxf_initialise_list_iter(&iter, &reader->vtrErrors);
+        while (mxf_next_list_iter_element(&iter))
+        {
+            vtrError = (VTRErrorAtPos*)mxf_get_iter_element(&iter);
+            printf("    %10"PFi64":%10"PFi64, count, vtrError->position);
+            if (!noSourceTimecode)
+            {
+                read_time_string_at_position(reader, vtrError->position, vitcStr, ltcStr);
+                printf("%16s%16s", vitcStr, ltcStr);
+            }
+            printf(" %8s%02x", "0x", vtrError->errorCode);
+            if (vtrError->errorCode == 0x00)
+            {
+                printf("    No error\n");
+            }
+            else
+            {
+                /* video error state */
+                if ((vtrError->errorCode & 0x07) == 0x01)
+                {
+                    printf("    Video almost good, ");
+                }
+                else if ((vtrError->errorCode & 0x07) == 0x02)
+                {
+                    printf("    Video state cannot be determined, ");
+                }
+                else if ((vtrError->errorCode & 0x07) == 0x03)
+                {
+                    printf("    Video state unclear, ");
+                }
+                else if ((vtrError->errorCode & 0x07) == 0x04)
+                {
+                    printf("    Video no good, ");
+                }
+                else
+                {
+                    printf("    Video good, ");
+                }
+            
+                /* audio error state */
+                if ((vtrError->errorCode & 0x70) == 0x10)
+                {
+                    printf("Audio almost good\n");
+                }
+                else if ((vtrError->errorCode & 0x70) == 0x20)
+                {
+                    printf("Audio state cannot be determined\n");
+                }
+                else if ((vtrError->errorCode & 0x70) == 0x30)
+                {
+                    printf("Audio state unclear\n");
+                }
+                else if ((vtrError->errorCode & 0x70) == 0x40)
+                {
+                    printf("Audio no good\n");
+                }
+                else
+                {
+                    printf("Audio good\n");
+                }
+            }
+            
+            count++;
+        }
+    }
+}
+
+static void write_infax_data(InfaxData* infaxData)
+{
+    printf("    Format: %s\n", infaxData->format);    
+    printf("    Programme title: %s\n", infaxData->progTitle);    
+    printf("    Episode title: %s\n", infaxData->epTitle);    
+    printf("    Transmission date: %04u-%02u-%02u\n", 
+        infaxData->txDate.year,
+        infaxData->txDate.month,
+        infaxData->txDate.day);    
+    printf("    Magazine prefix: %s\n", infaxData->magPrefix);    
+    printf("    Programme number: %s\n", infaxData->progNo);    
+    printf("    Spool status: %s\n", infaxData->spoolStatus);    
+    printf("    Stock date: %04u-%02u-%02u\n", 
+        infaxData->stockDate.year,
+        infaxData->stockDate.month,
+        infaxData->stockDate.day);    
+    printf("    Spool descriptor: %s\n", infaxData->spoolDesc);    
+    printf("    Memo: %s\n", infaxData->memo);    
+    printf("    Duration: %02"PFi64":%02"PFi64":%02"PFi64"\n", 
+        infaxData->duration / (60 * 60),
+        (infaxData->duration % (60 * 60)) / 60,
+        (infaxData->duration % (60 * 60)) % 60);    
+    printf("    Spool number: %s\n", infaxData->spoolNo);    
+    printf("    Accession number: %s\n", infaxData->accNo);    
+    printf("    Catalogue detail: %s\n", infaxData->catDetail);    
+}
+
+static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, int noSourceTimecode)
+{
+    MXFListIterator iter;
+    WriterIdentification* writerIdent;
+    int i;
+    PSEFailure* pseFailure = NULL;
+    uint64_t count;
+    char vitcStr[12];
+    char ltcStr[12];
+    
+
+    printf("BBC D3 MXF file information\n");
+    
+    printf("\nMXF writer identifications:\n");
+    i = 0;
+    mxf_initialise_list_iter(&iter, &reader->writerIdents);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        writerIdent = (WriterIdentification*)mxf_get_iter_element(&iter);
+        
+        if (i == 0)
+        {
+            printf("%d) Created on %04d-%02u-%02u %02u:%02u:%02u.%03u UTC using ", i,
+            writerIdent->modificationDate.year, writerIdent->modificationDate.month, 
+            writerIdent->modificationDate.day, writerIdent->modificationDate.hour, 
+            writerIdent->modificationDate.min, writerIdent->modificationDate.sec, 
+            writerIdent->modificationDate.qmsec * 4);
+        }
+        else
+        {
+            printf("%d) Modified %04d-%02u-%02u %02u:%02u:%02u.%03u UTC using ", i,
+                writerIdent->modificationDate.year, writerIdent->modificationDate.month, 
+                writerIdent->modificationDate.day, writerIdent->modificationDate.hour, 
+                writerIdent->modificationDate.min, writerIdent->modificationDate.sec, 
+                writerIdent->modificationDate.qmsec * 4);
+        }
+        printf("%ls '%ls' ('%ls')\n", writerIdent->companyName,
+            writerIdent->productName, writerIdent->versionString);
+        i++;
+    }
+
+    
+    printf("\nAV contents:\n");
+    printf("    %d video tracks (8-bit uncompressed UYVY 4:2:2 at 25 fps), %d audio tracks (20-bit PCM at 48kHz) \n", reader->numVideoTracks, reader->numAudioTracks);
+    printf("    duration is %"PFi64" frames at 25 fps (%02u:%02u:%02u:%02u)\n", 
+        reader->duration,
+        (uint8_t)(reader->duration / (25 * 60 * 60)), 
+        (uint8_t)((reader->duration % (25 * 60 * 60)) / (25 * 60)),
+        (uint8_t)(((reader->duration % (25 * 60 * 60)) % (25 * 60)) / 25),
+        (uint8_t)(((reader->duration % (25 * 60 * 60)) % (25 * 60)) % 25));
+
+        
+    printf("\nD3 source information:\n");
+    write_infax_data(&reader->d3InfaxData);
+    
+    printf("\nLTO/MXF destination information:\n");
+    write_infax_data(&reader->ltoInfaxData);
+    
+    
+    printf("\nPhoto Sensitive Epilepsy analysis results summary:\n");
+    printf("    %d RAW failures detected.", reader->pseFailureCount);
+    if (reader->pseFailureCount == 0)
+    {
+        printf("\n");
+    }
+    else
+    {
+        printf(" Check for PSE failure using the '-p, --show-pse-failures' and '-s, --summary-info' command-line options\n");
+    }
+
+    printf("\nVTR error results summary:\n");
+    printf("    %d errors detected\n", reader->d3VTRErrorCount);
+
+    /* initialise the timecode reading if showing source vitc and ltc */
+    if (!noSourceTimecode)
+    {
+        CHK_ORET(initialise_timecode_reader(reader));
+    }
+    
+    
+    if (showPSEFailures)
+    {
+        printf("\nPhoto Sensitive Epilepsy analysis results:\n");
+        if (mxf_get_list_length(&reader->pseFailures) == 0)
+        {
+            printf("    Passed - ");
+            printf("%d failures detected\n", reader->pseFailureCount);
+        }
+        else
+        {
+            printf("    FAILED - ");
+            printf("%d failures detected\n", reader->pseFailureCount);
+            if (noSourceTimecode)
+            {
+                printf("    %10s: %10s%10s%10s%10s%10s\n", 
+                    "num", "frame", "red", "spatial", "lumin", "ext");
+            }
+            else
+            {
+                printf("    %10s: %10s%16s%16s%10s%10s%10s%10s\n", 
+                    "num", "frame", "vitc", "ltc", "red", "spatial", "lumin", "ext");
+            }
+    
+            count = 0;
+            mxf_initialise_list_iter(&iter, &reader->pseFailures);
+            while (mxf_next_list_iter_element(&iter))
+            {
+                pseFailure = (PSEFailure*)mxf_get_iter_element(&iter);
+                printf("    %10"PFi64": %10"PFi64, count, pseFailure->position);
+                if (!noSourceTimecode)
+                {
+                    read_time_string_at_position(reader, pseFailure->position, vitcStr, ltcStr);
+                    printf("%16s%16s", vitcStr, ltcStr);
+                }
+                if (pseFailure->redFlash > 0)
+                {
+                    printf("%10.1f", pseFailure->redFlash / 1000.0);
+                }
+                else
+                {
+                    printf("%10.1f", 0.0);
+                }
+                if (pseFailure->spatialPattern > 0)
+                {
+                    printf("%10.1f", pseFailure->spatialPattern / 1000.0);
+                }
+                else
+                {
+                    printf("%10.1f", 0.0);
+                }
+                if (pseFailure->luminanceFlash > 0)
+                {
+                    printf("%10.1f", pseFailure->luminanceFlash / 1000.0);
+                }
+                else
+                {
+                    printf("%10.1f", 0.0);
+                }
+                if (pseFailure->extendedFailure == 0)
+                {
+                    printf("%10s\n", "F");
+                }
+                else
+                {
+                    printf("%10s\n", "T");
+                }
+                
+                count++;
+            }
+        }
+    }
+
+    
+    if (showVTRErrors)
+    {
+        write_d3_vtr_errors(reader, noSourceTimecode);    
+    }
+    
+    return 1;
+}
+
+static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors, int noSourceTimecode)
+{
+    MXFListIterator iter;
+    WriterIdentification* writerIdent;
+    PSEFailure* pseFailure = NULL;
+    uint64_t count;
+    InfaxData* infaxData;
+    int redCount;
+    int spatialCount;
+    int luminanceCount;
+    int extendedCount;
+    #define MAX_HIST 34
+    int redHist[MAX_HIST + 1];
+    int spatialHist[MAX_HIST + 1];
+    int luminanceHist[MAX_HIST + 1];
+    int i;
+    int threshold;
+    char vitcStr[12];
+    char ltcStr[12];
+    
+    mxf_initialise_list_iter(&iter, &reader->writerIdents);
+    if (mxf_next_list_iter_element(&iter))
+    {
+        writerIdent = (WriterIdentification*)mxf_get_iter_element(&iter);
+        printf("Date of analysis: %04d-%02u-%02u %02u:%02u:%02u\n",
+               writerIdent->modificationDate.year,
+               writerIdent->modificationDate.month, 
+               writerIdent->modificationDate.day,
+               writerIdent->modificationDate.hour, 
+               writerIdent->modificationDate.min,
+               writerIdent->modificationDate.sec);
+    }
+    infaxData = &reader->d3InfaxData;
+    printf("Programme title: %s\n", infaxData->progTitle);    
+    printf("Episode title: %s\n", infaxData->epTitle);    
+    printf("Programme number: %s\n", infaxData->progNo);    
+    printf("Duration: %02"PFi64":%02"PFi64":%02"PFi64"\n", 
+        infaxData->duration / (60 * 60),
+        (infaxData->duration % (60 * 60)) / 60,
+        (infaxData->duration % (60 * 60)) % 60);    
+    printf("Spool number: %s\n", infaxData->spoolNo);    
+    printf("Accession number: %s\n", infaxData->accNo);    
+    printf("Catalogue detail: %s\n", infaxData->catDetail);    
+
+    /* initialise the timecode reading if showing source vitc and ltc */
+    if (!noSourceTimecode)
+    {
+        CHK_ORET(initialise_timecode_reader(reader));
+    }
+    
+    if (showPSEFailures)
+    {
+        // get total violations
+        for (i = 0; i <= MAX_HIST; i++)
+        {
+            redHist[i] = 0;
+            spatialHist[i] = 0;
+            luminanceHist[i] = 0;
+        }
+        redCount = 0;
+        spatialCount = 0;
+        luminanceCount = 0;
+        extendedCount = 0;
+        if (mxf_get_list_length(&reader->pseFailures) > 0)
+        {
+            mxf_initialise_list_iter(&iter, &reader->pseFailures);
+            while (mxf_next_list_iter_element(&iter))
+            {
+                pseFailure = (PSEFailure*)mxf_get_iter_element(&iter);
+                if (pseFailure->redFlash >= 500)
+                    redCount++;
+                if (pseFailure->spatialPattern >= 500)
+                    spatialCount++;
+                if (pseFailure->luminanceFlash >= 500)
+                    luminanceCount++;
+                if (pseFailure->extendedFailure != 0)
+                    extendedCount++;
+                i = pseFailure->redFlash / 100;
+                if (i > MAX_HIST)
+                    i = MAX_HIST;
+                redHist[i]++;
+                i = pseFailure->spatialPattern / 100;
+                if (i > MAX_HIST)
+                    i = MAX_HIST;
+                spatialHist[i]++;
+                i = pseFailure->luminanceFlash / 100;
+                if (i > MAX_HIST)
+                    i = MAX_HIST;
+                luminanceHist[i]++;
+            }
+        }
+        printf("PSE Status: ");
+        if (redCount + spatialCount + luminanceCount + extendedCount > 0)
+            printf("FAILED\n");
+        else
+            printf("PASSED\n");
+        printf("\nRed Flash violations: %d\n", redCount);
+        printf("Spatial Pattern violations: %d\n", spatialCount);
+        printf("Luminance Flash violations: %d\n", luminanceCount);
+        printf("Extended Failure violations: %d\n", extendedCount);
+        if (mxf_get_list_length(&reader->pseFailures) > 0)
+        {
+            // list worst 100 or so warnings or violations
+            threshold = MAX_HIST + 1;
+            count = 0;
+            while (threshold > 1 && count < 100)
+            {
+                threshold--;
+                count += redHist[threshold] + spatialHist[threshold] +
+                         luminanceHist[threshold];
+            }
+            threshold = threshold * 100;
+            printf("\nDetail table threshold: %d\n", threshold);
+            if (noSourceTimecode)
+            {
+                printf("Frame   red  spat   lum   ext\n");
+            }
+            else
+            {
+                printf("Frame            vitc             ltc   red  spat   lum   ext\n");
+            }
+            mxf_initialise_list_iter(&iter, &reader->pseFailures);
+            while (mxf_next_list_iter_element(&iter))
+            {
+                pseFailure = (PSEFailure*)mxf_get_iter_element(&iter);
+                if (pseFailure->redFlash >= threshold ||
+                    pseFailure->spatialPattern >= threshold ||
+                    pseFailure->luminanceFlash >= threshold ||
+                    pseFailure->extendedFailure != 0)
+                {
+                    printf("%5d", (int)pseFailure->position);
+                    if (!noSourceTimecode)
+                    {
+                        read_time_string_at_position(reader, pseFailure->position, vitcStr, ltcStr);
+                        printf("%16s%16s", vitcStr, ltcStr);
+                    }
+                    printf("%6.1f", pseFailure->redFlash / 1000.0);
+                    printf("%6.1f", pseFailure->spatialPattern / 1000.0);
+                    printf("%6.1f", pseFailure->luminanceFlash / 1000.0);
+                    printf("%6s\n", pseFailure->extendedFailure != 0 ? "X" : "");
+                }
+            }
+        }
+    }
+
+    if (showVTRErrors)
+    {
+        write_d3_vtr_errors(reader, noSourceTimecode);
+    }
+    
+    
+    
+    return 1;
+}
+
+
+static void usage(const char* cmd)
+{
+    fprintf(stderr, "Usage: %s <<options>> <mxf filename>\n", cmd);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "  -h, --help               display this usage message\n");
+    fprintf(stderr, "  -v, --show-vtr-errors    show detailed D3 VTR errors\n");
+    fprintf(stderr, "  -p, --show-pse-failures  show detailed PSE failures\n");
+    fprintf(stderr, "  -s, --summary-info       show summary (omit detail)\n");
+    fprintf(stderr, "  -t, --no-src-tc          don't search for source VITC and LTC timecodes\n");
+}
+
+int main(int argc, const char* argv[])
+{
+    Reader* reader = NULL;
+    int showVTRErrors = 0;
+    int showPSEFailures = 0;
+    int summary = 0;
+    int cmdlnIndex = 1;
+    const char* mxfFilename = NULL;
+    int noSourceTimecode = 0;
+    
+    if (argc == 2 &&
+        (strcmp(argv[cmdlnIndex], "-h") == 0 ||
+            strcmp(argv[cmdlnIndex], "--help") == 0))
+    {
+        usage(argv[0]);
+        return 0;
+    }
+    
+    while (cmdlnIndex < argc - 1)
+    {
+        if (strcmp(argv[cmdlnIndex], "-h") == 0 ||
+            strcmp(argv[cmdlnIndex], "--help") == 0)
+        {
+            usage(argv[0]);
+            return 0;
+        }
+        else if (strcmp(argv[cmdlnIndex], "-v") == 0 ||
+            strcmp(argv[cmdlnIndex], "--show-vtr-errors") == 0)
+        {
+            showVTRErrors = 1;
+            cmdlnIndex += 1;
+        }
+        else if (strcmp(argv[cmdlnIndex], "-p") == 0 ||
+            strcmp(argv[cmdlnIndex], "--show-pse-failures") == 0)
+        {
+            showPSEFailures = 1;
+            cmdlnIndex += 1;
+        }
+        else if (strcmp(argv[cmdlnIndex], "-s") == 0 ||
+            strcmp(argv[cmdlnIndex], "--summary-info") == 0)
+        {
+            summary = 1;
+            cmdlnIndex += 1;
+        }
+        else if (strcmp(argv[cmdlnIndex], "-t") == 0 ||
+            strcmp(argv[cmdlnIndex], "--no-src-tc") == 0)
+        {
+            noSourceTimecode = 1;
+            cmdlnIndex += 1;
+        }
+        else
+        {
+            usage(argv[0]);
+            fprintf(stderr, "Unknown argument '%s'\n", argv[cmdlnIndex]);
+            return 1;
+        }
+    }
+
+    if (cmdlnIndex > argc - 1)
+    {
+        usage(argv[0]);
+        fprintf(stderr, "Missing mxf filename\n");
+        return 1;
+    }
+    mxfFilename = argv[cmdlnIndex];
+    
+    
+    
+    CHK_OFAIL(create_reader(&reader));
+    
+    reader->mxfFilename = mxfFilename;
+    
+    if (!mxf_disk_file_open_read(mxfFilename, &reader->mxfFile))
+    {
+        mxf_log(MXF_ELOG, "Failed to open '%s'\n", mxfFilename);
+        goto fail;
+    }
+    
+    if (!get_info(reader, showPSEFailures, showVTRErrors))
+    {
+        mxf_log(MXF_ELOG, "Failed to extract info from '%s'\n", mxfFilename);
+        goto fail;
+    }
+        
+    if (summary)
+    {
+        if (!write_summary(reader, showPSEFailures, showVTRErrors, noSourceTimecode))
+        {
+            mxf_log(MXF_ELOG, "Failed to write summary info\n");
+            goto fail;
+        }
+    }
+    else
+    {
+        if (!write_info(reader, showPSEFailures, showVTRErrors, noSourceTimecode))
+        {
+            mxf_log(MXF_ELOG, "Failed to write info\n");
+            goto fail;
+        }
+    }
+        
+    free_reader(&reader);
+    return 0;
+    
+fail:
+    free_reader(&reader);
+    return 1;
+}
+

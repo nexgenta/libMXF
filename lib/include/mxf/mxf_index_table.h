@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_index_table.h,v 1.1 2006/12/20 15:40:20 john_f Exp $
+ * $Id: mxf_index_table.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * MXF index table
  *

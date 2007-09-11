@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.1 2006/12/20 15:40:20 john_f Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -282,7 +282,10 @@ static const mxfUL MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped) =
 static const mxfUL MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped) = 
     MXF_UNC_EC_L(0x01, 0x01, 0x06);
 
-    
+static const mxfUL MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x2a);
+
+
 /* D-10 mapping */
 
 #define MXF_D10_EC_L(regver, byte15, byte16) \

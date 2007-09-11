@@ -1,0 +1,1309 @@
+/*
+ * $Id: mxf_reader.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ *
+ * Main functions for reading MXF files
+ *
+ * Copyright (C) 2006  Philip de Nier <philipn@users.sourceforge.net>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+ 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#include <assert.h>
+
+#include <mxf_reader_int.h>
+#include <mxf/mxf_uu_metadata.h>
+#include <mxf_opatom_reader.h>
+#include <mxf_op1a_reader.h>
+
+
+static int convert_timecode_to_position(TimecodeIndex* index, MXFTimecode* timecode, mxfPosition* position)
+{
+    TimecodeSegment* segment;
+    MXFListIterator iter;
+    mxfPosition segmentStartPosition;
+    int64_t frameCount;
+    
+    /* calculate the frame count */
+    frameCount = timecode->hour * 60 * 60 * index->roundedTimecodeBase + 
+        timecode->min * 60 * index->roundedTimecodeBase +
+        timecode->sec * index->roundedTimecodeBase + 
+        timecode->frame;
+    if (index->isDropFrame)
+    {
+        /* first 2 frame numbers shall be omitted at the start of each minute,
+           except minutes 0, 10, 20, 30, 40 and 50 */
+
+        /* calculate number frames skipped */
+        frameCount += (60-6) * 2 * timecode->hour; /* every whole hour */
+        frameCount += (timecode->min / 10) * 9 * 2; /* every whole 10 min */
+        frameCount += (timecode->min % 10) * 2; /* every whole min, except min 0 */
+    }
+    
+    /* find the segment that contains the given timecode and set the position */
+    segmentStartPosition = 0;
+    mxf_initialise_list_iter(&iter, &index->segments);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        segment = (TimecodeSegment*)mxf_get_iter_element(&iter);
+        
+        if (frameCount >= segment->startTimecode && 
+            (segment->duration == -1 /* segment with unknown duration */
+                || frameCount < segment->startTimecode + segment->duration))
+        {
+            *position = segmentStartPosition + (frameCount - segment->startTimecode);
+            return 1;
+        }
+        
+        segmentStartPosition += segment->duration;
+    }
+    
+    return 0;
+}
+
+static int convert_position_to_timecode(TimecodeIndex* index, mxfPosition position, MXFTimecode* timecode)
+{
+    int64_t workFrameCount;
+    int64_t numFramesSkipped;
+    MXFListIterator iter;
+    TimecodeSegment* segment;
+    mxfPosition segmentStartPosition;
+    int64_t frameCount = 0;
+    int foundTimecodeSegment;
+    
+    CHK_ORET(position >= 0);
+    
+    /* drop frame compensation only supported for NTSC */
+    CHK_ORET(!index->isDropFrame || index->roundedTimecodeBase == 30);
+    
+    
+    /* find the timecode segment that the position is within */
+    foundTimecodeSegment = 0;
+    segmentStartPosition = 0;
+    mxf_initialise_list_iter(&iter, &index->segments);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        segment = (TimecodeSegment*)mxf_get_iter_element(&iter);
+        if (segment->duration == -1) /* timecode segment with unknown duration */
+        {
+            frameCount = position - segmentStartPosition;
+            foundTimecodeSegment = 1;
+            break;
+        }
+        else if (position < segmentStartPosition + segment->duration)
+        {
+            frameCount = segment->startTimecode + (position - segmentStartPosition);
+            foundTimecodeSegment = 1;
+            break;
+        }
+        segmentStartPosition += segment->duration;
+    }
+    CHK_ORET(foundTimecodeSegment);    
+    
+    
+    /* first calculate timecode without regard for drop frames */
+    workFrameCount = frameCount;
+    timecode->hour = workFrameCount / (60 * 60 * index->roundedTimecodeBase);
+    workFrameCount %= 60 * 60 * index->roundedTimecodeBase;
+    timecode->min = workFrameCount / (60 * index->roundedTimecodeBase);
+    workFrameCount %= 60 * index->roundedTimecodeBase;
+    timecode->sec = workFrameCount / index->roundedTimecodeBase;
+    timecode->frame = workFrameCount % index->roundedTimecodeBase;
+        
+    /* then take drop frames into account */
+    timecode->isDropFrame = index->isDropFrame;
+    if (index->isDropFrame)
+    {
+        /* first 2 frame numbers shall be omitted at the start of each minute,
+           except minutes 0, 10, 20, 30, 40 and 50 */
+
+        /* calculate number frames skipped */
+        numFramesSkipped = (60-6) * 2 * timecode->hour; /* every whole hour */
+        numFramesSkipped += (timecode->min / 10) * 9 * 2; /* every whole 10 min */
+        numFramesSkipped += (timecode->min % 10) * 2; /* every whole min, except min 0 */
+        
+        /* re-calculate with skipped frames */
+        workFrameCount = frameCount + numFramesSkipped;
+        
+        timecode->hour = workFrameCount / (60 * 60 * index->roundedTimecodeBase);
+        workFrameCount %= 60 * 60 * index->roundedTimecodeBase;
+        timecode->min = workFrameCount / (60 * index->roundedTimecodeBase);
+        workFrameCount %= 60 * index->roundedTimecodeBase;
+        timecode->sec = workFrameCount / index->roundedTimecodeBase;
+        timecode->frame = workFrameCount % index->roundedTimecodeBase;
+    }
+    
+    return 1;
+}
+
+static int read_timecode_component(MXFMetadataSet* timecodeComponentSet, TimecodeIndex* timecodeIndex)
+{
+    TimecodeSegment* newSegment = NULL;
+    mxfBoolean dropFrame;
+    uint16_t roundedTimecodeBase;
+    
+    CHK_MALLOC_ORET(newSegment, TimecodeSegment);
+    memset(newSegment, 0, sizeof(TimecodeSegment));
+
+    /* Note: we assume that RoundedTimecodeBase and DropFrame are fixed */
+    CHK_OFAIL(mxf_get_uint16_item(timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, RoundedTimecodeBase), &roundedTimecodeBase));
+    timecodeIndex->roundedTimecodeBase = roundedTimecodeBase;
+    CHK_OFAIL(mxf_get_boolean_item(timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, DropFrame), &dropFrame));
+    timecodeIndex->isDropFrame = dropFrame;
+    CHK_OFAIL(mxf_get_length_item(timecodeComponentSet, &MXF_ITEM_K(StructuralComponent, Duration), &newSegment->duration));
+    CHK_OFAIL(mxf_get_position_item(timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, StartTimecode), &newSegment->startTimecode));
+    
+    CHK_OFAIL(mxf_append_list_element(&timecodeIndex->segments, newSegment));
+    newSegment = NULL; /* list now owns it */
+    
+    return 1;
+    
+fail:
+    SAFE_FREE(&newSegment);
+    return 0;
+}
+
+static int create_timecode_index(TimecodeIndex** index)
+{
+    TimecodeIndex* newIndex = NULL;
+    
+    CHK_MALLOC_ORET(newIndex, TimecodeIndex);
+    memset(newIndex, 0, sizeof(TimecodeIndex));
+    mxf_initialise_list(&newIndex->segments, free);
+    
+    *index = newIndex;
+    return 1;
+}
+
+static void free_timecode_index_in_list(void* data)
+{
+    TimecodeIndex* timecodeIndex;
+    
+    if (data == NULL)
+    {
+        return;
+    }
+    
+    timecodeIndex = (TimecodeIndex*)data;
+    mxf_clear_list(&timecodeIndex->segments);
+    
+    free(data);
+}
+
+
+
+int format_is_supported(MXFFile* mxfFile)
+{
+    MXFPartition* headerPartition = NULL;
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    
+    if (!mxf_read_header_pp_kl_with_runin(mxfFile, &key, &llen, &len) ||
+        !mxf_read_partition(mxfFile, &key, &headerPartition))
+    {
+        return 0;
+    }
+    
+    if (!opa_is_supported(headerPartition) && !op1a_is_supported(headerPartition))
+    {
+        mxf_free_partition(&headerPartition);
+        return 0;
+    }
+    
+    mxf_free_partition(&headerPartition);
+    return 1;
+}
+
+int open_mxf_reader(const char* filename, MXFReader** reader)
+{
+    MXFDataModel* dataModel = NULL;
+    
+    CHK_OFAIL(mxf_load_data_model(&dataModel));
+    CHK_OFAIL(mxf_finalise_data_model(dataModel));
+    
+    CHK_OFAIL(open_mxf_reader_2(filename, dataModel, reader));
+    (*reader)->ownDataModel = 1; /* the reader will free it when closed */
+    dataModel = NULL;
+    
+    return 1;
+    
+fail:
+    if (dataModel != NULL)
+    {
+        mxf_free_data_model(&dataModel);
+    }
+    return 0;
+}
+
+int init_mxf_reader(MXFFile** mxfFile, MXFReader** reader)
+{
+    MXFDataModel* dataModel = NULL;
+    
+    CHK_OFAIL(mxf_load_data_model(&dataModel));
+    CHK_OFAIL(mxf_finalise_data_model(dataModel));
+    
+    CHK_OFAIL(init_mxf_reader_2(mxfFile, dataModel, reader));
+    (*reader)->ownDataModel = 1; /* the reader will free it when closed */
+    dataModel = NULL;
+    
+    return 1;
+    
+fail:
+    if (dataModel != NULL)
+    {
+        mxf_free_data_model(&dataModel);
+    }
+    return 0;
+}
+
+int open_mxf_reader_2(const char* filename, MXFDataModel* dataModel, MXFReader** reader)
+{
+    MXFFile* newMXFFile = NULL;
+
+    if (!mxf_disk_file_open_read(filename, &newMXFFile))
+    {
+        mxf_log(MXF_ELOG, "Failed to open '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        goto fail;
+    }
+    
+    CHK_OFAIL(init_mxf_reader_2(&newMXFFile, dataModel, reader));
+    
+    return 1;
+    
+fail:
+    mxf_file_close(&newMXFFile);
+    return 0;
+}
+
+int init_mxf_reader_2(MXFFile** mxfFile, MXFDataModel* dataModel, MXFReader** reader)
+{
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    MXFReader* newReader = NULL;
+    MXFPartition* headerPartition = NULL;
+
+    
+    /* create the reader */
+    
+    CHK_MALLOC_ORET(newReader, MXFReader);
+    memset(newReader, 0, sizeof(MXFReader));
+    newReader->mxfFile = *mxfFile;
+    memset(&newReader->clip, 0, sizeof(MXFClip));
+    newReader->clip.duration = -1;
+    newReader->clip.minDuration = -1;
+    newReader->dataModel = dataModel;
+    
+    
+    /* read header partition pack */
+    
+    if (!mxf_read_header_pp_kl(newReader->mxfFile, &key, &llen, &len))
+    {
+        mxf_log(MXF_ELOG, "Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        goto fail;
+    }
+    CHK_OFAIL(mxf_read_partition(newReader->mxfFile, &key, &headerPartition));
+    
+    
+    /* create the essence reader */
+    
+    if (opa_is_supported(headerPartition))
+    {
+        CHK_MALLOC_OFAIL(newReader->essenceReader, EssenceReader);
+        memset(newReader->essenceReader, 0, sizeof(EssenceReader));
+
+        CHK_OFAIL(opa_initialise_reader(newReader, &headerPartition));
+    }
+    else if (op1a_is_supported(headerPartition))
+    {
+        CHK_MALLOC_OFAIL(newReader->essenceReader, EssenceReader);
+        memset(newReader->essenceReader, 0, sizeof(EssenceReader));
+
+        CHK_OFAIL(op1a_initialise_reader(newReader, &headerPartition));
+    }
+    else
+    {
+        /* if format_is_supported() succeeded then we shouldn't be here */
+        mxf_log(MXF_ELOG, "MXF format not supported" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        goto fail;
+    }
+
+    *mxfFile = NULL; /* take ownership */
+    *reader = newReader;
+    return 1;
+    
+fail:
+    mxf_free_partition(&headerPartition);
+    if (newReader != NULL)
+    {
+        newReader->mxfFile = NULL; /* release ownership */
+        close_mxf_reader(&newReader);
+    }
+    return 0;
+}
+
+void close_mxf_reader(MXFReader** reader)
+{
+    MXFTrack* track;
+    MXFTrack* nextTrack;
+    EssenceTrack* essenceTrack;
+    EssenceTrack* nextEssenceTrack;
+    
+    if (*reader == NULL)
+    {
+        return;
+    }
+    
+    /* close the MXF file */
+    mxf_file_close(&(*reader)->mxfFile);
+    
+    /* free the essence reader */
+    if ((*reader)->essenceReader != NULL)
+    {
+        (*reader)->essenceReader->close(*reader);
+        essenceTrack = (*reader)->essenceReader->essenceTracks;
+        while (essenceTrack != NULL)
+        {
+            nextEssenceTrack = essenceTrack->next;
+            SAFE_FREE(&essenceTrack);
+            essenceTrack = nextEssenceTrack;
+        }
+        (*reader)->essenceReader->essenceTracks = NULL;
+        SAFE_FREE(&(*reader)->essenceReader);
+    }
+    
+    /* free the reader */
+    track = (*reader)->clip.tracks;
+    while (track != NULL)
+    {
+        nextTrack = track->next;
+        SAFE_FREE(&track);
+        track = nextTrack;
+    }
+    (*reader)->clip.tracks = NULL;
+    mxf_clear_list(&(*reader)->playoutTimecodeIndex.segments);
+    mxf_clear_list(&(*reader)->sourceTimecodeIndexes);
+    if ((*reader)->ownDataModel)
+    {
+        mxf_free_data_model(&(*reader)->dataModel);
+    }
+    SAFE_FREE(&(*reader)->buffer);
+    
+    SAFE_FREE(reader);
+}
+
+MXFClip* get_mxf_clip(MXFReader* reader)
+{
+    return &reader->clip;
+}
+
+MXFTrack* get_mxf_track(MXFReader* reader, int trackIndex)
+{
+    MXFTrack* track = reader->clip.tracks;
+    int count = 0;
+    
+    while (count < trackIndex && track != NULL)
+    {
+        track = track->next;
+        count++;
+    }
+    
+    return track;
+}
+
+int64_t get_duration(MXFReader* reader)
+{
+    return reader->clip.duration;
+}
+
+int64_t get_min_duration(MXFReader* reader)
+{
+    return reader->clip.minDuration;
+}
+
+int get_num_tracks(MXFReader* reader)
+{
+    MXFTrack* track = reader->clip.tracks;
+    int count = 0;
+    
+    while (track != NULL)
+    {
+        track = track->next;
+        count++;
+    }
+    
+    return count;
+}
+
+MXFHeaderMetadata* get_header_metadata(MXFReader* reader)
+{
+    return reader->essenceReader->get_header_metadata(reader);
+}
+
+int have_footer_metadata(MXFReader* reader)
+{
+    return reader->essenceReader->have_footer_metadata(reader);
+}
+
+int mxfr_is_seekable(MXFReader* reader)
+{
+    return mxf_file_is_seekable(reader->mxfFile);
+}
+
+int position_at_frame(MXFReader* reader, int64_t frameNumber)
+{
+    int result;
+    int64_t i;
+    int64_t skipFrameCount;
+    
+    if (frameNumber < 0 || (reader->clip.duration >= 0 && frameNumber > reader->clip.duration))
+    {
+        /* frame is outside essence boundaries */
+        return 0;
+    }
+    
+    if (frameNumber == (get_frame_number(reader) + 1))
+    {
+        return 1;
+    }
+
+    if (!mxf_file_is_seekable(reader->mxfFile))
+    {
+        if (frameNumber < (get_frame_number(reader) + 1))
+        {
+            /* can't skip backwards */
+            return 0;
+        }
+        
+        /* simulate seeking by skipping individual frames */
+        result = 1;
+        skipFrameCount = frameNumber - (get_frame_number(reader) + 1);
+        for (i = 0; i < skipFrameCount; i++)
+        {
+            if ((result = skip_next_frame(reader)) != 1)
+            {
+                break;
+            }
+        }
+    }
+    else
+    {
+        if ((result = reader->essenceReader->position_at_frame(reader, frameNumber)))
+        {
+            /* update minDuration if frame is beyond the last known frame when the duration is unknown */
+            if (reader->clip.duration < 0 && (get_frame_number(reader) + 1) > reader->clip.minDuration)
+            {
+                reader->clip.minDuration = (get_frame_number(reader) + 1);
+            }
+        }
+    }
+    
+    return result;
+}
+
+int64_t get_last_written_frame_number(MXFReader* reader)
+{
+    if (reader->clip.duration >= 0 && get_frame_number(reader) >= reader->clip.duration)
+    {
+        /* we are at the last frame */
+        return reader->clip.duration - 1;
+    }
+    
+    if (!mxf_file_is_seekable(reader->mxfFile))
+    {
+        /* we'll always end up going past the end and not able to go back */
+        return -1;
+    }
+
+    return reader->essenceReader->get_last_written_frame_number(reader);
+}
+
+int skip_next_frame(MXFReader* reader)
+{
+    int result; 
+    
+    if (reader->clip.duration >= 0 && (get_frame_number(reader) + 1) >= reader->clip.duration)
+    {
+        /* end of essence reached */
+        return -1;
+    }
+
+    if ((result = reader->essenceReader->skip_next_frame(reader)) == 1)
+    {
+        /* update minDuration if frame is beyond the last known frame when the duration is unknown */
+        if (reader->clip.duration < 0 && (get_frame_number(reader) + 1) > reader->clip.minDuration)
+        {
+            reader->clip.minDuration = (get_frame_number(reader) + 1);
+        }
+    }
+    
+    return result;
+}
+
+int read_next_frame(MXFReader* reader, MXFReaderListener* listener)
+{
+    int result; 
+    
+    if (reader->clip.duration >= 0 && (get_frame_number(reader) + 1) >= reader->clip.duration)
+    {
+        /* end of essence reached */
+        return -1;
+    }
+
+    if ((result = reader->essenceReader->read_next_frame(reader, listener)) == 1)
+    {
+        /* update minDuration if frame is beyond the last known frame when the duration is unknown */
+        if (reader->clip.duration < 0 && (get_frame_number(reader) + 1) > reader->clip.minDuration)
+        {
+            reader->clip.minDuration = (get_frame_number(reader) + 1);
+        }
+    }
+    
+    if (result == -1 && reader->clip.duration >= 0)
+    {
+        /* we know what the length should be so we assume that the file is still being written to
+           and make the EOF a failure */
+        result = 0;
+    }
+    
+    if (result == 1)
+    {
+        /* flag that at least one frame has been read and therefore that source timecodes are present */
+        reader->haveReadAFrame = 1;
+    }
+    return result;
+}
+
+int64_t get_frame_number(MXFReader* reader)
+{
+    return reader->essenceReader->get_next_frame_number(reader) - 1;
+}
+
+int get_playout_timecode(MXFReader* reader, MXFTimecode* timecode)
+{
+    CHK_ORET(convert_position_to_timecode(&reader->playoutTimecodeIndex, get_frame_number(reader), 
+        timecode));
+    return 1;
+}
+
+int get_num_source_timecodes(MXFReader* reader)
+{
+    if (!reader->haveReadAFrame)
+    {
+        if (mxf_file_is_seekable(reader->mxfFile))
+        {
+            /* read the first frame, which will extract the source timecodes as a side-effect */
+            if (!read_next_frame(reader, NULL))
+            {
+                mxf_log(MXF_ELOG, "Failed to read first frame to update the number of source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            }
+            if (!position_at_frame(reader, 0))
+            {
+                mxf_log(MXF_ELOG, "Failed to position reader back to frame 0" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            }
+        }
+        else
+        {
+            mxf_log(MXF_WLOG, "Result of get_num_source_timecodes could be incorrect because "
+                "MXF file is not seekable and first frame has not been read" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        }
+    }
+    return mxf_get_list_length(&reader->sourceTimecodeIndexes);
+}
+
+int get_source_timecode_type(MXFReader* reader, int index)
+{
+    void* element = mxf_get_list_element(&reader->sourceTimecodeIndexes, (long)index);
+    if (element == NULL)
+    {
+        return -1;
+    }
+    return ((TimecodeIndex*)element)->type;
+}
+
+int get_source_timecode(MXFReader* reader, int index, MXFTimecode* timecode, int* type, int* count)
+{
+    void* element;
+    TimecodeIndex* timecodeIndex;
+    int result;
+    MXFClip* clip;
+    mxfPosition playoutFrameNumber;
+    mxfPosition sourceFrameNumber;
+    
+    CHK_ORET((element = mxf_get_list_element(&reader->sourceTimecodeIndexes, (long)index)) != NULL);
+    timecodeIndex = (TimecodeIndex*)element;
+
+    if (timecodeIndex->type == FILE_SOURCE_PACKAGE_TIMECODE ||
+        timecodeIndex->type == AVID_FILE_SOURCE_PACKAGE_TIMECODE)
+    {
+        /* take into account frame rate differences between material package track and source package track */
+        clip = get_mxf_clip(reader);
+        playoutFrameNumber = get_frame_number(reader);
+        sourceFrameNumber = (mxfPosition)(playoutFrameNumber * timecodeIndex->roundedTimecodeBase / 
+            (float)((uint16_t)(clip->frameRate.numerator / (float)clip->frameRate.denominator + 0.5)) + 0.5);
+        
+        CHK_ORET(convert_position_to_timecode(timecodeIndex, sourceFrameNumber, timecode));
+        result = 1;
+    }
+    else 
+    {
+        CHK_ORET(timecodeIndex->type == SYSTEM_ITEM_TC_ARRAY_TIMECODE ||
+            timecodeIndex->type == SYSTEM_ITEM_SDTI_CREATION_TIMECODE ||
+            timecodeIndex->type == SYSTEM_ITEM_SDTI_USER_TIMECODE);
+        if (timecodeIndex->position == get_frame_number(reader))
+        {
+            timecode->isDropFrame = timecodeIndex->isDropFrame;
+            timecode->hour = timecodeIndex->hour;
+            timecode->min = timecodeIndex->min;
+            timecode->sec = timecodeIndex->sec;
+            timecode->frame = timecodeIndex->frame;
+            result = 1;
+        }
+        else
+        {
+            timecode->isDropFrame = 0;
+            timecode->hour = 0;
+            timecode->min = 0;
+            timecode->sec = 0;
+            timecode->frame = 0;
+            result = -1;
+        }
+    }
+    
+    *type = timecodeIndex->type;
+    *count = timecodeIndex->count;
+    
+    return result;
+}
+
+int position_at_playout_timecode(MXFReader* reader, MXFTimecode* timecode)
+{
+    int64_t position;
+    
+    CHK_ORET(convert_timecode_to_position(&reader->playoutTimecodeIndex, timecode, &position));
+    
+    CHK_ORET(position_at_frame(reader, position));
+    
+    return 1;
+}
+
+int position_at_source_timecode(MXFReader* reader, MXFTimecode* timecode, int type, int count)
+{
+    CHK_ORET(type == FILE_SOURCE_PACKAGE_TIMECODE ||
+        type == AVID_FILE_SOURCE_PACKAGE_TIMECODE ||
+        type == SYSTEM_ITEM_TC_ARRAY_TIMECODE ||
+        type == SYSTEM_ITEM_SDTI_CREATION_TIMECODE ||
+        type == SYSTEM_ITEM_SDTI_USER_TIMECODE);
+        
+    if (type == FILE_SOURCE_PACKAGE_TIMECODE || type == AVID_FILE_SOURCE_PACKAGE_TIMECODE)
+    {
+        int64_t position;
+        TimecodeIndex* timecodeIndex = NULL;
+        MXFClip* clip;
+        mxfPosition playoutFrameNumber;
+        MXFListIterator iter;
+        
+        mxf_initialise_list_iter(&iter, &reader->sourceTimecodeIndexes);
+        while (mxf_next_list_iter_element(&iter))
+        {
+            timecodeIndex = (TimecodeIndex*)mxf_get_iter_element(&iter);
+        
+            if (timecodeIndex->type == type)
+            {
+                break;
+            }
+            timecodeIndex = NULL;
+        }
+        if (timecodeIndex == NULL)
+        {
+            mxf_log(MXF_ELOG, "MXF file does not have specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            return 0;
+        }
+
+        if (timecodeIndex->isDropFrame != timecode->isDropFrame)
+        {
+            mxf_log(MXF_ELOG, "Timecode drop frame flag mismatch for specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            return 0;
+        }
+        
+        
+        CHK_ORET(convert_timecode_to_position(timecodeIndex, timecode, &position));
+
+        /* take into account frame rate differences between material package track and source package track */
+        clip = get_mxf_clip(reader);
+        playoutFrameNumber = (mxfPosition)(position * 
+            (float)((uint16_t)(clip->frameRate.numerator / (float)clip->frameRate.denominator + 0.5)) / 
+            timecodeIndex->roundedTimecodeBase + 0.5);
+        
+        CHK_ORET(position_at_frame(reader, playoutFrameNumber));
+        
+        return 1;
+    }
+    else
+    {
+        TimecodeIndex* timecodeIndex = NULL;
+        MXFListIterator iter;
+        int64_t originalFrameNumber;
+
+        /* store original frame number for restoration later if failed to find frame with timecode */
+        originalFrameNumber = get_frame_number(reader);
+
+        /* read first frame to get list of available timecodes */
+        CHK_ORET(position_at_frame(reader, 0));
+        CHK_ORET(read_next_frame(reader, NULL) > 0);
+            
+        /* get the timecode index */
+        mxf_initialise_list_iter(&iter, &reader->sourceTimecodeIndexes);
+        while (mxf_next_list_iter_element(&iter))
+        {
+            timecodeIndex = (TimecodeIndex*)mxf_get_iter_element(&iter);
+        
+            if (timecodeIndex->type == type && timecodeIndex->count == count)
+            {
+                break;
+            }
+            timecodeIndex = NULL;
+        }
+        if (timecodeIndex == NULL)
+        {
+            mxf_log(MXF_ELOG, "MXF file does not have specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            return 0;
+        }
+
+        if (timecodeIndex->isDropFrame != timecode->isDropFrame)
+        {
+            mxf_log(MXF_ELOG, "Timecode drop frame flag mismatch for specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            return 0;
+        }
+        
+        /* linear search starting from frame 0 */
+        CHK_ORET(position_at_frame(reader, 0));
+        while (read_next_frame(reader, NULL) > 0)
+        {
+            if (timecodeIndex->isDropFrame == timecode->isDropFrame &&
+                timecodeIndex->hour == timecode->hour &&
+                timecodeIndex->min == timecode->min &&
+                timecodeIndex->sec == timecode->sec &&
+                timecodeIndex->frame == timecode->frame)
+            {
+                /* move back to start of previous read frame which had the timecode */
+                CHK_ORET(position_at_frame(reader, get_frame_number(reader)));
+                return 1;
+            }
+        }
+        
+        mxf_log(MXF_ELOG, "Could not find frame with specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        /* restore to original position */
+        CHK_ORET(position_at_frame(reader, originalFrameNumber));
+        return 0;
+    }
+    
+    return 0;
+}
+
+
+int add_track(MXFReader* reader, MXFTrack** track)
+{
+    MXFTrack* newTrack = NULL;
+    MXFTrack* lastTrack = reader->clip.tracks;
+    
+    CHK_MALLOC_ORET(newTrack, MXFTrack);
+    memset(newTrack, 0, sizeof(MXFTrack));
+    
+    if (reader->clip.tracks == NULL)
+    {
+        reader->clip.tracks = newTrack;
+    }
+    else
+    {
+        while (lastTrack->next != NULL)
+        {
+            lastTrack = lastTrack->next;
+        }            
+        lastTrack->next = newTrack;
+    }
+    
+    *track = newTrack;
+    return 1;
+}
+
+int add_essence_track(EssenceReader* essenceReader, EssenceTrack** essenceTrack)
+{
+    EssenceTrack* newTrack = NULL;
+    EssenceTrack* lastTrack = essenceReader->essenceTracks;
+    
+    CHK_MALLOC_ORET(newTrack, EssenceTrack);
+    memset(newTrack, 0, sizeof(EssenceTrack));
+    
+    if (essenceReader->essenceTracks == NULL)
+    {
+        essenceReader->essenceTracks = newTrack;
+    }
+    else
+    {
+        while (lastTrack->next != NULL)
+        {
+            lastTrack = lastTrack->next;
+        }            
+        lastTrack->next = newTrack;
+    }
+    
+    *essenceTrack = newTrack;
+    return 1;
+}
+
+int get_num_essence_tracks(EssenceReader* essenceReader)
+{
+    EssenceTrack* essenceTrack = essenceReader->essenceTracks;
+    int count = 0;
+    
+    while (essenceTrack != NULL)
+    {
+        essenceTrack = essenceTrack->next;
+        count++;
+    }            
+    
+    return count;
+}
+
+EssenceTrack* get_essence_track(EssenceReader* essenceReader, int trackIndex)
+{
+    EssenceTrack* essenceTrack = essenceReader->essenceTracks;
+    int count = 0;
+    
+    while (count < trackIndex && essenceTrack != NULL)
+    {
+        essenceTrack = essenceTrack->next;
+        count++;
+    }            
+    
+    return essenceTrack;
+}
+
+int get_essence_track_with_tracknumber(EssenceReader* essenceReader, uint32_t trackNumber, 
+    EssenceTrack** essenceTrack, int* trackIndex)
+{
+    EssenceTrack* eTrack = essenceReader->essenceTracks;
+    int tIndex = 0;
+    
+    while (eTrack != NULL && eTrack->trackNumber != trackNumber)
+    {
+        eTrack = eTrack->next;
+        tIndex++;
+    }            
+    
+    if (eTrack == NULL)
+    {
+        return 0;
+    }
+    
+    *essenceTrack = eTrack;
+    *trackIndex = tIndex;
+    return 1;
+}
+
+/* Fix inaccurate Avid NTSC rates */
+void clean_rate(mxfRational* rate)
+{
+    if (rate->numerator == 2997 && rate->denominator == 100)
+    {
+        rate->numerator = 30000;
+        rate->denominator = 1001;
+    }
+}
+
+int initialise_playout_timecode(MXFReader* reader, MXFMetadataSet* materialPackageSet)
+{
+    TimecodeIndex* timecodeIndex = &reader->playoutTimecodeIndex;
+    MXFMetadataSet* trackSet;
+    MXFMetadataSet* sequenceSet;
+    MXFMetadataSet* tcSet;
+    MXFArrayItemIterator iter1;
+    mxfUL dataDef;
+    int haveTimecodeTrack;
+    uint32_t sequenceComponentCount;
+    MXFArrayItemIterator iter2;
+    uint8_t* arrayElementValue;
+    uint32_t arrayElementLength;
+    
+    mxf_initialise_list(&timecodeIndex->segments, free);
+    timecodeIndex->isDropFrame = 0;
+    timecodeIndex->roundedTimecodeBase = 0;
+    
+    
+    /* get the TimecodeComponent in the timecode track
+       There should only be 1 TimecodeComponent directly referenced by a timecode Track */
+    haveTimecodeTrack = 0;
+    CHK_OFAIL(mxf_uu_get_package_tracks(materialPackageSet, &iter1));
+    while (mxf_uu_next_track(materialPackageSet->headerMetadata, &iter1, &trackSet))
+    {
+        CHK_OFAIL(mxf_uu_get_track_datadef(trackSet, &dataDef)); 
+        if (mxf_is_timecode(&dataDef))
+        {
+            if (haveTimecodeTrack)
+            {
+                mxf_log(MXF_WLOG, "Multiple playout timecode tracks present in Material Package - use first encountered" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                break;
+            }
+            
+            CHK_OFAIL(mxf_get_strongref_item(trackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+            if (mxf_is_subclass_of(sequenceSet->headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(TimecodeComponent)))
+            {
+                /* extract the single TimecodeComponent */
+                CHK_OFAIL(read_timecode_component(sequenceSet, timecodeIndex));
+                haveTimecodeTrack = 1;
+                /* don't break so that we check and warn if there are multiple timecode tracks */
+            }
+            else
+            {
+                /* MaterialPackage TimecodeComponent should not be contained in a Sequence, but we allow it, and
+                   only a single TimecodeComponent should be present, but we will allow multiple */
+                   
+                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &sequenceComponentCount));
+                if (sequenceComponentCount != 1)
+                {
+                    mxf_log(MXF_WLOG, "Material Package playout timecode has multiple components" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                }
+    
+                /* extract the sequence of TimecodeComponents */
+                mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &iter2);
+                while (mxf_next_array_item_element(&iter2, &arrayElementValue, &arrayElementLength))
+                {
+                    CHK_OFAIL(mxf_get_strongref(sequenceSet->headerMetadata, arrayElementValue, &tcSet));
+                    CHK_OFAIL(read_timecode_component(tcSet, timecodeIndex));
+                    haveTimecodeTrack = 1;
+                }
+                /* don't break so that we check and warn if there are multiple timecode tracks */
+            }
+        }
+    }
+    
+    if (!haveTimecodeTrack)
+    {
+        return 0;
+    }
+    
+    timecodeIndex->type = PLAYOUT_TIMECODE;
+    
+    return 1;
+    
+fail:
+    mxf_clear_list(&timecodeIndex->segments);
+    return 0;
+}
+
+int initialise_default_playout_timecode(MXFReader* reader)
+{
+    MXFClip* clip;
+    TimecodeIndex* timecodeIndex = &reader->playoutTimecodeIndex;
+    TimecodeSegment* newSegment = NULL;
+    
+    clip = get_mxf_clip(reader);
+
+    mxf_initialise_list(&timecodeIndex->segments, free);
+    timecodeIndex->isDropFrame = 0;
+    timecodeIndex->roundedTimecodeBase = (uint16_t)(clip->frameRate.numerator / (float)clip->frameRate.denominator + 0.5);
+    
+    CHK_MALLOC_ORET(newSegment, TimecodeSegment);
+    memset(newSegment, 0, sizeof(TimecodeSegment));
+    newSegment->startTimecode = 0;
+    newSegment->duration = clip->duration;
+
+    CHK_OFAIL(mxf_append_list_element(&timecodeIndex->segments, newSegment));
+    
+    return 1;
+    
+fail:
+    SAFE_FREE(&newSegment);
+    return 0;
+}
+
+
+int initialise_source_timecodes(MXFReader* reader, MXFMetadataSet* sourcePackageSet)
+{
+    MXFList* sourceTimecodeIndexes = &reader->sourceTimecodeIndexes;
+    MXFMetadataSet* trackSet;
+    MXFMetadataSet* sequenceSet;
+    MXFMetadataSet* tcSet;
+    MXFArrayItemIterator iter1;
+    mxfUL dataDef;
+    MXFArrayItemIterator iter2;
+    uint8_t* arrayElementValue;
+    uint32_t arrayElementLength;
+    TimecodeIndex* timecodeIndex = NULL;
+    TimecodeIndex* timecodeIndexRef = NULL;
+    int count = 0;
+    uint32_t componentCount;
+    MXFMetadataSet* structuralComponentSet;
+    mxfUMID sourcePackageID;
+    MXFMetadataSet* sourceClipSet;
+    MXFArrayItemIterator iter3;
+    MXFMetadataSet* timecodeComponentSet;
+    MXFMetadataSet* refSourcePackageSet;
+    mxfPosition fromStartPosition;
+    mxfPosition toStartPosition;
+    mxfRational fromEditRate;
+    mxfRational toEditRate;
+    mxfPosition startTimecode;
+    MXFTimecode timecode;
+    uint16_t roundedTimecodeBase;
+    TimecodeSegment* segment;
+    int continueAvidTimecodeSearch;
+    
+    mxf_initialise_list(sourceTimecodeIndexes, free_timecode_index_in_list);
+
+    
+    /* get the timecode tracks */
+    CHK_OFAIL(mxf_uu_get_package_tracks(sourcePackageSet, &iter1));
+    while (mxf_uu_next_track(sourcePackageSet->headerMetadata, &iter1, &trackSet))
+    {
+        CHK_OFAIL(mxf_uu_get_track_datadef(trackSet, &dataDef)); 
+        if (mxf_is_timecode(&dataDef))
+        {
+            CHK_OFAIL(mxf_get_strongref_item(trackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+            if (mxf_is_subclass_of(sequenceSet->headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(TimecodeComponent)))
+            {
+                /* extract the single TimecodeComponent */
+                CHK_OFAIL(create_timecode_index(&timecodeIndex));
+                CHK_OFAIL(mxf_append_list_element(sourceTimecodeIndexes, timecodeIndex));
+                timecodeIndexRef = timecodeIndex;
+                timecodeIndex = NULL; /* list now owns it */
+                CHK_OFAIL(read_timecode_component(sequenceSet, timecodeIndexRef));
+            }
+            else
+            {
+                /* extract the sequence of TimecodeComponents */
+                CHK_OFAIL(create_timecode_index(&timecodeIndex));
+                CHK_OFAIL(mxf_append_list_element(sourceTimecodeIndexes, timecodeIndex));
+                timecodeIndexRef = timecodeIndex;
+                timecodeIndex = NULL; /* list now owns it */
+                mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &iter2);
+                while (mxf_next_array_item_element(&iter2, &arrayElementValue, &arrayElementLength))
+                {
+                    CHK_OFAIL(mxf_get_strongref(sequenceSet->headerMetadata, arrayElementValue, &tcSet));
+                    CHK_OFAIL(read_timecode_component(tcSet, timecodeIndexRef));
+                }
+            }
+            timecodeIndexRef->type = FILE_SOURCE_PACKAGE_TIMECODE;
+            timecodeIndexRef->count = count++;
+        }
+    }
+    
+    if (count > 0)
+    {
+        /* if we have timecode tracks in the file source package then we don't look 
+        for Avid style source timecodes */
+        return 1;
+    }
+    
+    /* get the Avid source timecode */
+    /* the Avid source timecode is present when a SourceClip in the file SourcePackage references
+       a tape SourcePackage. The SourceClip::StartPosition defines the start timecode
+       in conjunction with the TimecodeComponent in the tape SourcePackage */
+    continueAvidTimecodeSearch = 1;       
+    CHK_OFAIL(mxf_uu_get_package_tracks(sourcePackageSet, &iter1));
+    while (continueAvidTimecodeSearch && mxf_uu_next_track(sourcePackageSet->headerMetadata, &iter1, &trackSet))
+    {
+        CHK_OFAIL(mxf_uu_get_track_datadef(trackSet, &dataDef)); 
+        if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef))
+        {
+            continue;
+        }
+        
+        CHK_OFAIL(mxf_get_strongref_item(trackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+        
+        /* get the source clip */
+        if (mxf_set_is_subclass_of(sequenceSet, &MXF_SET_K(Sequence)))
+        {
+            /* is a sequence, so we get the first component */
+            
+            CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &componentCount));
+            if (componentCount == 0)
+            {
+                /* empty sequence */
+                continue;
+            }
+            
+            /* get first component */
+            
+            CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElementValue)); 
+            CHK_OFAIL(mxf_get_strongref(sequenceSet->headerMetadata, arrayElementValue, &structuralComponentSet));
+        }
+        else
+        {
+            /* something other than a sequence */
+            structuralComponentSet = sequenceSet;
+        }
+        if (!mxf_set_is_subclass_of(structuralComponentSet, &MXF_SET_K(SourceClip)))
+        {
+            /* not a source clip, so we don't bother looking any further */
+            continue;
+        }
+        sourceClipSet = structuralComponentSet;
+        
+        /* get the start position and edit rate for the 'from' source clip */
+        CHK_OFAIL(mxf_get_rational_item(trackSet, &MXF_ITEM_K(Track, EditRate), &fromEditRate));
+        CHK_OFAIL(mxf_get_position_item(sourceClipSet, &MXF_ITEM_K(SourceClip, StartPosition), &fromStartPosition));
+        
+        
+        /* get the package referenced by the source clip */
+        CHK_OFAIL(mxf_get_umid_item(sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &sourcePackageID));
+        if (mxf_equals_umid(&g_Null_UMID, &sourcePackageID) ||
+            !mxf_uu_get_referenced_package(sourceClipSet->headerMetadata, &sourcePackageID, &refSourcePackageSet))
+        {
+            /* either end of chain or don't have referenced package */
+            continueAvidTimecodeSearch = 0;
+            break;
+        }
+        
+        /* find the timecode component */
+        CHK_OFAIL(mxf_uu_get_package_tracks(refSourcePackageSet, &iter3));
+        while (mxf_uu_next_track(refSourcePackageSet->headerMetadata, &iter3, &trackSet))
+        {
+            CHK_OFAIL(mxf_uu_get_track_datadef(trackSet, &dataDef)); 
+            if (!mxf_is_timecode(&dataDef))
+            {
+                continue;
+            }
+            
+            CHK_OFAIL(mxf_get_strongref_item(trackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+            if (mxf_set_is_subclass_of(sequenceSet, &MXF_SET_K(Sequence)))
+            {
+                /* is a sequence, so we get the first component */
+            
+                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &componentCount));
+                if (componentCount != 1)
+                {
+                    /* empty sequence or > 1 are not what we expect, so we don't bother looking further */
+                    continueAvidTimecodeSearch = 0;
+                    continue;
+                }
+                
+                /* get first component */
+                
+                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElementValue)); 
+                CHK_OFAIL(mxf_get_strongref(sequenceSet->headerMetadata, arrayElementValue, &structuralComponentSet));
+            }
+            else
+            {
+            /* something other than a sequence */
+                structuralComponentSet = sequenceSet;
+            }
+            if (!mxf_set_is_subclass_of(structuralComponentSet, &MXF_SET_K(TimecodeComponent)))
+            {
+                /* not a timecode component, so we don't bother looking any further */
+                continueAvidTimecodeSearch = 0;
+                break;
+            }
+            timecodeComponentSet = structuralComponentSet;
+
+            
+            /* get the start timecode, rounded timecode base and edit rate for the 'to' timecode component */
+            CHK_OFAIL(mxf_get_rational_item(trackSet, &MXF_ITEM_K(Track, EditRate), &toEditRate));
+            CHK_OFAIL(mxf_get_position_item(timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, StartTimecode), &startTimecode));
+            CHK_OFAIL(mxf_get_uint16_item(timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, RoundedTimecodeBase), &roundedTimecodeBase));
+            
+            /* create an timecode index */
+            CHK_OFAIL(create_timecode_index(&timecodeIndex));
+            CHK_OFAIL(mxf_append_list_element(sourceTimecodeIndexes, timecodeIndex));
+            timecodeIndexRef = timecodeIndex;
+            timecodeIndex = NULL; /* list now owns it */
+            CHK_OFAIL(read_timecode_component(timecodeComponentSet, timecodeIndexRef));
+            timecodeIndexRef->type = AVID_FILE_SOURCE_PACKAGE_TIMECODE;
+            timecodeIndexRef->count = 1;
+
+            /* convert start position to referenced source start position */
+            toStartPosition = fromStartPosition * toEditRate.numerator * fromEditRate.denominator /
+                (float)(toEditRate.denominator * fromEditRate.numerator) + 0.5;
+            
+            /* modify the timecode index with the file source package's start timecode */
+            CHK_OFAIL(convert_position_to_timecode(timecodeIndexRef, toStartPosition, &timecode));
+            startTimecode = timecode.hour * 60 * 60 * roundedTimecodeBase + 
+                timecode.min * 60 * roundedTimecodeBase +
+                timecode.sec * roundedTimecodeBase +
+                timecode.frame;
+            segment = (TimecodeSegment*)mxf_get_first_list_element(&timecodeIndexRef->segments);
+            segment->startTimecode = startTimecode;
+            
+            continueAvidTimecodeSearch = 0;
+            break;
+        }
+    }
+    
+    return 1;
+    
+fail:
+    SAFE_FREE(&timecodeIndex);
+    mxf_clear_list(sourceTimecodeIndexes);
+    return 0;
+}
+
+int set_essence_container_timecode(MXFReader* reader, mxfPosition position, 
+    int type, int count, int isDropFrame, uint8_t hour, uint8_t min, uint8_t sec, uint8_t frame)
+{
+    MXFList* sourceTimecodeIndexes = &reader->sourceTimecodeIndexes;
+    MXFListIterator iter;
+    TimecodeIndex* timecodeIndex = NULL;
+    TimecodeIndex* timecodeIndexRef = NULL;
+    int foundIt;
+    
+    foundIt = 0;
+    mxf_initialise_list_iter(&iter, sourceTimecodeIndexes);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        timecodeIndexRef = (TimecodeIndex*)mxf_get_iter_element(&iter);
+        if (timecodeIndexRef->type == type && timecodeIndexRef->count == count)
+        {
+            /* set existing timecode index to new value */
+            timecodeIndexRef->isDropFrame = isDropFrame;
+            timecodeIndexRef->position = position;
+            timecodeIndexRef->hour = hour;
+            timecodeIndexRef->min = min;
+            timecodeIndexRef->sec = sec;
+            timecodeIndexRef->frame = frame;
+            foundIt = 1;
+            break;
+        }
+    }
+    
+    if (!foundIt)
+    {
+        /* create new timecode index */
+        CHK_ORET(create_timecode_index(&timecodeIndex));
+        CHK_OFAIL(mxf_append_list_element(sourceTimecodeIndexes, timecodeIndex));
+        timecodeIndexRef = timecodeIndex;
+        timecodeIndex = NULL; /* list now owns it */
+        
+        timecodeIndexRef->isDropFrame = isDropFrame;
+        timecodeIndexRef->position = position;
+        timecodeIndexRef->type = type;
+        timecodeIndexRef->count = count;
+        timecodeIndexRef->hour = hour;
+        timecodeIndexRef->min = min;
+        timecodeIndexRef->sec = sec;
+        timecodeIndexRef->frame = frame;
+    }
+    
+    return 1;    
+    
+fail:
+    SAFE_FREE(&timecodeIndex);
+    return 0;
+}
+

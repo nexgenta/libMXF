@@ -1,5 +1,5 @@
 /*
- * $Id: xml_writer.h,v 1.1 2007/02/01 10:31:43 philipn Exp $
+ * $Id: xml_writer.h,v 1.2 2007/09/11 13:24:48 stuart_hc Exp $
  *
  * Simple XML writer
  *

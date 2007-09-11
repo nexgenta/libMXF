@@ -1,0 +1,58 @@
+
+[ K = Header ( 0000000000000000 )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.02.04.00, L =         88 (58), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000100
+       ThisPartition = 0000000000000000
+   PreviousPartition = 0000000000000000
+     FooterPartition = 0000000000000000
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000200
+            IndexSID = 00000000
+          BodyOffset = 0000000000000000
+             BodySID = 00000000
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          0 ]
+
+[ K = IndexTableSegment ( 0000000000000069 )
+06.0e.2b.34.02.53.01.01.0d.01.02.01.01.10.01.00, L =        116 (74), LL = 1 ]
+         InstanceUID = 1c.d8.f4.cb.c7.b5.40.da.98.d7.9a.69.03.73.42.4e
+     Index Edit Rate = (         25 /          1 )
+Index Start Position = 0000000000000000
+      Index Duration = 0000000000000064
+Edit Unit Byte Count = 00000100
+            IndexSID = 00000001
+             BodySID = 00000002
+     DeltaEntryArray = [ Number of entries =          4
+                         Entry size        =          6 ]
+                 Pos Table  Slice     Element
+                     Index              Delta
+             0 :      0      0              0
+             1 :      1      1              1
+             2 :      2      2              2
+             3 :      3      3              3
+
+[ K = KLVFill ( 00000000000000ee )
+06.0e.2b.34.01.01.01.01.03.01.02.10.01.00.00.00, L =          1 (1), LL = 1 ]
+
+[ K = IndexTableSegment ( 0000000000000100 )
+06.0e.2b.34.02.53.01.01.0d.01.02.01.01.10.01.00, L =        452 (1c4), LL = 3 ]
+         InstanceUID = 22.8d.ef.f1.81.e2.46.14.99.9e.47.a6.c5.1a.6c.f7
+     Index Edit Rate = (         25 /          1 )
+Index Start Position = 0000000000000000
+      Index Duration = 000000000000000a
+Edit Unit Byte Count = 00000000
+            IndexSID = 00000001
+             BodySID = 00000002
+          SliceCount = 02
+     Pos Table Count = 02
+     IndexEntryArray = [ Number of entries =         10
+                         Entry size        =         35 ]
+                 Temporal   Anchor  Flags        Stream
+                   Offset   Offset               Offset
+[ Index table truncated from         10 entries to          0 entries ]
+
+[ K = KLVFill ( 00000000000002d7 )
+06.0e.2b.34.01.01.01.01.03.01.02.10.01.00.00.00, L =         24 (18), LL = 1 ]

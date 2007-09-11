@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_descriptor.c,v 1.1 2006/12/20 16:01:09 john_f Exp $
+ * $Id: mxf_descriptor.c,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * MXF descriptor metadata
  *
@@ -23,81 +23,8 @@
 #include <mxf/mxf.h>
 #include <mxf/mxf_metadata.h>
 
+#include "mxf_metadata_int.h"
 
-#define GET_OPT_SIMPLE_VALUE(set, name, SetName, ItemName, type) \
-    if (mxf_have_item(set, &MXF_ITEM_K(SetName, ItemName))) \
-    { \
-        CHK_ORET(mxf_get_## type ## _item(set, &MXF_ITEM_K(SetName, ItemName), &name)); \
-        name##_isPresent = 1; \
-    } \
-    else \
-    { \
-        name##_isPresent = 0; \
-    }
-
-#define GET_OPT_ARRAY_VALUE(set, name, SetName, ItemName, type, maxElements) \
-    if (mxf_have_item(set, &MXF_ITEM_K(SetName, ItemName))) \
-    { \
-        uint32_t numElements; \
-        uint32_t i; \
-        CHK_ORET(mxf_get_array_item_count(set, &MXF_ITEM_K(SetName, ItemName), &numElements)); \
-        CHK_ORET(numElements <= maxElements); \
-        for (i = 0; i < numElements; i++) \
-        { \
-            uint8_t* data; \
-            CHK_ORET(mxf_get_array_item_element(set, &MXF_ITEM_K(SetName, ItemName), i, &data)); \
-            mxf_get_##type(data, &name[i]); \
-        } \
-        name##_size = numElements; \
-        name##_isPresent = 1; \
-    } \
-    else \
-    { \
-        name##_size = 0; \
-        name##_isPresent = 0; \
-    }
-
-#define GET_SIMPLE_VALUE(set, name, SetName, ItemName, type) \
-    if (mxf_have_item(set, &MXF_ITEM_K(SetName, ItemName))) \
-    { \
-        CHK_ORET(mxf_get_## type ## _item(set, &MXF_ITEM_K(SetName, ItemName), &name)) \
-    }
-
-    
-#define SET_OPT_SIMPLE_VALUE(set, name, SetName, ItemName, type) \
-    if (name##_isPresent) \
-    { \
-        CHK_ORET(mxf_set_## type ## _item(set, &MXF_ITEM_K(SetName, ItemName), name)); \
-    }
-
-#define SET_OPT_ARRAY_VALUE(set, name, SetName, ItemName, type, elementLen) \
-    if (name##_isPresent) \
-    { \
-        uint8_t* data; \
-        uint32_t i; \
-        CHK_ORET(mxf_alloc_array_item_elements(set, &MXF_ITEM_K(SetName, ItemName), \
-            elementLen, name ##_size, &data)); \
-        for (i = 0; i < name ##_size; i++) \
-        { \
-            mxf_set_##type(name[i], data); \
-            data += elementLen; \
-        } \
-    }
-
-#define SET_SIMPLE_VALUE(set, name, SetName, ItemName, type) \
-    CHK_ORET(mxf_set_## type ## _item(set, &MXF_ITEM_K(SetName, ItemName), name))
-
-#define SET_OPT_PSIMPLE_VALUE(set, name, SetName, ItemName, type) \
-    if (name##_isPresent) \
-    { \
-        CHK_ORET(mxf_set_## type ## _item(set, &MXF_ITEM_K(SetName, ItemName), &name)); \
-    }
-
-#define SET_PSIMPLE_VALUE(set, name, SetName, ItemName, type) \
-    CHK_ORET(mxf_set_## type ## _item(set, &MXF_ITEM_K(SetName, ItemName), &name))
-
-    
-    
     
 
 int mxf_get_generic_descriptor(MXFMetadataSet* set, MXFGenericDescriptor* descriptor)

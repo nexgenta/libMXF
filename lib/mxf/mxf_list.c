@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_list.c,v 1.1 2006/12/20 15:40:28 john_f Exp $
+ * $Id: mxf_list.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * General purpose linked list
  *

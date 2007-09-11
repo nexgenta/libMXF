@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_metadict_blob.c,v 1.1 2006/12/20 16:01:10 john_f Exp $
+ * $Id: mxf_avid_metadict_blob.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * Blobs of data containing Avid header metadata extensions
  *
@@ -523,7 +523,7 @@ const struct AvidMetaDictObjectOffsetsStruct g_AvidMetaDictObjectOffsets[] =
 const uint32_t g_AvidMetaDictObjectOffsets_len = sizeof(g_AvidMetaDictObjectOffsets) / sizeof(struct AvidMetaDictObjectOffsetsStruct);
 
 
-uint8_t g_AvidMetaDictBlob[] = 
+const uint8_t g_AvidMetaDictBlob[] = 
 {
     0x06, 0x0e, 0x2b, 0x34, 0x02, 0x53, 0x01, 0x01, 0x0d, 0x01, 0x01, 0x01, 0x02, 0x25, 0x00, 0x00, 
     0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0xac, 0x3c, 0x0a, 0x00, 0x10, 0x26, 0xfa, 0xd9, 

@@ -1,5 +1,5 @@
 /*
- * $Id: test_avid_mxf_to_p2.c,v 1.1 2007/02/01 10:31:42 philipn Exp $
+ * $Id: test_avid_mxf_to_p2.c,v 1.2 2007/09/11 13:24:48 stuart_hc Exp $
  *
  * Tests transfers of Avid MXF files to P2
  *

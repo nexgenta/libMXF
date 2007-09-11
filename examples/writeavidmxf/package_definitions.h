@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.1 2006/12/20 15:45:52 john_f Exp $
+ * $Id: package_definitions.h,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -41,9 +41,18 @@ typedef enum
     AvidMJPEG,
     DVBased25,
     DVBased50,
+    DV1080i50,
+    DV1080i60,
+    DV720p50,
+    DV720p60,
+    IMX30,
+    IMX40,
+    IMX50,
     DNxHD1080i120,
     DNxHD1080i180,
     UncUYVY,
+    Unc1080iUYVY,
+    Unc720pUYVY,
     PCM
 } EssenceType;
 
@@ -52,7 +61,8 @@ typedef enum
     Res21, 
     Res31, 
     Res101, 
-    Res151, 
+    Res101m, 
+    Res151s, 
     Res201
 } AvidMJPEGResolution;
 

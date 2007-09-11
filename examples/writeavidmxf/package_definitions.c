@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.c,v 1.1 2006/12/20 15:45:52 john_f Exp $
+ * $Id: package_definitions.c,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * Functions to create package definitions
  *

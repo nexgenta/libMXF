@@ -52,7 +52,7 @@ test_avidp2transfer.o: test_avidp2transfer.cpp avidp2transfer.h
 avidp2transfer.o: avidp2transfer.cpp avidp2transfer.h
 ifndef AAFSDKINSTALL
 	# AAFSDKINSTALL is path to installed AAF SDK includes and libs (i.e. after an SDK make install)
-	$(error Please set the AAFSDKINSTALL environment variable to the location of your installed AAFSDK files)
+	$(error Please set the AAFSDKINSTALL environment variable to the location of your installed AAFSDK files i.e. path to lib/debug/libaaflib.a lib/debug/libaafiid.a include/AAF.h etc)
 endif
 	$(CPP_CC) -c $(CPP_INCLUDES) avidp2transfer.cpp
 

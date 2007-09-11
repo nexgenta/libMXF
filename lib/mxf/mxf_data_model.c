@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.c,v 1.2 2007/01/30 14:21:56 john_f Exp $
+ * $Id: mxf_data_model.c,v 1.3 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * MXF header metadata data model
  *
@@ -195,8 +195,8 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
 #define MXF_SET_DEFINITION(parentName, name, label) \
     CHK_OFAIL(mxf_register_set_def(newDataModel, #name, &MXF_SET_K(parentName), &MXF_SET_K(name)));
     
-#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId) \
-    CHK_OFAIL(mxf_register_item_def(newDataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId));
+#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
+    CHK_OFAIL(mxf_register_item_def(newDataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
     
 
     
@@ -269,7 +269,7 @@ fail:
 }
 
 int mxf_register_item_def(MXFDataModel* dataModel, const char* name, const mxfKey* setKey, 
-    const mxfKey* key, mxfLocalTag tag, unsigned int typeId)
+    const mxfKey* key, mxfLocalTag tag, unsigned int typeId, int isRequired)
 {
     MXFItemDef* newItemDef = NULL;
     
@@ -284,6 +284,7 @@ int mxf_register_item_def(MXFDataModel* dataModel, const char* name, const mxfKe
     newItemDef->key = *key;
     newItemDef->localTag = tag;
     newItemDef->typeId = typeId;
+    newItemDef->isRequired = isRequired;
     
     CHK_OFAIL(add_item_def(dataModel, newItemDef));
     

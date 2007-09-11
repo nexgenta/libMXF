@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.c,v 1.1 2006/12/20 15:40:27 john_f Exp $
+ * $Id: mxf_file.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * Wraps a files, buffers etc. in an MXF file and provides low-level functions
  *
@@ -29,6 +29,8 @@
 #if defined(_WIN32)
 #include <io.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#else
 #include <sys/stat.h>
 #endif
 
@@ -180,6 +182,39 @@ static int disk_file_is_seekable(MXFFileSysData* sysData)
     return sysData->isSeekable;
 }
 
+static int64_t disk_file_size(MXFFileSysData* sysData)
+{
+#if defined(_WIN32)
+    struct _stati64 statBuf;
+#else
+    int fo;
+    struct stat statBuf;
+#endif
+
+    if (sysData == NULL)
+    {
+        return -1;
+    }
+    
+#if defined(_WIN32)
+    if (_fstati64(sysData->fileId, &statBuf) != 0) 
+    {
+        return -1;
+    }
+    return statBuf.st_size;
+#else
+    if ((fo = fileno(sysData->file)) == -1)
+    {
+        return -1;
+    }
+    else if (fstat(fo, &statBuf) != 0) 
+    {
+        return -1;
+    }
+    return statBuf.st_size;
+#endif
+}
+
 
 static void stdin_file_close(MXFFileSysData* sysData)
 {
@@ -290,6 +325,11 @@ static int stdin_file_is_seekable(MXFFileSysData* sysData)
     return 0;
 }
 
+static int64_t stdin_file_size(MXFFileSysData* sysData)
+{
+    return -1;
+}
+
 
 static void byte_array_file_close(MXFFileSysData* sysData)
 {
@@ -393,6 +433,11 @@ static int byte_array_file_is_seekable(MXFFileSysData* sysData)
     return 1;
 }
 
+static int64_t byte_array_size(MXFFileSysData* sysData)
+{
+    return sysData->dataSize;
+}
+
 static void free_byte_array_file(MXFFileSysData* sysData)
 {
     if (sysData == NULL)
@@ -432,6 +477,7 @@ int mxf_disk_file_open_new(const char* filename, MXFFile** mxfFile)
     newMXFFile->seek = disk_file_seek;
     newMXFFile->tell = disk_file_tell;
     newMXFFile->is_seekable = disk_file_is_seekable;
+    newMXFFile->size = disk_file_size;
     newMXFFile->sysData = newDiskFile;
     newMXFFile->free_sys_data = free_disk_file;
     
@@ -472,6 +518,7 @@ int mxf_disk_file_open_read(const char* filename, MXFFile** mxfFile)
     newMXFFile->seek = disk_file_seek;
     newMXFFile->tell = disk_file_tell;
     newMXFFile->is_seekable = disk_file_is_seekable;
+    newMXFFile->size = disk_file_size;
     newMXFFile->sysData = newDiskFile;
     newMXFFile->free_sys_data = free_disk_file;
     
@@ -512,6 +559,7 @@ int mxf_disk_file_open_modify(const char* filename, MXFFile** mxfFile)
     newMXFFile->seek = disk_file_seek;
     newMXFFile->tell = disk_file_tell;
     newMXFFile->is_seekable = disk_file_is_seekable;
+    newMXFFile->size = disk_file_size;
     newMXFFile->sysData = newDiskFile;
     newMXFFile->free_sys_data = free_disk_file;
     
@@ -550,6 +598,7 @@ int mxf_stdin_wrap_read(MXFFile** mxfFile)
     newMXFFile->seek = stdin_file_seek;
     newMXFFile->tell = stdin_file_tell;
     newMXFFile->is_seekable = stdin_file_is_seekable;
+    newMXFFile->size = stdin_file_size;
     newMXFFile->sysData = newStdInFile;
     newMXFFile->free_sys_data = free_stdin_file;
     
@@ -590,6 +639,7 @@ int mxf_byte_array_wrap_read(const uint8_t* data, int64_t dataSize, MXFFile **mx
     newMXFFile->seek = byte_array_file_seek;
     newMXFFile->tell = byte_array_file_tell;
     newMXFFile->is_seekable = byte_array_file_is_seekable;
+    newMXFFile->size = byte_array_size;
     newMXFFile->sysData = newSysData;
     newMXFFile->free_sys_data = free_byte_array_file;
     
@@ -662,6 +712,11 @@ int64_t mxf_file_tell(MXFFile* mxfFile)
 int mxf_file_is_seekable(MXFFile* mxfFile)
 {
     return mxfFile->is_seekable(mxfFile->sysData);
+}
+
+int64_t mxf_file_size(MXFFile* mxfFile)
+{
+    return mxfFile->size(mxfFile->sysData);
 }
 
 

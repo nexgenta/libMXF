@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.h,v 1.2 2007/01/30 14:21:56 john_f Exp $
+ * $Id: mxf_data_model.h,v 1.3 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * MXF header metadata data model
  *
@@ -93,6 +93,7 @@ typedef struct
     mxfKey key;
     mxfLocalTag localTag;
     unsigned int typeId;
+    int isRequired;
 } MXFItemDef;
 
 typedef struct _MXFSetDef
@@ -190,7 +191,7 @@ typedef enum
 #define MXF_SET_DEFINITION(parentName, name, label) \
     static const mxfUL MXF_SET_K(name) = label;
     
-#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId) \
+#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired) \
     static const mxfUL MXF_ITEM_K(setName, name) = label;
 
 #include <mxf/mxf_baseline_data_model.h>
@@ -200,8 +201,10 @@ typedef enum
 int mxf_load_data_model(MXFDataModel** dataModel);
 void mxf_free_data_model(MXFDataModel** dataModel);
 
-int mxf_register_set_def(MXFDataModel* dataModel, const char* name, const mxfKey* parentKey, const mxfKey* key);
-int mxf_register_item_def(MXFDataModel* dataModel, const char* name, const mxfKey* setKey, const mxfKey* key, mxfLocalTag tag, unsigned int typeId);
+int mxf_register_set_def(MXFDataModel* dataModel, const char* name, const mxfKey* parentKey, 
+    const mxfKey* key);
+int mxf_register_item_def(MXFDataModel* dataModel, const char* name, const mxfKey* setKey, 
+    const mxfKey* key, mxfLocalTag tag, unsigned int typeId, int isRequired);
 
 /* if the typeId parameter is 0 in the following functions, then a new id is created */
 MXFItemType* mxf_register_basic_type(MXFDataModel* dataModel, const char* name, unsigned int typeId, unsigned int size);

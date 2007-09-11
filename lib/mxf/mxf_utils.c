@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_utils.c,v 1.2 2007/01/30 14:21:56 john_f Exp $
+ * $Id: mxf_utils.c,v 1.3 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * General purpose utilities
  *

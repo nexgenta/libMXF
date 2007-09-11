@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_p2.c,v 1.2 2007/01/30 14:21:57 john_f Exp $
+ * $Id: mxf_p2.c,v 1.3 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * P2 data model extensions
  *
@@ -33,8 +33,8 @@
 #define MXF_SET_DEFINITION(parentName, name, label) \
     CHK_ORET(mxf_register_set_def(dataModel, #name, &MXF_SET_K(parentName), &MXF_SET_K(name)));
     
-#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId) \
-    CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId));
+#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
+    CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
 
     
 int mxf_p2_load_extensions(MXFDataModel* dataModel)

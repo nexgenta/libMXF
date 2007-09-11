@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.h,v 1.1 2006/12/20 15:40:19 john_f Exp $
+ * $Id: mxf_file.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * Wraps a C-file and provides low-level MXF file functions
  *
@@ -48,6 +48,7 @@ typedef struct
     int (*seek)(MXFFileSysData* sysData, int64_t offset, int whence);
     int64_t (*tell)(MXFFileSysData* sysData);
     int (*is_seekable)(MXFFileSysData* sysData);
+    int64_t (*size)(MXFFileSysData* sysData);
 
     /* private data for the MXF file implementation */
     void (*free_sys_data)(MXFFileSysData* sysData);
@@ -80,6 +81,7 @@ int mxf_file_eof(MXFFile* mxfFile);
 int mxf_file_seek(MXFFile* mxfFile, int64_t offset, int whence);
 int64_t mxf_file_tell(MXFFile* mxfFile);
 int mxf_file_is_seekable(MXFFile* mxfFile);
+int64_t mxf_file_size(MXFFile* mxfFile);
 
 
 void mxf_file_set_min_llen(MXFFile* mxfFile, uint8_t llen);

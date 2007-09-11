@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_types.h,v 1.1 2006/12/20 15:40:25 john_f Exp $
+ * $Id: mxf_types.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * MXF types
  *
@@ -98,6 +98,8 @@ typedef struct
 
 typedef mxfUL mxfUID;
 
+typedef mxfUID mxfAUID;
+
 typedef uint16_t mxfLocalTag;
 
 typedef uint16_t mxfVersionType;
@@ -174,21 +176,30 @@ typedef struct
 } mxfProductVersion;
 
 
+typedef struct
+{
+    uint8_t code;
+    uint8_t depth;
+} mxfRGBALayoutComponent;
+
+
 /* external MXF data lengths */
-#define mxfLocalTag_extlen         2
-#define mxfVersionType_extlen      2
-#define mxfUUID_extlen             16 
-#define mxfKey_extlen              16 
-#define mxfUID_extlen              16 
-#define mxfUL_extlen               16 
-#define mxfTimestamp_extlen        8
-#define mxfUTF16Char_extlen        2
-#define mxfUMID_extlen             32
-#define mxfRational_extlen         8
-#define mxfPosition_extlen         8
-#define mxfLength_extlen           8
-#define mxfBoolean_extlen          1
-#define mxfProductVersion_extlen   10
+#define mxfLocalTag_extlen              2
+#define mxfVersionType_extlen           2
+#define mxfUUID_extlen                  16 
+#define mxfKey_extlen                   16 
+#define mxfUID_extlen                   16 
+#define mxfUL_extlen                    16 
+#define mxfAUID_extlen                  16 
+#define mxfTimestamp_extlen             8
+#define mxfUTF16Char_extlen             2
+#define mxfUMID_extlen                  32
+#define mxfRational_extlen              8
+#define mxfPosition_extlen              8
+#define mxfLength_extlen                8
+#define mxfBoolean_extlen               1
+#define mxfProductVersion_extlen        10
+#define mxfRGBALayoutComponent_extlen   2
 
 
 static const mxfUUID g_Null_UUID =

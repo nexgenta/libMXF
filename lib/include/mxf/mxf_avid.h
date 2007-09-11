@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.h,v 1.2 2007/01/30 14:21:56 john_f Exp $
+ * $Id: mxf_avid.h,v 1.3 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -66,7 +66,7 @@ typedef MXFMetadataSet MXFAvidMetadataRootSet;
 #define MXF_SET_DEFINITION(parentName, name, label) \
     static const mxfUL MXF_SET_K(name) = label;
     
-#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId) \
+#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired) \
     static const mxfUL MXF_ITEM_K(setName, name) = label;
 
 #include <mxf/mxf_avid_extensions_data_model.h>
@@ -78,6 +78,7 @@ int mxf_avid_load_extensions(MXFDataModel* dataModel);
 int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata);
 
 void mxf_generate_aafsdk_umid(mxfUMID* umid);
+void mxf_generate_old_aafsdk_umid(mxfUMID* umid);
 
 int mxf_avid_set_indirect_string_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfUTF16Char* value);
 

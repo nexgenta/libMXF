@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_header_metadata.c,v 1.1 2006/12/20 15:40:28 john_f Exp $
+ * $Id: mxf_header_metadata.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * MXF header metadata
  *
@@ -261,6 +261,12 @@ int mxf_add_set(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* set)
 }
 
 
+void mxf_set_fixed_set_space_allocation(MXFMetadataSet* set, uint64_t size)
+{
+    set->fixedSpaceAllocation = size;
+}
+
+
 int mxf_register_item(MXFHeaderMetadata* headerMetadata, const mxfKey* key)
 {
     mxfLocalTag tag;
@@ -392,6 +398,15 @@ int mxf_have_item(MXFMetadataSet* set, const mxfKey* key)
     MXFMetadataItem* item;
     return mxf_get_item(set, key, &item);
 }
+
+
+int mxf_set_is_subclass_of(MXFMetadataSet* set, const mxfKey* parentSetKey)
+{
+    CHK_ORET(set->headerMetadata != NULL && set->headerMetadata->dataModel != NULL);
+    
+    return mxf_is_subclass_of(set->headerMetadata->dataModel, &set->key, parentSetKey);
+}
+
 
 
 int mxf_read_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata,
@@ -648,6 +663,7 @@ int mxf_write_set(MXFFile* mxfFile, MXFMetadataSet* set)
 {
     MXFListIterator iter;
     uint64_t setLen = 0;
+    uint64_t setSize = 0;
     
     mxf_initialise_list_iter(&iter, &set->items);
     while (mxf_next_list_iter_element(&iter))
@@ -659,16 +675,32 @@ int mxf_write_set(MXFFile* mxfFile, MXFMetadataSet* set)
     {
         /* spec says preferred 4-byte BER encoded len for sets */ 
         CHK_ORET(mxf_write_fixed_kl(mxfFile, &set->key, 4, setLen));
+        setSize = mxfKey_extlen + 4 + setLen;
     }
     else
     {
         CHK_ORET(mxf_write_kl(mxfFile, &set->key, setLen));
+        setSize = mxfKey_extlen + mxf_get_llen(mxfFile, setLen) + setLen;
     }
     
     mxf_initialise_list_iter(&iter, &set->items);
     while (mxf_next_list_iter_element(&iter))
     {
         CHK_ORET(mxf_write_item(mxfFile, (MXFMetadataItem*)mxf_get_iter_element(&iter)));
+    }
+    
+    if (set->fixedSpaceAllocation > 0)
+    {
+        /* check that we can achieve the fixed size, possibly using a filler */
+        CHK_ORET(setSize == set->fixedSpaceAllocation || 
+            (setSize < set->fixedSpaceAllocation && 
+                setSize + mxf_get_min_llen(mxfFile) + mxfKey_extlen <= set->fixedSpaceAllocation));
+            
+        if (setSize < set->fixedSpaceAllocation)
+        {
+            /* add filler */
+            CHK_ORET(mxf_write_fill(mxfFile, (uint32_t)(set->fixedSpaceAllocation - setSize)));
+        }
     }
     
     return 1;
@@ -687,8 +719,6 @@ int mxf_write_item(MXFFile* mxfFile, MXFMetadataItem* item)
 void mxf_get_header_metadata_size(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata, uint64_t* size)
 {
     MXFListIterator iter;
-    uint8_t setLLen;
-    uint64_t setLen;
     uint64_t primerSize;
     
     mxf_get_primer_pack_size(mxfFile, headerMetadata->primerPack, &primerSize);
@@ -697,28 +727,36 @@ void mxf_get_header_metadata_size(MXFFile* mxfFile, MXFHeaderMetadata* headerMet
     mxf_initialise_list_iter(&iter, &headerMetadata->sets);
     while (mxf_next_list_iter_element(&iter))
     {
-        mxf_get_set_len(mxfFile, (MXFMetadataSet*)mxf_get_iter_element(&iter), &setLLen, &setLen);
-        *size += mxfKey_extlen + setLLen + setLen;
+        *size += mxf_get_set_size(mxfFile, (MXFMetadataSet*)mxf_get_iter_element(&iter));
     }        
 }
 
 /* note: keep in sync with mxf_write_set */
-void mxf_get_set_len(MXFFile* mxfFile, MXFMetadataSet* set, uint8_t* llen, uint64_t* len)
+uint64_t mxf_get_set_size(MXFFile* mxfFile, MXFMetadataSet* set)
 {
     MXFListIterator iter;
+    uint64_t len;
+    uint8_t llen;
 
-    *len = 0;    
+    if (set->fixedSpaceAllocation > 0)
+    {
+        return set->fixedSpaceAllocation;
+    }
+    
+    len = 0;
     mxf_initialise_list_iter(&iter, &set->items);
     while (mxf_next_list_iter_element(&iter))
     {
-        *len += ((MXFMetadataItem*)mxf_get_iter_element(&iter))->length + 4;
+        len += ((MXFMetadataItem*)mxf_get_iter_element(&iter))->length + 4;
     }
-    *llen = mxf_get_llen(mxfFile, *len);
-    if (*llen < 4)
+    llen = mxf_get_llen(mxfFile, len);
+    if (llen < 4)
     {
         /* spec says preferred 4-byte BER encoded len for sets */ 
-        *llen = 4;
+        llen = 4;
     }
+    
+    return mxfKey_extlen + len + llen;
 }
 
 
@@ -781,6 +819,11 @@ void mxf_get_ul(const uint8_t* value, mxfUL* result)
     memcpy(result, value, mxfUL_extlen);
 }
 
+void mxf_get_auid(const uint8_t* value, mxfAUID* result)
+{
+    memcpy(result, value, mxfAUID_extlen);
+}
+
 void mxf_get_umid(const uint8_t* value, mxfUMID* result)
 {
     memcpy(result, value, mxfUMID_extlen);
@@ -825,6 +868,12 @@ void mxf_get_product_version(const uint8_t* value, mxfProductVersion* result)
     mxf_get_uint16(&value[4], &result->patch);
     mxf_get_uint16(&value[6], &result->build);
     mxf_get_uint16(&value[8], &result->release);
+}
+
+void mxf_get_rgba_layout_component(const uint8_t* value, mxfRGBALayoutComponent* result)
+{
+    mxf_get_uint8(value, &result->code);
+    mxf_get_uint8(&value[1], &result->depth);
 }
 
 void mxf_get_array_header(const uint8_t* value, uint32_t* arrayLen, uint32_t* arrayItemLen)
@@ -1050,6 +1099,11 @@ void mxf_set_ul(const mxfUL* value, uint8_t* result)
     mxf_set_uuid((const mxfUUID*)value, result);
 }
 
+void mxf_set_auid(const mxfAUID* value, uint8_t* result)
+{
+    mxf_set_uuid((const mxfUUID*)value, result);
+}
+
 void mxf_set_umid(const mxfUMID* value, uint8_t* result)
 {
     memcpy(result, value, mxfUMID_extlen);
@@ -1140,6 +1194,12 @@ void mxf_set_product_version(const mxfProductVersion* value, uint8_t* result)
     mxf_set_uint16(value->patch, &result[4]); 
     mxf_set_uint16(value->build, &result[6]); 
     mxf_set_uint16(value->release, &result[8]); 
+}
+
+void mxf_set_rgba_layout_component(const mxfRGBALayoutComponent* value, uint8_t* result)
+{
+    mxf_set_uint8(value->code, result); 
+    mxf_set_uint8(value->depth, &result[1]); 
 }
 
 void mxf_set_array_header(uint32_t arrayLen, uint32_t arrayElementLen, uint8_t* result)
@@ -1262,6 +1322,11 @@ int mxf_set_ul_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfUL* val
     SET_VALUE(mxfUL_extlen, mxf_set_ul);
 }
 
+int mxf_set_auid_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfAUID* value)
+{
+    SET_VALUE(mxfAUID_extlen, mxf_set_auid);
+}
+
 int mxf_set_timestamp_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfTimestamp* value)
 {
     SET_VALUE(mxfTimestamp_extlen, mxf_set_timestamp);
@@ -1340,9 +1405,51 @@ int mxf_set_product_version_item(MXFMetadataSet* set, const mxfKey* itemKey, con
     SET_VALUE(mxfProductVersion_extlen, mxf_set_product_version);
 }
 
+int mxf_set_rgba_layout_component_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfRGBALayoutComponent* value)
+{
+    SET_VALUE(mxfRGBALayoutComponent_extlen, mxf_set_rgba_layout_component);
+}
+
 
 int mxf_alloc_array_item_elements(MXFMetadataSet* set, const mxfKey* itemKey, uint32_t elementLen, 
     uint32_t count, uint8_t** elements)
+{
+    MXFMetadataItem* newItem = NULL;
+    uint8_t* buffer = NULL;
+
+    assert(set->headerMetadata != NULL);
+    
+    if (count == 0)
+    {
+        int result = mxf_set_empty_array_item(set, itemKey, elementLen);
+        if (result)
+        {
+            *elements = NULL;
+        }
+        return result;
+    }
+
+    CHK_OFAIL(8 + count * elementLen < 65536);
+    
+    CHK_ORET(get_or_create_set_item(set->headerMetadata, set, itemKey, &newItem));
+
+    CHK_MALLOC_ARRAY_ORET(buffer, uint8_t, 8 + count * elementLen);
+    mxf_set_array_header(count, elementLen, buffer);
+    memset(&buffer[8], 0, elementLen * count);
+    
+    CHK_OFAIL(mxf_set_item_value(newItem, buffer, (uint16_t)(8 + count * elementLen)));
+    *elements = &newItem->value[8];
+    
+    SAFE_FREE(&buffer);
+    return 1;
+    
+fail:
+    SAFE_FREE(&buffer);
+    return 0;
+}
+
+int mxf_grow_array_item(MXFMetadataSet* set, const mxfKey* itemKey, uint32_t elementLen, 
+    uint32_t count, uint8_t** newElements)
 {
     MXFMetadataItem* newItem = NULL;
     uint8_t* buffer = NULL;
@@ -1350,7 +1457,16 @@ int mxf_alloc_array_item_elements(MXFMetadataSet* set, const mxfKey* itemKey, ui
     uint32_t existElementLen;
 
     assert(set->headerMetadata != NULL);
-    assert(count > 0);
+    
+    if (count == 0)
+    {
+        int result = mxf_set_empty_array_item(set, itemKey, elementLen);
+        if (result)
+        {
+            *newElements = NULL;
+        }
+        return result;
+    }
     
     CHK_ORET(get_or_create_set_item(set->headerMetadata, set, itemKey, &newItem));
 
@@ -1377,7 +1493,7 @@ int mxf_alloc_array_item_elements(MXFMetadataSet* set, const mxfKey* itemKey, ui
     
     CHK_OFAIL(8 + arrayLen * elementLen < 65536);
     CHK_OFAIL(mxf_set_item_value(newItem, buffer, (uint16_t)(8 + arrayLen * elementLen)));
-    *elements = &newItem->value[8 + (arrayLen - count) * elementLen];
+    *newElements = &newItem->value[8 + (arrayLen - count) * elementLen];
     
     SAFE_FREE(&buffer);
     return 1;
@@ -1413,8 +1529,18 @@ int mxf_add_array_item_strongref(MXFMetadataSet* set, const mxfKey* itemKey, con
 {
     uint8_t* arrayElement;
     
-    CHK_ORET(mxf_alloc_array_item_elements(set, itemKey, mxfUUID_extlen, 1, &arrayElement));
+    CHK_ORET(mxf_grow_array_item(set, itemKey, mxfUUID_extlen, 1, &arrayElement));
     mxf_set_strongref(value, arrayElement);
+    
+    return 1;
+}
+
+int mxf_add_array_item_weakref(MXFMetadataSet* set, const mxfKey* itemKey, const MXFMetadataSet* value)
+{
+    uint8_t* arrayElement;
+    
+    CHK_ORET(mxf_grow_array_item(set, itemKey, mxfUUID_extlen, 1, &arrayElement));
+    mxf_set_weakref(value, arrayElement);
     
     return 1;
 }
@@ -1494,6 +1620,11 @@ int mxf_get_uuid_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfUUID* value
 int mxf_get_ul_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfUL* value)
 {
     GET_VALUE(mxfUL_extlen, mxf_get_ul);
+}
+
+int mxf_get_auid_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfAUID* value)
+{
+    GET_VALUE(mxfAUID_extlen, mxf_get_auid);
 }
 
 int mxf_get_umid_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfUMID* value)
@@ -1601,6 +1732,11 @@ int mxf_get_boolean_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfBoolean*
 int mxf_get_product_version_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfProductVersion* value)
 {
     GET_VALUE(mxfProductVersion_extlen, mxf_get_product_version);
+}
+
+int mxf_get_rgba_layout_component_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfRGBALayoutComponent* value)
+{
+    GET_VALUE(mxfRGBALayoutComponent_extlen, mxf_get_rgba_layout_component);
 }
 
 

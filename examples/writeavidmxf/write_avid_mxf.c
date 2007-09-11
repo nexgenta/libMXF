@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.2 2007/01/30 14:21:56 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.3 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -89,6 +89,8 @@ typedef struct
     mxfUL pictureEssenceCoding;
     uint32_t storedHeight;
     uint32_t storedWidth;
+    uint32_t sampledHeight;
+    uint32_t sampledWidth;
     uint32_t displayHeight;
     uint32_t displayWidth;
     uint32_t displayYOffset;
@@ -197,34 +199,65 @@ static const mxfKey MXF_EE_K(BWFClipWrapped) =
     MXF_AES3BWF_EE_K(0x01, MXF_BWF_CLIP_WRAPPED_EE_TYPE, 0x01);
 
 /* Avid MJPEG labels observed in files created by Media Composer 2.1.x */
-	/* CompressionId's */
+    /* CompressionId's */
 static const mxfUL MXF_CMDEF_L(AvidMJPEG21) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x08};
 static const mxfUL MXF_CMDEF_L(AvidMJPEG31) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x06};
 static const mxfUL MXF_CMDEF_L(AvidMJPEG101) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x04};
-static const mxfUL MXF_CMDEF_L(AvidMJPEG151) = 
+static const mxfUL MXF_CMDEF_L(AvidMJPEG101m) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x04, 0x02};
+static const mxfUL MXF_CMDEF_L(AvidMJPEG151s) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x02, 0x02};
 static const mxfUL MXF_CMDEF_L(AvidMJPEG201) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x02};
 
-	/* EssenceContainer label */
+    /* EssenceContainer label */
 static const mxfUL MXF_EC_L(AvidMJPEGClipWrapped) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x01, 0x00, 0x00};
 
 static const mxfUL g_AvidAAFKLVEssenceContainer_ul = 
     {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x01, 0x01, 0xff, 0x4b, 0x46, 0x41, 0x41, 0x00, 0x0d, 0x4d, 0x4f};
     
-static const uint32_t g_AvidMJPEG21_ResolutionID = 0x4c;	/* 76 */
-static const uint32_t g_AvidMJPEG31_ResolutionID = 0x4d;	/* 77 */
-static const uint32_t g_AvidMJPEG101_ResolutionID = 0x4b;	/* 75 */
-static const uint32_t g_AvidMJPEG151_ResolutionID = 0x4e;	/* 78 */
-static const uint32_t g_AvidMJPEG201_ResolutionID = 0x52;	/* 82 */
+static const uint32_t g_AvidMJPEG21_ResolutionID = 0x4c;    /* 76 */
+static const uint32_t g_AvidMJPEG31_ResolutionID = 0x4d;    /* 77 */
+static const uint32_t g_AvidMJPEG101_ResolutionID = 0x4b;   /* 75 */
+static const uint32_t g_AvidMJPEG101m_ResolutionID = 0x6e;  /* 110 */
+static const uint32_t g_AvidMJPEG151s_ResolutionID = 0x4e;  /* 78 */
+static const uint32_t g_AvidMJPEG201_ResolutionID = 0x52;   /* 82 */
 
 static const mxfKey MXF_EE_K(AvidMJPEGClipWrapped) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x01, 0x01};
-    
+
+/* IMX (D10) labels observed in files by Media Composer 2.6 */
+static const mxfKey MXF_EE_K(IMX) = MXF_D10_PICTURE_EE_K(0x01);
+
+  /* To be identical to the Avid don't use MXF_EC_L(D10_50_625_50_picture_only)
+     etc since they use regver=2 while Avid uses regver=1 */
+static const mxfUL MXF_EC_L(IMX30) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x05, 0x7f};
+static const mxfUL MXF_EC_L(IMX40) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x03, 0x7f};
+static const mxfUL MXF_EC_L(IMX50) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x01, 0x7f};
+
+/* DV100 labels observed in files by Media Composer 2.6 */
+static const mxfUL MXF_EC_L(DV1080i50ClipWrapped) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x02, 0x61, 0x02};
+static const mxfUL MXF_CMDEF_L(DV1080i50) =
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x04, 0x01, 0x02, 0x02, 0x02, 0x02, 0x06, 0x00};
+static const mxfKey MXF_EE_K(DV1080i50) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x18, 0x01, 0x02, 0x01};
+
+/* DV100 720p50 is not supported by Media Composer 2.6, labels found in P2 created media */
+static const mxfUL MXF_EC_L(DV720p50ClipWrapped) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x02, 0x63, 0x02};
+static const mxfUL MXF_CMDEF_L(DV720p50) =
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x04, 0x01, 0x02, 0x02, 0x02, 0x02, 0x08, 0x00};
+static const mxfKey MXF_EE_K(DV720p50) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x18, 0x01, 0x02, 0x01};
+
 /* DNxHD EssenceContainer labels observed in files created by Media Composer Adrenaline 2.2.9 */
 static const mxfUL MXF_EC_L(DNxHD1080i120ClipWrapped) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x06, 0x02, 0x02};
@@ -232,7 +265,7 @@ static const mxfUL MXF_EC_L(DNxHD1080i180ClipWrapped) =
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x06, 0x02, 0x03};
 
 static const mxfUL MXF_CMDEF_L(DNxHD) =
-	{0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x04, 0x01, 0x00};
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x04, 0x01, 0x00};
 
 static const mxfKey MXF_EE_K(DNxHD) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x06, 0x01};
@@ -257,11 +290,15 @@ static const uint32_t g_uncPALStartOffsetSize =
 
 static const uint32_t g_uncPALVBISize = 720 * 16 * 2;
 
+static const uint32_t g_uncAligned1080i50FrameSize = 4153344;    /* 0x3f6000 (6144 pad + 4147200 frame) */
+static const uint32_t g_unc1080i50StartOffsetSize = 6144;
+
 
 static const uint32_t g_bodySID = 1;
 static const uint32_t g_indexSID = 2;
 
-static const uint64_t g_fixedBodyPPOffset = 0x40000;
+static const uint64_t g_fixedBodyPPOffset = 0x40020;
+static const uint64_t g_uncFixedBodyPPOffset = 0x60020;
 
 
 static void free_offsets_array_in_list(void* data)
@@ -654,6 +691,11 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         }
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, StoredHeight), writer->storedHeight));
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, StoredWidth), writer->storedWidth));
+        if (writer->sampledHeight != 0 || writer->sampledWidth != 0)
+        {
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, SampledHeight), writer->sampledHeight));
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, SampledWidth), writer->sampledWidth));
+        }
         if (writer->displayHeight != 0 || writer->displayWidth != 0)
         {
             CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayHeight), writer->displayHeight));
@@ -687,7 +729,9 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         {
             CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageStartOffset), writer->imageStartOffset));
         }
-        CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ResolutionID), writer->resolutionID));
+        if (writer->resolutionID != 0) {
+            CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ResolutionID), writer->resolutionID));
+        }
         CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameSampleSize), writer->frameSize));
         CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageSize), writer->essenceLength));
 
@@ -895,6 +939,7 @@ static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer)
     uint32_t j;
     MXFIndexEntry indexEntry;
     uint32_t numIndexEntries;
+    int64_t filePos;
 
     
     /* finalise and close the essence element */
@@ -913,8 +958,9 @@ static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer)
     writer->footerPartition->kagSize = 0x100;
     writer->footerPartition->indexSID = g_indexSID;
 
+    CHK_ORET((filePos = mxf_file_tell(writer->mxfFile)) >= 0);
     CHK_ORET(mxf_write_partition(writer->mxfFile, writer->footerPartition));
-    CHK_ORET(mxf_fill_to_kag(writer->mxfFile, writer->footerPartition));
+    CHK_ORET(mxf_fill_to_position(writer->mxfFile, filePos + 199));
 
     
     /* write the index table segment */
@@ -1020,7 +1066,15 @@ static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer)
     
     CHK_ORET(mxf_mark_header_start(writer->mxfFile, writer->headerPartition));
     CHK_ORET(mxf_avid_write_header_metadata(writer->mxfFile, writer->headerMetadata));    
-    CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_fixedBodyPPOffset));
+    if (writer->essenceType == Unc1080iUYVY ||
+        writer->essenceType == Unc720pUYVY)
+    {
+        CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncFixedBodyPPOffset));
+    }
+    else
+    {
+        CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_fixedBodyPPOffset));
+    }
     CHK_ORET(mxf_mark_header_end(writer->mxfFile, writer->headerPartition));
 
     
@@ -1041,6 +1095,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     MXFListIterator iter;
     int haveMaterialTrackRef;
     uint32_t i;
+    int64_t filePos;
     
     CHK_ORET(filePackage->filename != NULL);
     CHK_ORET(clipWriter->projectFormat == PAL_25i || clipWriter->projectFormat == NTSC_30i);
@@ -1096,6 +1151,8 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->videoLineMapLen = 2;
                         newTrackWriter->storedHeight = 296;
                         newTrackWriter->storedWidth = 720;
+                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledWidth = 720;
                         newTrackWriter->displayHeight = 288;
                         newTrackWriter->displayWidth = 720;
                         newTrackWriter->displayYOffset = 8;
@@ -1111,6 +1168,8 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->videoLineMapLen = 2;
                         newTrackWriter->storedHeight = 296;
                         newTrackWriter->storedWidth = 720;
+                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledWidth = 720;
                         newTrackWriter->displayHeight = 288;
                         newTrackWriter->displayWidth = 720;
                         newTrackWriter->displayYOffset = 8;
@@ -1126,6 +1185,8 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->videoLineMapLen = 2;
                         newTrackWriter->storedHeight = 296;
                         newTrackWriter->storedWidth = 720;
+                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledWidth = 720;
                         newTrackWriter->displayHeight = 288;
                         newTrackWriter->displayWidth = 720;
                         newTrackWriter->displayYOffset = 8;
@@ -1133,13 +1194,31 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->frameLayout = 1; /* SeparateFields */
                         newTrackWriter->colorSiting = 4; /* Rec601 */
                         break;
-                    case Res151:
-                        newTrackWriter->resolutionID = g_AvidMJPEG151_ResolutionID;
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG151);
+                    case Res101m:
+                        newTrackWriter->resolutionID = g_AvidMJPEG101m_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101m);
+                        newTrackWriter->videoLineMap[0] = 15;
+                        newTrackWriter->videoLineMapLen = 1;
+                        newTrackWriter->storedHeight = 296;
+                        newTrackWriter->storedWidth = 288;
+                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledWidth = 288;
+                        newTrackWriter->displayHeight = 288;
+                        newTrackWriter->displayWidth = 288;
+                        newTrackWriter->displayYOffset = 8;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 2; /* SingleField */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
+                    case Res151s:
+                        newTrackWriter->resolutionID = g_AvidMJPEG151s_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG151s);
                         newTrackWriter->videoLineMap[0] = 15;
                         newTrackWriter->videoLineMapLen = 1;
                         newTrackWriter->storedHeight = 296;
                         newTrackWriter->storedWidth = 352;
+                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledWidth = 352;
                         newTrackWriter->displayHeight = 288;
                         newTrackWriter->displayWidth = 352;
                         newTrackWriter->displayYOffset = 8;
@@ -1155,6 +1234,8 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->videoLineMapLen = 2;
                         newTrackWriter->storedHeight = 296;
                         newTrackWriter->storedWidth = 720;
+                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledWidth = 720;
                         newTrackWriter->displayHeight = 288;
                         newTrackWriter->displayWidth = 720;
                         newTrackWriter->displayYOffset = 8;
@@ -1294,44 +1375,142 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->resolutionID = 0x8e;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
+        case DV1080i50:
+        case DV720p50:
+            newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
+            newTrackWriter->videoLineMap[0] = 21;
+            newTrackWriter->videoLineMap[1] = 584;
+            newTrackWriter->videoLineMapLen = 2;
+            newTrackWriter->storedHeight = 540;
+            newTrackWriter->storedWidth = 1920;
+            newTrackWriter->displayHeight = 540;
+            newTrackWriter->displayWidth = 1920;
+            newTrackWriter->displayYOffset = 0;
+            newTrackWriter->displayXOffset = 0;
+            newTrackWriter->frameLayout = 1; /* SeparateFields */
+            newTrackWriter->colorSiting = 4; /* Rec601 */
+            newTrackWriter->horizSubsampling = 2;
+            newTrackWriter->vertSubsampling = 1;
+            newTrackWriter->frameSize = 576000;
+
+            switch (filePackage->essenceType)
+            {
+                case DV1080i50:        /* SMPTE 370M */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DV1080i50);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DV1080i50ClipWrapped);
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DV1080i50);
+                    break;
+                case DV720p50:        /* Not part of SMPTE 370M but being shipped by Panasonic */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DV720p50);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DV720p50ClipWrapped);
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DV720p50);
+                    break;
+                default:
+                    assert(0);
+                    return 0;
+            }
+            /* Note: no ResolutionID is set in DV100 files */
+
+            newTrackWriter->sourceTrackNumber = MXF_DV_TRACK_NUM(0x01, MXF_DV_CLIP_WRAPPED_EE_TYPE, 0x01);
+            newTrackWriter->essenceElementLLen = 9;
+            CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
+            newTrackWriter->sampleRate = track->editRate;
+            newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
+            break;
+        case IMX30:
+        case IMX40:
+        case IMX50:
+            newTrackWriter->cdciEssenceContainerLabel = g_Null_UL;
+            if (clipWriter->projectFormat == PAL_25i)
+            {
+                switch (filePackage->essenceType)
+                {
+                    case IMX30:
+                        newTrackWriter->frameSize = 150000;
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(IMX30);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_30);
+                        newTrackWriter->resolutionID = 162;
+                        break;
+                    case IMX40:
+                        newTrackWriter->frameSize = 200000;
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(IMX40);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_40);
+                        newTrackWriter->resolutionID = 161;
+                        break;
+                    case IMX50:
+                        newTrackWriter->frameSize = 250000;
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(IMX50);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_50);
+                        newTrackWriter->resolutionID = 160;
+                        break;
+                    default:
+                        assert(0);
+                        return 0;
+                }
+                newTrackWriter->displayHeight = 288;
+                newTrackWriter->displayWidth = 720;
+                newTrackWriter->displayYOffset = 16;
+                newTrackWriter->displayXOffset = 0;
+                newTrackWriter->storedHeight = 304;
+                newTrackWriter->storedWidth = 720;
+                newTrackWriter->videoLineMap[0] = 7;
+                newTrackWriter->videoLineMap[1] = 320;
+                newTrackWriter->videoLineMapLen = 2;
+                newTrackWriter->horizSubsampling = 2;
+                newTrackWriter->vertSubsampling = 1;
+                newTrackWriter->colorSiting = 4; /* Rec601 */
+                newTrackWriter->frameLayout = 1; /* SeparateFields */
+            }
+            else
+            {
+                mxf_log(MXF_ELOG, "IMX NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                assert(0);
+            }
+            newTrackWriter->essenceElementKey = MXF_EE_K(IMX);
+            newTrackWriter->sourceTrackNumber = MXF_D10_PICTURE_TRACK_NUM(0x01);
+            newTrackWriter->essenceElementLLen = 8;
+            CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0);
+            newTrackWriter->sampleRate = track->editRate;
+            newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
+            break;
         case DNxHD1080i120:
         case DNxHD1080i180:
             newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
-			newTrackWriter->videoLineMap[0] = 21;
-			newTrackWriter->videoLineMap[1] = 584;
-			newTrackWriter->videoLineMapLen = 2;
-			newTrackWriter->storedHeight = 540;
-			newTrackWriter->storedWidth = 1920;
-			newTrackWriter->displayHeight = 540;
-			newTrackWriter->displayWidth = 1920;
-			newTrackWriter->displayYOffset = 0;
-			newTrackWriter->displayXOffset = 0;
-			newTrackWriter->frameLayout = 1; /* SeparateFields */
-			newTrackWriter->colorSiting = 4; /* Rec601 */
-			newTrackWriter->horizSubsampling = 2;
-			newTrackWriter->vertSubsampling = 1;
-			newTrackWriter->imageAlignmentOffset = 8192;
+            newTrackWriter->videoLineMap[0] = 21;
+            newTrackWriter->videoLineMap[1] = 584;
+            newTrackWriter->videoLineMapLen = 2;
+            newTrackWriter->storedHeight = 540;
+            newTrackWriter->storedWidth = 1920;
+            newTrackWriter->displayHeight = 540;
+            newTrackWriter->displayWidth = 1920;
+            newTrackWriter->displayYOffset = 0;
+            newTrackWriter->displayXOffset = 0;
+            newTrackWriter->frameLayout = 1; /* SeparateFields */
+            newTrackWriter->colorSiting = 4; /* Rec601 */
+            newTrackWriter->horizSubsampling = 2;
+            newTrackWriter->vertSubsampling = 1;
+            newTrackWriter->imageAlignmentOffset = 8192;
 
-			switch (filePackage->essenceType)
-			{
-				case DNxHD1080i120:		/* DNxHD 1920x1080 50i 120MBps */
-            		newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
-					newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080i120ClipWrapped);
-					newTrackWriter->resolutionID = 1242;
-					newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
-					newTrackWriter->frameSize = 606208;
-					break;
-				case DNxHD1080i180:		/* DNxHD 1920x1080 50i 180MBps */
-            		newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
-					newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080i180ClipWrapped);
-					newTrackWriter->resolutionID = 1243;
-					newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
-					newTrackWriter->frameSize = 917504;
-					break;
-				default:
-					assert(0);
-					return 0;
-			}
+            switch (filePackage->essenceType)
+            {
+                case DNxHD1080i120:        /* DNxHD 1920x1080 50i 120MBps */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080i120ClipWrapped);
+                    newTrackWriter->resolutionID = 1242;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 606208;
+                    break;
+                case DNxHD1080i180:        /* DNxHD 1920x1080 50i 180MBps */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080i180ClipWrapped);
+                    newTrackWriter->resolutionID = 1243;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 917504;
+                    break;
+                default:
+                    assert(0);
+                    return 0;
+            }
             newTrackWriter->sourceTrackNumber = g_DNxHDTrackNumber;
             newTrackWriter->essenceElementLLen = 9;
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
@@ -1386,6 +1565,45 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->resolutionID = 0xaa;
+            newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
+            break;
+        case Unc1080iUYVY:
+            newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
+            if (clipWriter->projectFormat == PAL_25i)
+            {
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped);
+                newTrackWriter->frameSize = g_uncAligned1080i50FrameSize;
+                newTrackWriter->storedHeight = 1080;
+                newTrackWriter->storedWidth = 1920;
+                newTrackWriter->displayHeight = 1080;
+                newTrackWriter->displayWidth = 1920;
+                newTrackWriter->displayYOffset = 0;
+                newTrackWriter->displayXOffset = 0;
+                newTrackWriter->videoLineMap[0] = 21;
+                newTrackWriter->videoLineMap[1] = 584;
+                newTrackWriter->videoLineMapLen = 2;
+                newTrackWriter->horizSubsampling = 2;
+                newTrackWriter->vertSubsampling = 1;
+                newTrackWriter->colorSiting = 4; /* Rec601 */
+                newTrackWriter->frameLayout = 3; /* MixedFields */
+                newTrackWriter->imageAlignmentOffset = g_uncImageAlignmentOffset;
+                newTrackWriter->imageStartOffset = g_unc1080i50StartOffsetSize;
+
+                CHK_MALLOC_ARRAY_OFAIL(newTrackWriter->startOffsetData, uint8_t, g_unc1080i50StartOffsetSize);
+                memset(newTrackWriter->startOffsetData, 0, g_unc1080i50StartOffsetSize);
+            }
+            else
+            {
+                /* TODO */
+                mxf_log(MXF_ELOG, "Uncompressed 1080i NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                assert(0);
+                return 0;
+            }
+            newTrackWriter->essenceElementKey = MXF_EE_K(UncClipWrapped);
+            newTrackWriter->sourceTrackNumber = MXF_UNC_TRACK_NUM(0x01, MXF_UNC_CLIP_WRAPPED_EE_TYPE, 0x01);
+            newTrackWriter->essenceElementLLen = 9;
+            CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
+            newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
         case PCM:
@@ -1472,7 +1690,15 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     
     CHK_OFAIL(mxf_mark_header_start(newTrackWriter->mxfFile, newTrackWriter->headerPartition));
     CHK_OFAIL(mxf_avid_write_header_metadata(newTrackWriter->mxfFile, newTrackWriter->headerMetadata));    
-    CHK_OFAIL(mxf_fill_to_position(newTrackWriter->mxfFile, g_fixedBodyPPOffset));
+    if (newTrackWriter->essenceType == Unc1080iUYVY ||
+        newTrackWriter->essenceType == Unc720pUYVY)
+    {
+        CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncFixedBodyPPOffset));
+    }
+    else
+    {
+        CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_fixedBodyPPOffset));
+    }
     CHK_OFAIL(mxf_mark_header_end(newTrackWriter->mxfFile, newTrackWriter->headerPartition));
 
     
@@ -1480,11 +1706,32 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
 
     CHK_OFAIL(mxf_append_new_from_partition(newTrackWriter->partitions, newTrackWriter->headerPartition, &newTrackWriter->bodyPartition));
     newTrackWriter->bodyPartition->key = MXF_PP_K(ClosedComplete, Body);
-    newTrackWriter->bodyPartition->kagSize = 0x200;
+    if (newTrackWriter->essenceType == PCM) /* audio */
+    {
+        newTrackWriter->bodyPartition->kagSize = 0x200;
+    }
+    else /* video */
+    {
+        newTrackWriter->bodyPartition->kagSize = 0x20000;
+    }
     newTrackWriter->bodyPartition->bodySID = g_bodySID;
 
+    CHK_OFAIL((filePos = mxf_file_tell(newTrackWriter->mxfFile)) >= 0);
     CHK_OFAIL(mxf_write_partition(newTrackWriter->mxfFile, newTrackWriter->bodyPartition));
-    CHK_OFAIL(mxf_fill_to_kag(newTrackWriter->mxfFile, newTrackWriter->bodyPartition));
+    if (newTrackWriter->essenceType == Unc1080iUYVY ||
+        newTrackWriter->essenceType == Unc720pUYVY)
+    {
+        /* place the first byte of the essence data at 0x8000.
+        Note: 57 = 0x20 + 16 + 9. This assumes a 9 byte llen and that the partition pack 
+        position is 0x20 beyond 0x6000 (don't know why?) */        
+        CHK_OFAIL(mxf_fill_to_position(newTrackWriter->mxfFile, filePos + newTrackWriter->bodyPartition->kagSize - 57));
+    }
+    else
+    {
+        /* TODO: it would make sense to make this filePos + newTrackWriter->bodyPartition->kagSize - 57 as well 
+        Must first check that this doesn't break other formats */
+        CHK_OFAIL(mxf_fill_to_position(newTrackWriter->mxfFile, filePos + 199));
+    }
     
     
     /* open the essence element, ready for writing */
@@ -1580,6 +1827,11 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
             break;
         case DVBased25:
         case DVBased50:
+        case DV1080i50:
+        case DV720p50:
+        case IMX30:
+        case IMX40:
+        case IMX50:
         case DNxHD1080i120:
         case DNxHD1080i180:
         case PCM:
@@ -1597,6 +1849,15 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
             /* write VBI */
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->vbiData, 
                 g_uncPALVBISize));
+            CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
+            writer->duration += numSamples;
+            break;
+        case Unc1080iUYVY:
+            CHK_ORET(numSamples == 1);
+            CHK_ORET((size + g_unc1080i50StartOffsetSize) == numSamples * writer->editUnitByteCount);
+            /* write start offset for alignment */
+            CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, 
+                g_unc1080i50StartOffsetSize));
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
             writer->duration += numSamples;
             break;
@@ -1632,6 +1893,12 @@ int write_sample_data(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
         CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->vbiData, 
             g_uncPALVBISize));
     }
+    else if (writer->essenceType == Unc1080iUYVY && writer->sampleDataSize == 0)
+    {
+        /* write start offset for alignment */
+        CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, 
+            g_uncPALStartOffsetSize));
+    }
     else
     {
         CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
@@ -1659,6 +1926,11 @@ int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
             break;
         case DVBased25:
         case DVBased50:
+        case DV1080i50:
+        case DV720p50:
+        case IMX30:
+        case IMX40:
+        case IMX50:
         case DNxHD1080i120:
         case DNxHD1080i180:
         case PCM:
@@ -1666,10 +1938,16 @@ int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
             writer->duration += numSamples;
             break;
         case UncUYVY:
-            /* Avid uncompressed video requires padding and VBI and currently only accepts 1 sample at a time */
+            /* Avid uncompressed SD video requires padding and VBI and currently only accepts 1 sample at a time */
             CHK_ORET(numSamples == 1);
             CHK_ORET((writer->sampleDataSize + g_uncPALStartOffsetSize + g_uncPALVBISize) == 
                 numSamples * writer->editUnitByteCount);
+            writer->duration += numSamples;
+            break;
+        case Unc1080iUYVY:
+            /* Avid uncompressed HD video requires padding and currently only accepts 1 sample at a time */
+            CHK_ORET(numSamples == 1);
+            CHK_ORET((writer->sampleDataSize + g_unc1080i50StartOffsetSize) == numSamples * writer->editUnitByteCount);
             writer->duration += numSamples;
             break;
         default:

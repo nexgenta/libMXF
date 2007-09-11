@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_header_metadata.h,v 1.1 2006/12/20 15:40:19 john_f Exp $
+ * $Id: mxf_header_metadata.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * MXF header metadata
  *
@@ -46,6 +46,7 @@ typedef struct _MXFMetadataSet
     mxfUUID instanceUID;
     MXFList items;
     struct _MXFHeaderMetadata* headerMetadata;
+    uint64_t fixedSpaceAllocation;
 } MXFMetadataSet;
 
 typedef struct _MXFHeaderMetadata
@@ -84,6 +85,8 @@ void mxf_free_header_metadata(MXFHeaderMetadata** headerMetadata);
 void mxf_free_set(MXFMetadataSet** set);
 void mxf_free_item(MXFMetadataItem** item);
 
+void mxf_set_fixed_set_space_allocation(MXFMetadataSet* set, uint64_t size);
+
 int mxf_add_set(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* set);
 
 int mxf_register_item(MXFHeaderMetadata* headerMetadata, const mxfKey* key);
@@ -97,6 +100,8 @@ int mxf_find_singular_set_by_key(MXFHeaderMetadata* headerMetadata, const mxfKey
 int mxf_get_item(MXFMetadataSet* set, const mxfKey* key, MXFMetadataItem** resultItem);
 int mxf_have_item(MXFMetadataSet* set, const mxfKey* key);
     
+int mxf_set_is_subclass_of(MXFMetadataSet* set, const mxfKey* parentSetKey);
+
     
 int mxf_read_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata,
     uint64_t headerByteCount, const mxfKey* key, uint8_t llen, uint64_t len);
@@ -115,7 +120,7 @@ int mxf_write_header_sets(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata);
 int mxf_write_set(MXFFile* mxfFile, MXFMetadataSet* set);
 int mxf_write_item(MXFFile* mxfFile, MXFMetadataItem* item);
 void mxf_get_header_metadata_size(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata, uint64_t* size);
-void mxf_get_set_len(MXFFile* mxfFile, MXFMetadataSet* set, uint8_t* llen, uint64_t* len);
+uint64_t mxf_get_set_size(MXFFile* mxfFile, MXFMetadataSet* set);
 
 
 void mxf_get_uint8(const uint8_t* value, uint8_t* result);
@@ -129,6 +134,7 @@ void mxf_get_int64(const uint8_t* value, int64_t* result);
 void mxf_get_version_type(const uint8_t* value, mxfVersionType* result);
 void mxf_get_uuid(const uint8_t* value, mxfUUID* result);
 void mxf_get_ul(const uint8_t* value, mxfUL* result);
+void mxf_get_auid(const uint8_t* value, mxfAUID* result);
 void mxf_get_umid(const uint8_t* value, mxfUMID* result);
 void mxf_get_timestamp(const uint8_t* value, mxfTimestamp* result);
 void mxf_get_length(const uint8_t* value, mxfLength* result);
@@ -136,6 +142,7 @@ void mxf_get_rational(const uint8_t* value, mxfRational* result);
 void mxf_get_position(const uint8_t* value, mxfPosition* result);
 void mxf_get_boolean(const uint8_t* value, mxfBoolean* result);
 void mxf_get_product_version(const uint8_t* value, mxfProductVersion* result);
+void mxf_get_rgba_layout_component(const uint8_t* value, mxfRGBALayoutComponent* result);
 void mxf_get_array_header(const uint8_t* value, uint32_t* arrayLen, uint32_t* arrayItemLen);
 uint16_t mxf_get_utf16string_size(const uint8_t* value, uint16_t valueLen);
 void mxf_get_utf16string(const uint8_t* value, uint16_t valueLen, mxfUTF16Char* result);
@@ -161,6 +168,7 @@ void mxf_set_int64(int64_t value, uint8_t* result);
 void mxf_set_version_type(mxfVersionType value, uint8_t* result);
 void mxf_set_uuid(const mxfUUID* value, uint8_t* result);
 void mxf_set_ul(const mxfUL* value, uint8_t* result);
+void mxf_set_auid(const mxfAUID* value, uint8_t* result);
 void mxf_set_umid(const mxfUMID* value, uint8_t* result);
 void mxf_set_timestamp(const mxfTimestamp* value, uint8_t* result);
 uint16_t mxf_get_external_utf16string_size(const mxfUTF16Char* value);
@@ -173,6 +181,7 @@ void mxf_set_position(mxfPosition value, uint8_t* result);
 void mxf_set_length(mxfLength value, uint8_t* result);
 void mxf_set_boolean(mxfBoolean value, uint8_t* result);
 void mxf_set_product_version(const mxfProductVersion* value, uint8_t* result);
+void mxf_set_rgba_layout_component(const mxfRGBALayoutComponent* value, uint8_t* result);
 void mxf_set_array_header(uint32_t arrayLen, uint32_t arrayElementLen, uint8_t* result);
 
 
@@ -192,6 +201,7 @@ int mxf_set_int64_item(MXFMetadataSet* set, const mxfKey* itemKey, int64_t value
 int mxf_set_version_type_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfVersionType value);
 int mxf_set_uuid_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfUUID* value);
 int mxf_set_ul_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfUL* value);
+int mxf_set_auid_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfAUID* value);
 int mxf_set_umid_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfUMID* value);
 int mxf_set_timestamp_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfTimestamp* value);
 int mxf_set_utf16string_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfUTF16Char* value);
@@ -204,11 +214,15 @@ int mxf_set_position_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfPositio
 int mxf_set_length_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfLength value);
 int mxf_set_boolean_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfBoolean value);
 int mxf_set_product_version_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfProductVersion* value);
+int mxf_set_rgba_layout_component_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfRGBALayoutComponent* value);
 
 int mxf_alloc_array_item_elements(MXFMetadataSet* set, const mxfKey* itemKey, uint32_t elementLen, 
     uint32_t count, uint8_t** elements);
+int mxf_grow_array_item(MXFMetadataSet* set, const mxfKey* itemKey, uint32_t elementLen, 
+    uint32_t count, uint8_t** newElements);
 int mxf_set_empty_array_item(MXFMetadataSet* set, const mxfKey* itemKey, uint32_t elementLen);
 int mxf_add_array_item_strongref(MXFMetadataSet* set, const mxfKey* itemKey, const MXFMetadataSet* value);
+int mxf_add_array_item_weakref(MXFMetadataSet* set, const mxfKey* itemKey, const MXFMetadataSet* value);
 
 
 int mxf_get_item_len(MXFMetadataSet* set, const mxfKey* itemKey, uint16_t* len);
@@ -224,6 +238,7 @@ int mxf_get_int64_item(MXFMetadataSet* set, const mxfKey* itemKey, int64_t* valu
 int mxf_get_version_type_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfVersionType* value);
 int mxf_get_uuid_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfUUID* value);
 int mxf_get_ul_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfUL* value);
+int mxf_get_auid_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfAUID* value);
 int mxf_get_umid_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfUMID* value);
 int mxf_get_timestamp_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfTimestamp* value);
 int mxf_get_utf16string_item_size(MXFMetadataSet* set, const mxfKey* itemKey, uint16_t* size);
@@ -237,6 +252,7 @@ int mxf_get_rational_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfRationa
 int mxf_get_position_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfPosition* value);
 int mxf_get_boolean_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfBoolean* value);
 int mxf_get_product_version_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfProductVersion* value);
+int mxf_get_rgba_layout_component_item(MXFMetadataSet* set, const mxfKey* itemKey, mxfRGBALayoutComponent* value);
 
 int mxf_get_array_item_count(MXFMetadataSet* set, const mxfKey* itemKey, uint32_t* count);
 int mxf_get_array_item_element_len(MXFMetadataSet* set, const mxfKey* itemKey, uint32_t* elementLen);

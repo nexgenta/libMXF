@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_p2_extensions_data_model.h,v 1.2 2007/01/30 14:21:56 john_f Exp $
+ * $Id: mxf_p2_extensions_data_model.h,v 1.3 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * P2 data model extension definitions
  *
@@ -48,7 +48,7 @@
 #define MXF_SET_DEFINITION(parentName, name, label)
 #endif
 #if !defined (MXF_ITEM_DEFINITION)
-#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId)
+#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired)
 #endif
 
 

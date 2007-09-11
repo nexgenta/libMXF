@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_labels_and_keys.h,v 1.1 2006/12/20 15:40:19 john_f Exp $
+ * $Id: mxf_avid_labels_and_keys.h,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * Avid labels, keys, etc.
  *

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_metadata.h,v 1.1 2006/12/20 15:40:24 john_f Exp $
+ * $Id: mxf_metadata.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
  *
  * MXF metadata
  *
@@ -39,6 +39,15 @@ extern "C"
     type name[maxElements]; \
     uint32_t name ##_size; \
     int name ## _isPresent;
+
+#define OPTIONAL_VARARRAY(type, name, maxElements) \
+    type* name; \
+    uint32_t name ##_size; \
+    int name ## _isPresent;
+
+#define VARARRAY(type, name) \
+    type* name; \
+    uint32_t name ##_size;
 
 
 #define SET_OPTIONAL_VALUE(name, val) \
@@ -227,22 +236,149 @@ typedef struct
 
 int mxf_get_generic_descriptor(MXFMetadataSet* set, MXFGenericDescriptor* descriptor);
 int mxf_set_generic_descriptor(MXFMetadataSet* set, MXFGenericDescriptor* descriptor);
+void mxf_clear_generic_descriptor(MXFGenericDescriptor* descriptor); /* TODO */
 
 int mxf_get_file_descriptor(MXFMetadataSet* set, MXFFileDescriptor* descriptor);
 int mxf_set_file_descriptor(MXFMetadataSet* set, MXFFileDescriptor* descriptor);
+void mxf_clear_file_descriptor(MXFFileDescriptor* descriptor); /* TODO */
 
 int mxf_get_picture_descriptor(MXFMetadataSet* set, MXFGenericPictureEssenceDescriptor* descriptor);
 int mxf_set_picture_descriptor(MXFMetadataSet* set, MXFGenericPictureEssenceDescriptor* descriptor);
+void mxf_clear_picture_descriptor(MXFGenericPictureEssenceDescriptor* descriptor); /* TODO */
 
 int mxf_get_cdci_descriptor(MXFMetadataSet* set, MXFCDCIDescriptor* descriptor);
 int mxf_set_cdci_descriptor(MXFMetadataSet* set, MXFCDCIDescriptor* descriptor);
+void mxf_clear_cdci_descriptor(MXFCDCIDescriptor* descriptor); /* TODO */
 
 
 int mxf_get_sound_descriptor(MXFMetadataSet* set, MXFGenericSoundEssenceDescriptor* descriptor);
 int mxf_set_sound_descriptor(MXFMetadataSet* set, MXFGenericSoundEssenceDescriptor* descriptor);
+void mxf_clear_sound_descriptor(MXFGenericSoundEssenceDescriptor* descriptor); /* TODO */
 
 int mxf_get_wave_descriptor(MXFMetadataSet* set, MXFWaveAudioDescriptor* descriptor);
 int mxf_set_wave_descriptor(MXFMetadataSet* set, MXFWaveAudioDescriptor* descriptor);
+void mxf_clear_wave_descriptor(MXFWaveAudioDescriptor* descriptor); /* TODO */
+
+
+#define GENERIC_PACKAGE_ITEMS \
+    INTERCHANGE_OBJECT_ITEMS; \
+    mxfUMID packageUID; \
+    OPTIONAL(mxfUTF16Char*, name); \
+    mxfTimestamp packageCreationDate; \
+    mxfTimestamp packageModifiedDate; \
+    VARARRAY(mxfUUID, tracks);
+    
+typedef struct
+{
+    GENERIC_PACKAGE_ITEMS;
+} MXFGenericPackage;
+
+#define MATERIAL_PACKAGE_ITEMS \
+    GENERIC_PACKAGE_ITEMS;
+    
+typedef struct
+{
+    MATERIAL_PACKAGE_ITEMS;
+} MXFMaterialPackage;
+
+#define SOURCE_PACKAGE_ITEMS \
+    GENERIC_PACKAGE_ITEMS; \
+    mxfUUID descriptor;
+    
+typedef struct
+{
+    SOURCE_PACKAGE_ITEMS;
+} MXFSourcePackage;
+
+
+int mxf_get_generic_package(MXFMetadataSet* set, MXFGenericPackage* genericPackage);
+int mxf_set_generic_package(MXFMetadataSet* set, MXFGenericPackage* genericPackage);
+void mxf_clear_generic_package(MXFGenericPackage* genericPackage);
+
+int mxf_get_material_package(MXFMetadataSet* set, MXFMaterialPackage* materialPackage);
+int mxf_set_material_package(MXFMetadataSet* set, MXFMaterialPackage* materialPackage);
+void mxf_clear_material_package(MXFMaterialPackage* materialPackage);
+
+int mxf_get_source_package(MXFMetadataSet* set, MXFSourcePackage* sourcePackage);
+int mxf_set_source_package(MXFMetadataSet* set, MXFSourcePackage* sourcePackage);
+void mxf_clear_source_package(MXFSourcePackage* sourcePackage);
+
+
+#define GENERIC_TRACK_ITEMS \
+    INTERCHANGE_OBJECT_ITEMS; \
+    uint32_t trackID; \
+    uint32_t trackNumber; \
+    OPTIONAL(mxfUTF16Char*, trackName); \
+    mxfUUID sequence;
+    
+typedef struct
+{
+    GENERIC_TRACK_ITEMS;
+} MXFGenericTrack;
+
+#define TRACK_ITEMS \
+    GENERIC_TRACK_ITEMS; \
+    mxfRational editRate; \
+    mxfPosition origin;
+    
+typedef struct
+{
+    TRACK_ITEMS;
+} MXFTrack;
+
+
+int mxf_get_generic_track(MXFMetadataSet* set, MXFGenericTrack* genericTrack);
+int mxf_set_generic_track(MXFMetadataSet* set, MXFGenericTrack* genericTrack);
+void mxf_clear_generic_track(MXFGenericTrack* genericTrack);
+
+int mxf_get_track(MXFMetadataSet* set, MXFTrack* track);
+int mxf_set_track(MXFMetadataSet* set, MXFTrack* track);
+void mxf_clear_track(MXFTrack* track);
+
+
+
+#define STRUCTURAL_COMPONENT_ITEMS \
+    INTERCHANGE_OBJECT_ITEMS; \
+    mxfUL dataDefinition; \
+    OPTIONAL(mxfLength, duration);
+    
+typedef struct
+{
+    STRUCTURAL_COMPONENT_ITEMS;
+} MXFStructuralComponent;
+
+#define SEQUENCE_ITEMS \
+    STRUCTURAL_COMPONENT_ITEMS; \
+    VARARRAY(mxfUUID, structuralComponents);
+    
+typedef struct
+{
+    SEQUENCE_ITEMS;
+} MXFSequence;
+
+#define SOURCE_CLIP_ITEMS \
+    STRUCTURAL_COMPONENT_ITEMS; \
+    mxfPosition startPosition; \
+    mxfUMID sourcePackageID; \
+    uint32_t sourceTrackID;
+    
+typedef struct
+{
+    SOURCE_CLIP_ITEMS;
+} MXFSourceClip;
+
+
+int mxf_get_structural_component(MXFMetadataSet* set, MXFStructuralComponent* structuralComponent);
+int mxf_set_structural_component(MXFMetadataSet* set, MXFStructuralComponent* structuralComponent);
+void mxf_clear_structural_component(MXFStructuralComponent* structuralComponent);
+
+int mxf_get_sequence(MXFMetadataSet* set, MXFSequence* sequence);
+int mxf_set_sequence(MXFMetadataSet* set, MXFSequence* sequence);
+void mxf_clear_sequence(MXFSequence* sequence);
+
+int mxf_get_source_clip(MXFMetadataSet* set, MXFSourceClip* sourceClip);
+int mxf_set_source_clip(MXFMetadataSet* set, MXFSourceClip* sourceClip);
+void mxf_clear_source_clip(MXFSourceClip* sourceClip);
 
 
 

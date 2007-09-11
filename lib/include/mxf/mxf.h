@@ -1,5 +1,5 @@
 /*
- * $Id: mxf.h,v 1.1 2006/12/20 15:40:18 john_f Exp $
+ * $Id: mxf.h,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * libMXF header files
  *

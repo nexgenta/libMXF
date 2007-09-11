@@ -27,7 +27,10 @@ OBJS = $(MXF_DIR)/mxf_version.o \
 	$(PRODUCTS_DIR)/mxf_avid_metadict_blob.o \
 	$(PRODUCTS_DIR)/mxf_p2.o \
 	$(UTILS_DIR)/mxf_uu_metadata.o \
-	$(METADATA_DIR)/mxf_descriptor.o
+	$(METADATA_DIR)/mxf_descriptor.o \
+	$(METADATA_DIR)/mxf_package.o \
+	$(METADATA_DIR)/mxf_track.o \
+	$(METADATA_DIR)/mxf_structural_component.o
 
 INCLUDE_FILES = $(INCLUDES_DIR)/mxf/mxf_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_header_metadata.h \
@@ -114,15 +117,24 @@ $(UTILS_DIR)/mxf_uu_metadata.o: $(UTILS_DIR)/mxf_uu_metadata.c $(INCLUDE_FILES)
 	
 	
 $(METADATA_DIR)/mxf_descriptor.o: $(METADATA_DIR)/mxf_descriptor.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_descriptor.c -o $(METADATA_DIR)/mxf_descriptor.o 
+	$(CC) -c -I$(METADATA_DIR) -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_descriptor.c -o $(METADATA_DIR)/mxf_descriptor.o 
+	
+$(METADATA_DIR)/mxf_package.o: $(METADATA_DIR)/mxf_package.c $(INCLUDE_FILES)
+	$(CC) -c -I$(METADATA_DIR) -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_package.c -o $(METADATA_DIR)/mxf_package.o 
+	
+$(METADATA_DIR)/mxf_track.o: $(METADATA_DIR)/mxf_track.c $(INCLUDE_FILES)
+	$(CC) -c -I$(METADATA_DIR) -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_track.c -o $(METADATA_DIR)/mxf_track.o 
+	
+$(METADATA_DIR)/mxf_structural_component.o: $(METADATA_DIR)/mxf_structural_component.c $(INCLUDE_FILES)
+	$(CC) -c -I$(METADATA_DIR) -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_structural_component.c -o $(METADATA_DIR)/mxf_structural_component.o 
 	
 	
 	
 .PHONY: install
 install: libMXF.a
-	@cp libMXF.a $(MXF_INSTALL_PREFIX)/lib
-	@mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf
-	@cp include/mxf/*.h $(MXF_INSTALL_PREFIX)/include/mxf/
+	cp libMXF.a $(MXF_INSTALL_PREFIX)/lib
+	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf
+	cp include/mxf/*.h $(MXF_INSTALL_PREFIX)/include/mxf/
 
 .PHONY: uninstall
 uninstall:

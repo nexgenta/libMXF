@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.2 2007/01/30 14:21:57 john_f Exp $
+ * $Id: mxf_avid.c,v 1.3 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -115,8 +115,6 @@ static int mxf_avid_add_header_dir_entries(MXFFile* mxfFile, MXFAvidObjectDirect
     MXFListIterator iter;
     int64_t offset;
     MXFMetadataSet* set;
-    uint64_t len;
-    uint8_t llen;
     
     CHK_ORET((offset = mxf_file_tell(mxfFile)) >= 0);
     
@@ -126,8 +124,7 @@ static int mxf_avid_add_header_dir_entries(MXFFile* mxfFile, MXFAvidObjectDirect
         set = (MXFMetadataSet*)mxf_get_iter_element(&iter);
         mxf_avid_add_object_directory_entry(directory, &set->instanceUID, offset, 0x00);
 
-        mxf_get_set_len(mxfFile, set, &llen, &len);
-        offset += mxfKey_extlen + llen + len;
+        offset += mxf_get_set_size(mxfFile, set);
     }
     
     return 1;
@@ -234,19 +231,19 @@ static int mxf_avid_register_metadict_tags(MXFPrimerPack* primerPack)
     return 1;
 }
 
-static int mxf_avid_write_metadict_blob(MXFFile* mxfFile)
+static int mxf_avid_write_metadict_blob(MXFFile* mxfFile, uint8_t* avidMetaDictBlob, uint32_t avidMetaDictBlobLen)
 {
     const uint32_t maxWriteBytes = 4096;
-    const uint8_t* dataPtr = g_AvidMetaDictBlob;
+    const uint8_t* dataPtr = avidMetaDictBlob;
     uint32_t numBytes;
     uint32_t totalBytes = 0;
     int done = 0;
     while (!done)
     {
-        if (g_AvidMetaDictBlob_len - totalBytes < maxWriteBytes)
+        if (avidMetaDictBlobLen - totalBytes < maxWriteBytes)
         {
             done = 1;
-            numBytes = g_AvidMetaDictBlob_len - totalBytes;
+            numBytes = avidMetaDictBlobLen - totalBytes;
         }
         else
         {
@@ -276,8 +273,7 @@ static int mxf_avid_register_metadict_object_offsets(uint64_t startOffset,
     return 1;
 }
     
-
-static int mxf_avid_fixup_dynamic_tags_in_blob(MXFPrimerPack* primerPack)
+static int mxf_avid_fixup_dynamic_tags_in_blob(MXFPrimerPack* primerPack, uint8_t* avidMetaDictBlob)
 {
     mxfLocalTag tag;
     uint32_t i;
@@ -293,7 +289,7 @@ static int mxf_avid_fixup_dynamic_tags_in_blob(MXFPrimerPack* primerPack)
         }
         
         /* fixup the tag in the meta-definition */
-        mxf_set_uint16(tag, &g_AvidMetaDictBlob[g_AvidMetaDictDynTagOffsets[i].tagOffset]);
+        mxf_set_uint16(tag, &avidMetaDictBlob[g_AvidMetaDictDynTagOffsets[i].tagOffset]);
     }
     
     return 1;
@@ -418,8 +414,8 @@ fail:
 #define MXF_SET_DEFINITION(parentName, name, label) \
     CHK_ORET(mxf_register_set_def(dataModel, #name, &MXF_SET_K(parentName), &MXF_SET_K(name)));
     
-#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId) \
-    CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId));
+#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
+    CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
     
 int mxf_avid_load_extensions(MXFDataModel* dataModel)
 {
@@ -440,6 +436,11 @@ int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMe
     MXFAvidMetadataRootSet* avidRootSet = NULL;
     MXFAvidMetadataRoot avidRoot;
     MXFMetadataSet* prefaceSet;
+    uint8_t* avidMetaDictBlob = NULL;
+    
+    CHK_MALLOC_ARRAY_ORET(avidMetaDictBlob, uint8_t, g_AvidMetaDictBlob_len);
+    memcpy(avidMetaDictBlob, g_AvidMetaDictBlob, g_AvidMetaDictBlob_len);
+    
 
     /* init the avid root */    
     avidRoot.id = g_Null_UUID;
@@ -467,8 +468,8 @@ int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMe
     
     /* write the Avid meta-dictionary blob */
     CHK_OFAIL((headerMetadataSetsPos = mxf_file_tell(mxfFile)) >= 0);
-    CHK_OFAIL(mxf_avid_fixup_dynamic_tags_in_blob(headerMetadata->primerPack));
-    CHK_OFAIL(mxf_avid_write_metadict_blob(mxfFile));
+    CHK_OFAIL(mxf_avid_fixup_dynamic_tags_in_blob(headerMetadata->primerPack, avidMetaDictBlob));
+    CHK_OFAIL(mxf_avid_write_metadict_blob(mxfFile, avidMetaDictBlob, g_AvidMetaDictBlob_len));
     CHK_OFAIL(mxf_avid_register_metadict_object_offsets(headerMetadataSetsPos, objectDirectory));
         
     /* write the header metadata; record the object directory entries before writing */
@@ -488,12 +489,13 @@ int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMe
     /* position file after object directory */
     CHK_OFAIL(mxf_file_seek(mxfFile, endPos, SEEK_SET));
     
-    
+    SAFE_FREE(&avidMetaDictBlob);
     mxf_free_set(&avidRootSet);
     mxf_avid_free_object_directory(&objectDirectory);
     return 1;
     
 fail:
+    SAFE_FREE(&avidMetaDictBlob);
     mxf_free_set(&avidRootSet);
     mxf_avid_free_object_directory(&objectDirectory);
     return 0;
@@ -536,6 +538,68 @@ void mxf_generate_aafsdk_umid(mxfUMID* umid)
     umid->octet8 = 0x01;
     umid->octet9 = 0x01;
     umid->octet10 = 0x0f; /* material type not identified */
+    umid->octet11 = 0x00; /* no method specified for material and instance number generation */
+    umid->octet12 = 0x13;
+    umid->octet13 = 0x00;
+    umid->octet14 = 0x00;
+    umid->octet15 = 0x00;
+
+    umid->octet24 = 0x06;
+    umid->octet25 = 0x0e;
+    umid->octet26 = 0x2b;
+    umid->octet27 = 0x34;
+    umid->octet28 = 0x7f;
+    umid->octet29 = 0x7f;
+    umid->octet30 = (uint8_t)(42 & 0x7f); /* company specific prefix = 42 */
+    umid->octet31 = (uint8_t)((42 >> 7L) | 0x80);  /* company specific prefix = 42 */
+    
+    umid->octet16 = (uint8_t)((major >> 24) & 0xff);
+    umid->octet17 = (uint8_t)((major >> 16) & 0xff);
+    umid->octet18 = (uint8_t)((major >> 8) & 0xff);
+    umid->octet19 = (uint8_t)(major & 0xff);
+    
+    umid->octet20 = (uint8_t)(((uint16_t)(minor & 0xFFFF) >> 8) & 0xff);
+    umid->octet21 = (uint8_t)((uint16_t)(minor & 0xFFFF) & 0xff);
+    
+    umid->octet22 = (uint8_t)(((uint16_t)((minor >> 16L) & 0xFFFF) >> 8) & 0xff);
+    umid->octet23 = (uint8_t)((uint16_t)((minor >> 16L) & 0xFFFF) & 0xff);
+
+}
+
+/* MobID generation code following the same algorithm as implemented in the older AAF SDK versions
+  - see revision 1.47 of AAF/ref-impl/src/impl/AAFUtils.c */
+void mxf_generate_old_aafsdk_umid(mxfUMID* umid)
+{
+    uint32_t major, minor;
+    static uint32_t last_part2 = 0;
+
+    major = (uint32_t)time(NULL);
+#if defined(_WIN32)
+    minor = (uint32_t)GetTickCount();
+#else
+    struct tms tms_buf;
+    minor = (uint32_t)times(&tms_buf);
+    assert(minor != 0 && minor != (uint32_t)-1);
+#endif
+
+    if (last_part2 >= minor)
+    {
+        minor = last_part2 + 1;
+    }
+        
+    last_part2 = minor;
+
+    umid->octet0 = 0x06;
+    umid->octet1 = 0x0c;
+    umid->octet2 = 0x2b;
+    umid->octet3 = 0x34;
+    umid->octet4 = 0x02;         
+    umid->octet5 = 0x05;     
+    umid->octet6 = 0x11; 
+    umid->octet7 = 0x01;
+    umid->octet8 = 0x01;
+    umid->octet9 = 0x04;  /* UMIDType */
+    umid->octet10 = 0x10;
     umid->octet11 = 0x00; /* no method specified for material and instance number generation */
     umid->octet12 = 0x13;
     umid->octet13 = 0x00;

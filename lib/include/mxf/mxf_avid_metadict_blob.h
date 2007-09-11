@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_metadict_blob.h,v 1.1 2006/12/20 15:40:19 john_f Exp $
+ * $Id: mxf_avid_metadict_blob.h,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * Blobs of data containing Avid header metadata extensions
  *
@@ -60,7 +60,7 @@ extern const struct AvidMetaDictObjectOffsetsStruct
 extern const uint32_t g_AvidMetaDictObjectOffsets_len;
 
 
-extern uint8_t g_AvidMetaDictBlob[];
+extern const uint8_t g_AvidMetaDictBlob[];
 
 extern const uint32_t g_AvidMetaDictBlob_len;
 

@@ -1,0 +1,102 @@
+
+[ Omitted 8 bytes of run-in ]
+
+[ K = Header ( 0000000000000008 )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.02.04.00, L =        120 (78), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000001
+       ThisPartition = 0000000000000008
+   PreviousPartition = 0000000000000000
+     FooterPartition = 000000000000061a
+     HeaderByteCount = 0000000000000400
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000001
+          BodyOffset = 0000000000000000
+             BodySID = 00000000
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          2 ]
+                   0 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.05.01.05
+                     = [ Uncompressed Picture - 625 50i 422 13.5MHz (frame wrapped) ]
+                   1 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.01.00
+                     = [ AES3/BWF - BWF (frame wrapped) ]
+
+[ K = KLVFill ( 0000000000000091 )
+06.0e.2b.34.01.01.01.01.03.01.02.10.01.00.00.00, L =       1005 (3ed), LL = 3 ]
+
+[ K = Body ( 0000000000000491 )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.03.04.00, L =        120 (78), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000001
+       ThisPartition = 0000000000000491
+   PreviousPartition = 0000000000000008
+     FooterPartition = 000000000000061a
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000000
+          BodyOffset = 0000000000000000
+             BodySID = 00000002
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          2 ]
+                   0 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.05.01.05
+                     = [ Uncompressed Picture - 625 50i 422 13.5MHz (frame wrapped) ]
+                   1 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.01.00
+                     = [ AES3/BWF - BWF (frame wrapped) ]
+
+[ K = Body ( 000000000000051a )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.03.04.00, L =        120 (78), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000100
+       ThisPartition = 000000000000051a
+   PreviousPartition = 0000000000000491
+     FooterPartition = 000000000000061a
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000000
+          BodyOffset = 0000000000000000
+             BodySID = 00000003
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          2 ]
+                   0 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.05.01.05
+                     = [ Uncompressed Picture - 625 50i 422 13.5MHz (frame wrapped) ]
+                   1 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.01.00
+                     = [ AES3/BWF - BWF (frame wrapped) ]
+
+[ K = KLVFill ( 00000000000005a3 )
+06.0e.2b.34.01.01.01.01.03.01.02.10.01.00.00.00, L =        102 (66), LL = 1 ]
+
+[ K = Footer ( 000000000000061a )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.04.04.00, L =        120 (78), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000001
+       ThisPartition = 000000000000061a
+   PreviousPartition = 000000000000051a
+     FooterPartition = 000000000000061a
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000001
+          BodyOffset = 0000000000000000
+             BodySID = 00000000
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          2 ]
+                   0 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.05.01.05
+                     = [ Uncompressed Picture - 625 50i 422 13.5MHz (frame wrapped) ]
+                   1 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.01.00
+                     = [ AES3/BWF - BWF (frame wrapped) ]
+
+[ K = RandomIndexMetadata ( 00000000000006a3 )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.11.01.00, L =         52 (34), LL = 1 ]
+  [ Number of entries =          4 ]
+       Partition           SID        Offset
+             0 :             0    0000000000000008
+             1 :             2    0000000000000491
+             2 :             3    000000000000051a
+             3 :             0    000000000000061a
+  [ Overall length =         69 ]

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MXFDictionary>
+	<D3P_D3ErrorCount detail="The number of D3 VTR errors detected when recording" type="UInt32" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 40 01 01 00"/>
+	<D3P_PSEFailureCount detail="The number of PSE failures detected" type="UInt32" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 40 01 02 00"/>
+	<D3P_InfaxFramework base="DM_Framework" detail="BBC D3 transfer Infax framework" type="localSet" key="06 0E 2B 34 02 53 01 01 0D 04 01 01 01 01 00 00">
+		<D3P_Format detail="OFFLINE_STORAGE::OFS_VT_Technical_Code_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 01 00"/>
+		<D3P_ProgrammeTitle detail="EDITORIAL_OBJECT_GROUP::EOG_Title" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 02 00"/>
+		<D3P_EpisodeTitle detail="EDITORIAL_OBJECT_CONCEPT::EOC_Title" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 03 00"/>
+		<D3P_TransmissionDate detail="PUBLICATION_EVENT::PEV_Actual_Start_Date or PEV_Planned_Start_Date (TODO)" use="optional" type="Timestamp" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 04 00"/>
+		<D3P_MagazinePrefix detail="TV_RADIO_CONCEPT::TRC_Magazine_Prefix_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 05 00"/>
+		<D3P_ProgrammeNumber detail="TV_RADIO_CONCEPT::TRC_Core_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 06 00"/>
+		<D3P_SpoolStatus detail="STORAGE::SGE_Status" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 07 00"/>
+		<D3P_StockDate detail="MEDIA_OBJECT_GROUP_INSTANCE::MOI_Creation_Date" use="optional" type="Timestamp" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 08 00"/>
+		<D3P_SpoolDescriptor detail="MEDIA_OBJECT_GROUP_INSTANCE::MOI_Description" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 09 00"/>
+		<D3P_Memo detail="CATALOGUE_ITEM::CIT_Analytical_Description" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0A 00"/>
+		<D3P_Duration detail="MEDIA_OBJECT_GROUP::MOG_Duration" use="optional" type="Int64" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0B 00"/>
+		<D3P_SpoolNumber detail="OFFLINE_STORAGE::OFS_Spool_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0C 00"/>
+		<D3P_AccessionNumber detail="OFFLINE_STORAGE::OFS_Library_Accession_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0D 00"/>
+		<D3P_CatalogueDetail detail="CATALOGUE::Cat_Code" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0E 00"/>
+	</D3P_InfaxFramework>
+	<D3P_PSEAnalysisFramework base="DM_Framework" detail="BBC D3 transfer PSE analysis framework" type="localSet" key="06 0E 2B 34 02 53 01 01 0D 04 01 01 01 02 00 00">
+		<D3P_RedFlash detail="The HardingFPA photosensitive epilepsy red flash analysis result" type="Int16" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 02 01 00"/>
+		<D3P_SpatialPattern detail="The HardingFPA photosensitive epilepsy spatial pattern analysis result" type="Int16" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 02 02 00"/>
+		<D3P_LuminanceFlash detail="The HardingFPA photosensitive epilepsy luminance flash result" type="Int16" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 02 03 00"/>
+		<D3P_ExtendedFailure detail="The HardingFPA photosensitive epilepsy cumulative sequence result" type="Boolean" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 02 04 00"/>
+	</D3P_PSEAnalysisFramework>
+	<D3P_D3ReplayErrorFramework base="DM_Framework" detail="BBC D3 transfer VTR error framework" type="localSet" key="06 0E 2B 34 02 53 01 01 0D 04 01 01 01 03 00 00">
+		<D3P_D3ErrorCode detail="The D3 VTR error code" type="UInt8" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 03 01 00"/>
+	</D3P_D3ReplayErrorFramework>
+	<TapeDescriptor base="GenericDescriptor" detail="A Tape Physical Descriptor" type="localSet" key="06 0e 2b 34 02 53 01 01 0d 01 01 01 01 01 2e 00"/>
+</MXFDictionary>

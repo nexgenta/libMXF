@@ -1,0 +1,111 @@
+
+[ K = Header ( 0000000000000000 )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.02.04.00, L =        120 (78), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000001
+       ThisPartition = 0000000000000000
+   PreviousPartition = 0000000000000000
+     FooterPartition = 0000000000000adf
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000000
+          BodyOffset = 0000000000000000
+             BodySID = 00000001
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          2 ]
+                   0 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.01.00
+                     = [ AES3/BWF - BWF (frame wrapped) ]
+                   1 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.02.00
+                     = [ AES3/BWF - BWF (clip wrapped) ]
+
+[ K = Essence Element ( 0000000000000089 )
+06.0e.2b.34.01.02.01.01.0d.01.03.01.16.01.01.01, L =        256 (100), LL = 4 ]
+  Track          = 16.01.01.01
+  Item Type      = "GC Sound" (16)
+  Element Type   = "Broadcast Wave (Frame Wrapped)" (01)
+  Element Count  = 1 (01)
+  Element Number = 1 (01)
+[ Value truncated from        256 bytes to          0 bytes ]
+
+[ K = Body ( 000000000000019d )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.03.04.00, L =        120 (78), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000001
+       ThisPartition = 000000000000019d
+   PreviousPartition = 0000000000000000
+     FooterPartition = 0000000000000adf
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000000
+          BodyOffset = 0000000000000000
+             BodySID = 00000002
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          2 ]
+                   0 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.01.00
+                     = [ AES3/BWF - BWF (frame wrapped) ]
+                   1 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.02.00
+                     = [ AES3/BWF - BWF (clip wrapped) ]
+
+[ K = Essence Element ( 0000000000000226 )
+06.0e.2b.34.01.02.01.01.0d.01.03.01.16.01.02.01, L =       1024 (400), LL = 8 ]
+  Track          = 16.01.02.01
+  Item Type      = "GC Sound" (16)
+  Element Type   = "Broadcast Wave (Clip Wrapped)" (02)
+  Element Count  = 1 (01)
+  Element Number = 1 (01)
+[ Value truncated from       1024 bytes to          0 bytes ]
+
+[ K = Body ( 000000000000063e )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.03.04.00, L =        120 (78), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000001
+       ThisPartition = 000000000000063e
+   PreviousPartition = 000000000000019d
+     FooterPartition = 0000000000000adf
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000000
+          BodyOffset = 0000000000000000
+             BodySID = 00000003
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          2 ]
+                   0 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.01.00
+                     = [ AES3/BWF - BWF (frame wrapped) ]
+                   1 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.02.00
+                     = [ AES3/BWF - BWF (clip wrapped) ]
+
+[ K = Essence Element ( 00000000000006c7 )
+06.0e.2b.34.01.02.01.01.0d.01.03.01.16.01.02.01, L =       1024 (400), LL = 8 ]
+  Track          = 16.01.02.01
+  Item Type      = "GC Sound" (16)
+  Element Type   = "Broadcast Wave (Clip Wrapped)" (02)
+  Element Count  = 1 (01)
+  Element Number = 1 (01)
+[ Value truncated from       1024 bytes to          0 bytes ]
+
+[ K = Footer ( 0000000000000adf )
+06.0e.2b.34.02.05.01.01.0d.01.02.01.01.04.04.00, L =        120 (78), LL = 1 ]
+       Major Version = 0001
+       Minor Version = 0002
+             KAGSize = 00000001
+       ThisPartition = 0000000000000adf
+   PreviousPartition = 000000000000063e
+     FooterPartition = 0000000000000adf
+     HeaderByteCount = 0000000000000000
+      IndexByteCount = 0000000000000000
+            IndexSID = 00000000
+          BodyOffset = 0000000000000000
+             BodySID = 00000000
+ Operational Pattern = 00.00.00.00.00.00.00.00.00.00.00.00.00.00.00.00
+                     = [ Invalid ]
+   EssenceContainers = [ count =          2 ]
+                   0 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.01.00
+                     = [ AES3/BWF - BWF (frame wrapped) ]
+                   1 = 06.0e.2b.34.04.01.01.01.0d.01.03.01.02.06.02.00
+                     = [ AES3/BWF - BWF (clip wrapped) ]

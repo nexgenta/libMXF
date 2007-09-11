@@ -1,5 +1,5 @@
 /*
- * $Id: avidp2transfer.h,v 1.1 2007/02/01 10:31:43 philipn Exp $
+ * $Id: avidp2transfer.h,v 1.2 2007/09/11 13:24:48 stuart_hc Exp $
  *
  * Reads an Avid AAF composition file and transfers referenced MXF files to P2
  *
@@ -117,7 +117,7 @@ public:
     
 private:
     void processAvidComposition(const char* filename);
-    std::string AvidP2Transfer::rewriteFilepath(std::string filepath);
+    std::string rewriteFilepath(std::string filepath);
     
     AvidMXFToP2Transfer* _transfer;
     bool _readyToTransfer;

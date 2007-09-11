@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.h,v 1.1 2006/12/20 15:45:52 john_f Exp $
+ * $Id: write_avid_mxf.h,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *

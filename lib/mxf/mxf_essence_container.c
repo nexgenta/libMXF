@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_container.c,v 1.1 2006/12/20 15:40:27 john_f Exp $
+ * $Id: mxf_essence_container.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
  *
  * MXF file body essence container functions
  *
