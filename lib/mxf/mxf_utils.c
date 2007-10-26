@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_utils.c,v 1.3 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_utils.c,v 1.4 2007/10/26 15:15:52 john_f Exp $
  *
  * General purpose utilities
  *
@@ -122,7 +122,8 @@ void mxf_generate_uuid(mxfUUID* uuid)
 
 void mxf_get_timestamp_now(mxfTimestamp* now)
 {
-#if defined(_MSC_VER) && _MSC_VER < 1400
+#if (defined(_MSC_VER) && _MSC_VER < 1400) || (defined(_WIN32) && defined(__GNUC__))
+    /* MSVC 7 or MinGW */
 
     /* NOTE: gmtime is not thread safe (not reentrant) */
     
@@ -142,7 +143,8 @@ void mxf_get_timestamp_now(mxfTimestamp* now)
     now->sec = gmt.tm_sec;
     now->qmsec = (uint8_t)(tb.millitm / 4 + 0.5); /* 1/250th second */
     
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) || (defined(_WIN32) && defined(__GNUC__))
+    /* MSVC 8 (MinGW doesn't seem to have gmtime_s() yet ) */
 
     struct _timeb tb;
     struct tm gmt;
