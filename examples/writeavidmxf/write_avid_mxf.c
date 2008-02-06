@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.3 2007/09/11 13:24:53 stuart_hc Exp $
+ * $Id: write_avid_mxf.c,v 1.4 2008/02/06 16:58:54 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -258,17 +258,8 @@ static const mxfUL MXF_CMDEF_L(DV720p50) =
 static const mxfKey MXF_EE_K(DV720p50) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x18, 0x01, 0x02, 0x01};
 
-/* DNxHD EssenceContainer labels observed in files created by Media Composer Adrenaline 2.2.9 */
-static const mxfUL MXF_EC_L(DNxHD1080i120ClipWrapped) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x06, 0x02, 0x02};
-static const mxfUL MXF_EC_L(DNxHD1080i180ClipWrapped) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x06, 0x02, 0x03};
-
-static const mxfUL MXF_CMDEF_L(DNxHD) =
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x04, 0x01, 0x00};
-
-static const mxfKey MXF_EE_K(DNxHD) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x06, 0x01};
+static const mxfKey MXF_EE_K(DNxHD) =
+    MXF_DNXHD_PICT_EE_K(0x01, 0x06, 0x01)
 
 /* 15 = GC Picture, 01 = element count=1, 01 = Avid JFIF, 01 = element number=1 */
 static const uint32_t g_AvidMJPEGTrackNumber = 0x15010101;
@@ -1474,7 +1465,12 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
         case DNxHD1080i120:
-        case DNxHD1080i180:
+        case DNxHD1080i185:
+        case DNxHD1080p36:
+        case DNxHD1080p120:
+        case DNxHD1080p185:
+        case DNxHD720p120:
+        case DNxHD720p185:
             newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
             newTrackWriter->videoLineMap[0] = 21;
             newTrackWriter->videoLineMap[1] = 584;
@@ -1500,12 +1496,76 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
                     newTrackWriter->frameSize = 606208;
                     break;
-                case DNxHD1080i180:        /* DNxHD 1920x1080 50i 180MBps */
+                case DNxHD1080i185:        /* DNxHD 1920x1080 50i 185MBps */
                     newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
-                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080i180ClipWrapped);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080i185ClipWrapped);
                     newTrackWriter->resolutionID = 1243;
                     newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
                     newTrackWriter->frameSize = 917504;
+                    break;
+                case DNxHD1080p36:         /* DNxHD 1920x1080 25p 36MBps */
+                    newTrackWriter->videoLineMap[0] = 42;
+                    newTrackWriter->videoLineMap[1] = 0;
+                    newTrackWriter->storedHeight = 1080;
+                    newTrackWriter->displayHeight = 1080;
+                    newTrackWriter->frameLayout = 0; /* FullFrame */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080p36ClipWrapped);
+                    newTrackWriter->resolutionID = 1253;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 188416;
+                    break;
+                case DNxHD1080p120:        /* DNxHD 1920x1080 25p 120MBps */
+                    newTrackWriter->videoLineMap[0] = 42;
+                    newTrackWriter->videoLineMap[1] = 0;
+                    newTrackWriter->storedHeight = 1080;
+                    newTrackWriter->displayHeight = 1080;
+                    newTrackWriter->frameLayout = 0; /* FullFrame */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080p120ClipWrapped);
+                    newTrackWriter->resolutionID = 1237;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 606208;
+                    break;
+                case DNxHD1080p185:        /* DNxHD 1920x1080 25p 185MBps */
+                    newTrackWriter->videoLineMap[0] = 42;
+                    newTrackWriter->videoLineMap[1] = 0;
+                    newTrackWriter->storedHeight = 1080;
+                    newTrackWriter->displayHeight = 1080;
+                    newTrackWriter->frameLayout = 0; /* FullFrame */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080p185ClipWrapped);
+                    newTrackWriter->resolutionID = 1238;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 917504;
+                    break;
+                case DNxHD720p120:        /* DNxHD 1280x720 50p 120MBps */
+                    newTrackWriter->videoLineMap[0] = 26;
+                    newTrackWriter->videoLineMap[1] = 0;
+                    newTrackWriter->storedWidth = 1280;
+                    newTrackWriter->storedHeight = 720;
+                    newTrackWriter->displayWidth = 1280;
+                    newTrackWriter->displayHeight = 720;
+                    newTrackWriter->frameLayout = 0; /* FullFrame */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD720p120ClipWrapped);
+                    newTrackWriter->resolutionID = 1252;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 303104;
+                    break;
+                case DNxHD720p185:        /* DNxHD 1280x720 50p 185MBps */
+                    newTrackWriter->videoLineMap[0] = 26;
+                    newTrackWriter->videoLineMap[1] = 0;
+                    newTrackWriter->storedWidth = 1280;
+                    newTrackWriter->storedHeight = 720;
+                    newTrackWriter->displayWidth = 1280;
+                    newTrackWriter->displayHeight = 720;
+                    newTrackWriter->frameLayout = 0; /* FullFrame */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD720p185ClipWrapped);
+                    newTrackWriter->resolutionID = 1251;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 458752;
                     break;
                 default:
                     assert(0);
@@ -1757,7 +1817,7 @@ fail:
 
 
 int create_clip_writer(const char* projectName, ProjectFormat projectFormat,
-    mxfRational imageAspectRatio, int dropFrameFlag, int useLegacy, 
+    mxfRational imageAspectRatio, mxfRational projectEditRate, int dropFrameFlag, int useLegacy, 
     PackageDefinitions* packageDefinitions, AvidClipWriter** clipWriter)
 {
     AvidClipWriter* newClipWriter = NULL;
@@ -1781,18 +1841,9 @@ int create_clip_writer(const char* projectName, ProjectFormat projectFormat,
     newClipWriter->dropFrameFlag = dropFrameFlag;
     newClipWriter->useLegacy = useLegacy;
 
-    if (newClipWriter->projectFormat == PAL_25i)
-    {
-        newClipWriter->projectEditRate.numerator = 25;
-        newClipWriter->projectEditRate.denominator = 1;
-    }
-    else
-    {
-        newClipWriter->projectEditRate.numerator = 30000;
-        newClipWriter->projectEditRate.denominator = 1001;
-    }
-    
-    
+    newClipWriter->projectEditRate.numerator = projectEditRate.numerator;
+    newClipWriter->projectEditRate.denominator = projectEditRate.denominator;
+
     /* create track writer for each file package */
     mxf_initialise_list_iter(&iter, &packageDefinitions->fileSourcePackages);
     while (mxf_next_list_iter_element(&iter))
@@ -1832,8 +1883,13 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
         case IMX30:
         case IMX40:
         case IMX50:
+        case DNxHD720p120:
+        case DNxHD720p185:
         case DNxHD1080i120:
-        case DNxHD1080i180:
+        case DNxHD1080i185:
+        case DNxHD1080p36:
+        case DNxHD1080p120:
+        case DNxHD1080p185:
         case PCM:
             CHK_ORET(size == numSamples * writer->editUnitByteCount);
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
@@ -1931,8 +1987,13 @@ int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
         case IMX30:
         case IMX40:
         case IMX50:
+        case DNxHD720p120:
+        case DNxHD720p185:
         case DNxHD1080i120:
-        case DNxHD1080i180:
+        case DNxHD1080i185:
+        case DNxHD1080p36:
+        case DNxHD1080p120:
+        case DNxHD1080p185:
         case PCM:
             CHK_ORET(writer->sampleDataSize == numSamples * writer->editUnitByteCount);
             writer->duration += numSamples;

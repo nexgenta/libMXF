@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
+ * $Id: package_definitions.h,v 1.3 2008/02/06 16:58:54 john_f Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -48,8 +48,13 @@ typedef enum
     IMX30,
     IMX40,
     IMX50,
+    DNxHD720p120,
+    DNxHD720p185,
+    DNxHD1080p36,
+    DNxHD1080p120,
+    DNxHD1080p185,
     DNxHD1080i120,
-    DNxHD1080i180,
+    DNxHD1080i185,
     UncUYVY,
     Unc1080iUYVY,
     Unc720pUYVY,

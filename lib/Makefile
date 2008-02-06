@@ -27,6 +27,7 @@ OBJS = $(MXF_DIR)/mxf_version.o \
 	$(PRODUCTS_DIR)/mxf_avid_metadict_blob.o \
 	$(PRODUCTS_DIR)/mxf_p2.o \
 	$(UTILS_DIR)/mxf_uu_metadata.o \
+	$(UTILS_DIR)/mxf_page_file.o \
 	$(METADATA_DIR)/mxf_descriptor.o \
 	$(METADATA_DIR)/mxf_package.o \
 	$(METADATA_DIR)/mxf_track.o \
@@ -43,6 +44,7 @@ INCLUDE_FILES = $(INCLUDES_DIR)/mxf/mxf_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_list.h \
 	$(INCLUDES_DIR)/mxf/mxf_logging.h \
 	$(INCLUDES_DIR)/mxf/mxf_utils.h \
+	$(INCLUDES_DIR)/mxf/mxf_page_file.h \
 	$(INCLUDES_DIR)/mxf/mxf_file.h \
 	$(INCLUDES_DIR)/mxf/mxf_version.h \
 	$(INCLUDES_DIR)/mxf/mxf_types.h \
@@ -114,6 +116,9 @@ $(PRODUCTS_DIR)/mxf_p2.o: $(PRODUCTS_DIR)/mxf_p2.c $(INCLUDE_FILES)
 	
 $(UTILS_DIR)/mxf_uu_metadata.o: $(UTILS_DIR)/mxf_uu_metadata.c $(INCLUDE_FILES)
 	$(CC) -c -I$(INCLUDES_DIR) $(UTILS_DIR)/mxf_uu_metadata.c -o $(UTILS_DIR)/mxf_uu_metadata.o 
+	
+$(UTILS_DIR)/mxf_page_file.o: $(UTILS_DIR)/mxf_page_file.c $(INCLUDE_FILES)
+	$(CC) -c -I$(INCLUDES_DIR) $(UTILS_DIR)/mxf_page_file.c -o $(UTILS_DIR)/mxf_page_file.o 
 	
 	
 $(METADATA_DIR)/mxf_descriptor.o: $(METADATA_DIR)/mxf_descriptor.c $(INCLUDE_FILES)

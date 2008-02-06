@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: mxf_opatom_reader.c,v 1.2 2008/02/06 16:58:54 john_f Exp $
  *
  * MXF OP-Atom reader
  *
@@ -39,6 +39,9 @@ static const mxfUL MXF_EC_L(AvidMJPEGClipWrapped) =
 static const mxfKey MXF_EE_K(AvidMJPEGEssenceElement) =
     {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x01, 0x01};
 
+static const mxfKey MXF_EE_K(DNxHD) =
+    MXF_DNXHD_PICT_EE_K(0x00, 0x06, 0x00)
+    
 
 /* TODO: handle frame size sequences for audio */
 
@@ -59,7 +62,12 @@ struct _EssenceReaderData
 
 static int is_avid_mjpeg_essence_element(const mxfKey* key)
 {
-    return mxf_equals_key(key, &MXF_EE_K(AvidMJPEGEssenceElement));
+    return mxf_equals_key_prefix(key, &MXF_EE_K(AvidMJPEGEssenceElement), 13) && key->octet14 == 0x01;
+}
+
+static int is_avid_dnxhd_essence_element(const mxfKey* key)
+{
+    return mxf_equals_key_prefix(key, &MXF_EE_K(DNxHD), 13) && key->octet14 == 0x06;
 }
 
 static int read_avid_mjpeg_index_segment(MXFReader* reader)
@@ -735,6 +743,11 @@ int opa_is_supported(MXFPartition* headerPartition)
     {
         return 1;
     }
+    else if (mxf_equals_ul(label, &MXF_EC_L(DNxHD1080i120ClipWrapped)))
+    {
+        return 1;
+    }
+
         
     
     return 0;
@@ -799,7 +812,9 @@ int opa_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
     CHK_OFAIL(mxf_is_body_partition_pack(&key));
     CHK_OFAIL(mxf_skip(mxfFile, len));
     CHK_OFAIL(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
-    CHK_OFAIL(mxf_is_gc_essence_element(&key) || is_avid_mjpeg_essence_element(&key));
+    CHK_OFAIL(mxf_is_gc_essence_element(&key) || 
+        is_avid_mjpeg_essence_element(&key) ||
+        is_avid_dnxhd_essence_element(&key));
 
     CHK_OFAIL((filePos = mxf_file_tell(mxfFile)) >= 0);
     data->essenceStartPos = filePos;

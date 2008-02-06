@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.1 2007/09/11 13:24:53 stuart_hc Exp $
+ * $Id: main.c,v 1.2 2008/02/06 16:58:54 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -457,33 +457,39 @@ static void usage(const char* cmd)
     fprintf(stderr, "Usage: %s <<options>> <<inputs>>\n", cmd);
     fprintf(stderr, "\n");
     fprintf(stderr, "Options: (options marked with * are required)\n");
-    fprintf(stderr, "  -h, --help               display this usage message\n");
-    fprintf(stderr, "* --prefix <filename>      output filename prefix\n");
-    fprintf(stderr, "  --clip <name>            clip (MaterialPackage) name.\n");
-    fprintf(stderr, "  --project <name>         Avid project name.\n");
-    fprintf(stderr, "  --tape <name>            tape name.\n");
-    fprintf(stderr, "  --ntsc                   NTSC. Default is PAL\n");
-    fprintf(stderr, "  --nolegacy               don't use the legacy definitions\n");
-    fprintf(stderr, "  --aspect <ratio>         video aspect ratio x:y. Default is 4:3\n");
-    fprintf(stderr, "  --comment <string>       add 'Comments' user comment to material package\n");
-    fprintf(stderr, "  --desc <string>          add 'Descript' user comment to material package\n");
+    fprintf(stderr, "  -h, --help                 display this usage message\n");
+    fprintf(stderr, "* --prefix <filename>        output filename prefix\n");
+    fprintf(stderr, "  --clip <name>              clip (MaterialPackage) name.\n");
+    fprintf(stderr, "  --project <name>           Avid project name.\n");
+    fprintf(stderr, "  --tape <name>              tape name.\n");
+    fprintf(stderr, "  --ntsc                     NTSC. Default is PAL\n");
+    fprintf(stderr, "  --nolegacy                 don't use the legacy definitions\n");
+    fprintf(stderr, "  --aspect <ratio>           video aspect ratio x:y. Default is 4:3\n");
+    fprintf(stderr, "  --comment <string>         add 'Comments' user comment to material package\n");
+    fprintf(stderr, "  --desc <string>            add 'Descript' user comment to material package\n");
+    fprintf(stderr, "  --start-tc <count>         set the start timecode to given count of video frames\n");
     fprintf(stderr, "Inputs:\n");
-    fprintf(stderr, "  --mjpeg <filename>       Avid MJPEG\n");
-    fprintf(stderr, "       --res <resolution>  Resolution '2:1' (default), '3:1', '10:1', '10:1m', '15:1s' or '20:1'\n");
-    fprintf(stderr, "  --dv25 <filename>        DV-based 25 Mbps\n");
-    fprintf(stderr, "  --dv50 <filename>        DV-based 50 Mbps\n");
-    fprintf(stderr, "  --dv1080i50 <filename>   DV 100 Mbps 1080i50 (SMPTE 370M)\n");
-    fprintf(stderr, "  --dv720p50 <filename>    DV 100 Mbps 720p50 (not specified in SMPTE 370M)\n");
-    fprintf(stderr, "  --IMX30 <filename>       IMX 30 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
-    fprintf(stderr, "  --IMX40 <filename>       IMX 40 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
-    fprintf(stderr, "  --IMX50 <filename>       IMX 50 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
-    fprintf(stderr, "  --DNxHD120 <filename>    DNxHD 1920x1080i50 120 Mbps\n");
-    fprintf(stderr, "  --DNxHD180 <filename>    DNxHD 1920x1080i50 180 Mbps\n");
-    fprintf(stderr, "  --unc <filename>         Uncompressed 8-bit UYVY SD\n");
-    fprintf(stderr, "  --unc1080i <filename>    Uncompressed 8-bit UYVY HD 1920x1080i\n");
-    fprintf(stderr, "  --pcm <filename>         raw 48kHz PCM audio\n");
+    fprintf(stderr, "  --mjpeg <filename>         Avid MJPEG\n");
+    fprintf(stderr, "       --res <resolution>    Resolution '2:1' (default), '3:1', '10:1', '10:1m', '15:1s' or '20:1'\n");
+    fprintf(stderr, "  --dv25 <filename>          DV-based 25 Mbps\n");
+    fprintf(stderr, "  --dv50 <filename>          DV-based 50 Mbps\n");
+    fprintf(stderr, "  --dv1080i50 <filename>     DV 100 Mbps 1080i50 (SMPTE 370M)\n");
+    fprintf(stderr, "  --dv720p50 <filename>      DV 100 Mbps 720p50 (not specified in SMPTE 370M)\n");
+    fprintf(stderr, "  --IMX30 <filename>         IMX 30 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
+    fprintf(stderr, "  --IMX40 <filename>         IMX 40 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
+    fprintf(stderr, "  --IMX50 <filename>         IMX 50 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
+    fprintf(stderr, "  --DNxHD720p120 <filename>  DNxHD 1280x720p50 120 Mbps\n");
+    fprintf(stderr, "  --DNxHD720p185 <filename>  DNxHD 1280x720p50 185 Mbps\n");
+    fprintf(stderr, "  --DNxHD1080i120 <filename> DNxHD 1920x1080i50 120 Mbps\n");
+    fprintf(stderr, "  --DNxHD1080i185 <filename> DNxHD 1920x1080i50 185 Mbps\n");
+    fprintf(stderr, "  --DNxHD1080p36 <filename>  DNxHD 1920x1080p25 36 Mbps\n");
+    fprintf(stderr, "  --DNxHD1080p120 <filename> DNxHD 1920x1080p25 120 Mbps\n");
+    fprintf(stderr, "  --DNxHD1080p185 <filename> DNxHD 1920x1080p25 185 Mbps\n");
+    fprintf(stderr, "  --unc <filename>           Uncompressed 8-bit UYVY SD\n");
+    fprintf(stderr, "  --unc1080i <filename>      Uncompressed 8-bit UYVY HD 1920x1080i\n");
+    fprintf(stderr, "  --pcm <filename>           raw 48kHz PCM audio\n");
     fprintf(stderr, "       --bps <bits per sample>    # bits per sample. Default is 16\n");
-    fprintf(stderr, "  --wavpcm <filename>      raw 48kHz PCM audio contained in a WAV file\n");
+    fprintf(stderr, "  --wavpcm <filename>        raw 48kHz PCM audio contained in a WAV file\n");
     fprintf(stderr, "\n");
 }
 
@@ -500,6 +506,7 @@ int main(int argc, const char* argv[])
     int inputIndex = 0;
     int cmdlnIndex = 1;
     mxfRational imageAspectRatio = {4, 3};
+    mxfRational sampleRate = {25, 1};
     int numAudioTracks = 0;
     int i;
     char filename[FILENAME_MAX];
@@ -520,6 +527,7 @@ int main(int argc, const char* argv[])
     char trackName[4];
     const char* comment = NULL;
     const char* desc = NULL;
+    int64_t videoStartPosition = 0; 
     
     memset(inputs, 0, sizeof(Input) * MAX_INPUTS);    
 
@@ -578,6 +586,8 @@ int main(int argc, const char* argv[])
         else if (strcmp(argv[cmdlnIndex], "--ntsc") == 0)
         {
             isPAL = 0;
+            sampleRate.numerator = 30000;
+            sampleRate.denominator = 1001;
             cmdlnIndex++;
         }
         else if (strcmp(argv[cmdlnIndex], "--nolegacy") == 0)
@@ -623,6 +633,24 @@ int main(int argc, const char* argv[])
                 return 1;
             }
             desc = argv[cmdlnIndex + 1];
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--start-tc") == 0)
+        {
+            int result;
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for --start-tc\n");
+                return 1;
+            }
+            if ((result = sscanf(argv[cmdlnIndex + 1], "%"PRId64"", &videoStartPosition)) != 1 ||
+                videoStartPosition < 0)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Failed to accept --start-tc integer value '%s'\n", argv[cmdlnIndex + 1]);
+                return 1;
+            }
             cmdlnIndex += 2;
         }
         else if (strcmp(argv[cmdlnIndex], "--mjpeg") == 0)
@@ -770,14 +798,50 @@ int main(int argc, const char* argv[])
             inputIndex++;
             cmdlnIndex += 2;
         }
-        else if (strcmp(argv[cmdlnIndex], "--DNxHD120") == 0)
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD720p120") == 0)
         {
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD120\n");
+                fprintf(stderr, "Missing argument for --DNxHD720p120\n");
                 return 1;
             }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = DNxHD720p120;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD720p185") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for --DNxHD720p185\n");
+                return 1;
+            }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = DNxHD720p185;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080i120") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for --DNxHD1080i120\n");
+                return 1;
+            }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
             inputs[inputIndex].isVideo = 1;
             inputs[inputIndex].essenceType = DNxHD1080i120;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
@@ -785,16 +849,69 @@ int main(int argc, const char* argv[])
             inputIndex++;
             cmdlnIndex += 2;
         }
-        else if (strcmp(argv[cmdlnIndex], "--DNxHD180") == 0)
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080i185") == 0)
         {
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD180\n");
+                fprintf(stderr, "Missing argument for --DNxHD1080i185\n");
                 return 1;
             }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
             inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = DNxHD1080i180;
+            inputs[inputIndex].essenceType = DNxHD1080i185;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p36") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for --DNxHD1080p36\n");
+                return 1;
+            }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = DNxHD1080p36;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p120") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for --DNxHD1080p120\n");
+                return 1;
+            }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = DNxHD1080p120;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p185") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for --DNxHD1080p185\n");
+                return 1;
+            }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = DNxHD1080p185;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
             inputIndex++;
@@ -1052,7 +1169,41 @@ int main(int argc, const char* argv[])
                 return 1;
             }
         }
-        else if (inputs[i].essenceType == DNxHD1080i120)
+        else if (inputs[i].essenceType == DNxHD720p120)
+        {
+            sampleRate.numerator = 50;
+            sampleRate.denominator = 1;
+            inputs[i].frameSize = 303104;
+            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
+            if (inputs[i].buffer == NULL)
+            {
+                fprintf(stderr, "Out of memory\n");
+                return 1;
+            }
+        }
+        else if (inputs[i].essenceType == DNxHD720p185)
+        {
+            sampleRate.numerator = 50;
+            sampleRate.denominator = 1;
+            inputs[i].frameSize = 458752;
+            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
+            if (inputs[i].buffer == NULL)
+            {
+                fprintf(stderr, "Out of memory\n");
+                return 1;
+            }
+        }
+        else if (inputs[i].essenceType == DNxHD1080p36)
+        {
+            inputs[i].frameSize = 188416;
+            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
+            if (inputs[i].buffer == NULL)
+            {
+                fprintf(stderr, "Out of memory\n");
+                return 1;
+            }
+        }
+        else if (inputs[i].essenceType == DNxHD1080i120 || inputs[i].essenceType == DNxHD1080p120)
         {
             inputs[i].frameSize = 606208;
             inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
@@ -1062,7 +1213,7 @@ int main(int argc, const char* argv[])
                 return 1;
             }
         }
-        else if (inputs[i].essenceType == DNxHD1080i180)
+        else if (inputs[i].essenceType == DNxHD1080i185 || inputs[i].essenceType == DNxHD1080p185)
         {
             inputs[i].frameSize = 917504;
             inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
@@ -1228,39 +1379,38 @@ int main(int argc, const char* argv[])
         int64_t tapeLen;
         int64_t startPosition;
         
+        projectEditRate.numerator = sampleRate.numerator;
+        projectEditRate.denominator = sampleRate.denominator;
+
         if (isPAL)
         {
-            projectEditRate.numerator = 25;
-            projectEditRate.denominator = 1;
-            tapeLen = 120 * 60 * 60 *25;
+            tapeLen = 120 * 60 * 60 * 25;
         }
         else
         {
-            projectEditRate.numerator = 30000;
-            projectEditRate.denominator = 1001;
             tapeLen = 120 * 60 * 60 * 30;
         }
         
         if (inputs[i].isVideo)
         {
-            if (isPAL)
-            {
-                editRate.numerator = 25;
-                editRate.denominator = 1;
-                startPosition = 10 * 60 * 60 * 25;
-            }
-            else
-            {
-                editRate.numerator = 30000;
-                editRate.denominator = 1001;
-                startPosition = 10 * 60 * 60 * 30;
-            }
+            startPosition = videoStartPosition;
+            
+            editRate.numerator = sampleRate.numerator;
+            editRate.denominator = sampleRate.denominator;
         }
         else
         {
             editRate.numerator = 48000;
             editRate.denominator = 1;
-            startPosition = 10 * 60 * 60 * 48000;
+            
+            if (isPAL)
+            {
+                startPosition = videoStartPosition * 48000 / 25;
+            }
+            else
+            {
+                startPosition = videoStartPosition * 48000 / 30;
+            }
         }
         
         get_filename(filenamePrefix, inputs[i].isVideo, inputs[i].trackNumber, filename);
@@ -1307,7 +1457,7 @@ int main(int argc, const char* argv[])
     
     /* create the clip writer */
     if (!create_clip_writer(projectName, isPAL ? PAL_25i : NTSC_30i,
-        imageAspectRatio, 0, useLegacy, packageDefinitions, &clipWriter))
+        imageAspectRatio, sampleRate, 0, useLegacy, packageDefinitions, &clipWriter))
     {
         fprintf(stderr, "Failed to create Avid MXF clip writer\n");
         return 1;
@@ -1407,7 +1557,10 @@ int main(int argc, const char* argv[])
                     goto abort;
                 }
             }
-            else if (inputs[i].essenceType == DNxHD1080i120 || inputs[i].essenceType == DNxHD1080i180)
+            else if (inputs[i].essenceType == DNxHD720p120 || inputs[i].essenceType == DNxHD720p185 ||
+                     inputs[i].essenceType == DNxHD1080i120 || inputs[i].essenceType == DNxHD1080i185 ||
+                     inputs[i].essenceType == DNxHD1080p120 || inputs[i].essenceType == DNxHD1080p185 ||
+                     inputs[i].essenceType == DNxHD1080p36)
             {
                 if (fread(inputs[i].buffer, 1, inputs[i].frameSize, inputs[i].file) != inputs[i].frameSize)
                 {

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: mxf_essence_helper.c,v 1.2 2008/02/06 16:58:54 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -272,6 +272,18 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         track->video.displayYOffset = 13 * 2;
         track->video.horizSubsampling = 2;
         track->video.vertSubsampling = 1;
+    }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD1080i120ClipWrapped)))
+    {
+        track->video.frameWidth = 1920;
+        track->video.frameHeight = 540 * 2;
+        track->video.displayWidth = 1920;
+        track->video.displayHeight = 540 * 2;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 606208;
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped)))

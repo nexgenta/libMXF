@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: mxf_reader.c,v 1.2 2008/02/06 16:58:54 john_f Exp $
  *
  * Main functions for reading MXF files
  *
@@ -1065,6 +1065,7 @@ int initialise_source_timecodes(MXFReader* reader, MXFMetadataSet* sourcePackage
     uint16_t roundedTimecodeBase;
     TimecodeSegment* segment;
     int continueAvidTimecodeSearch;
+    uint32_t i;
     
     mxf_initialise_list(sourceTimecodeIndexes, free_timecode_index_in_list);
 
@@ -1140,10 +1141,20 @@ int initialise_source_timecodes(MXFReader* reader, MXFMetadataSet* sourcePackage
                 continue;
             }
             
-            /* get first component */
-            
-            CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElementValue)); 
-            CHK_OFAIL(mxf_get_strongref(sequenceSet->headerMetadata, arrayElementValue, &structuralComponentSet));
+            /* get first source clip component */
+            for (i = 0; i < componentCount; i++)
+            {
+                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), i, &arrayElementValue)); 
+                if (!mxf_get_strongref(sequenceSet->headerMetadata, arrayElementValue, &structuralComponentSet))
+                {
+                    /* probably a Filler if it hasn't been registered in the dictionary */
+                    continue;
+                }
+                if (mxf_set_is_subclass_of(structuralComponentSet, &MXF_SET_K(SourceClip)))
+                {
+                    break;
+                }
+            }
         }
         else
         {

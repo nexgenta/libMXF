@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.h,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
+ * $Id: write_avid_mxf.h,v 1.3 2008/02/06 16:58:54 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -44,7 +44,7 @@ typedef enum
 
 /* create the writer */
 int create_clip_writer(const char* projectName, ProjectFormat projectFormat,
-    mxfRational imageAspectRatio, int dropFrameFlag, int useLegacy, 
+    mxfRational imageAspectRatio, mxfRational projectEditRate, int dropFrameFlag, int useLegacy, 
     PackageDefinitions* packageDefinitions, AvidClipWriter** clipWriter);
     
 
