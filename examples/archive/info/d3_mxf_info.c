@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info.c,v 1.1 2007/09/11 13:24:46 stuart_hc Exp $
+ * $Id: d3_mxf_info.c,v 1.2 2008/02/18 10:18:49 philipn Exp $
  *
  * 
  *
@@ -33,6 +33,7 @@
 #include <archive_types.h>
 #include <mxf/mxf.h>
 #include <mxf/mxf_uu_metadata.h>
+#include <mxf/mxf_page_file.h>
 
 /* declare the BBC D3 extensions */
 
@@ -488,6 +489,7 @@ static int get_infax_data(Reader* reader, InfaxData* infaxData)
     GET_DATE_ITEM(D3P_TransmissionDate, txDate);
     GET_STRING_ITEM(D3P_MagazinePrefix, magPrefix);
     GET_STRING_ITEM(D3P_ProgrammeNumber, progNo);
+    GET_STRING_ITEM(D3P_ProductionCode, prodCode);
     GET_STRING_ITEM(D3P_SpoolStatus, spoolStatus);
     GET_DATE_ITEM(D3P_StockDate, stockDate);
     GET_STRING_ITEM(D3P_SpoolDescriptor, spoolDesc);
@@ -929,6 +931,7 @@ static void write_infax_data(InfaxData* infaxData)
         infaxData->txDate.day);    
     printf("    Magazine prefix: %s\n", infaxData->magPrefix);    
     printf("    Programme number: %s\n", infaxData->progNo);    
+    printf("    Production code: %s\n", infaxData->prodCode);    
     printf("    Spool status: %s\n", infaxData->spoolStatus);    
     printf("    Stock date: %04u-%02u-%02u\n", 
         infaxData->stockDate.year,
@@ -1141,7 +1144,9 @@ static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors,
     infaxData = &reader->d3InfaxData;
     printf("Programme title: %s\n", infaxData->progTitle);    
     printf("Episode title: %s\n", infaxData->epTitle);    
+    printf("Magazine prefix: %s\n", infaxData->magPrefix);    
     printf("Programme number: %s\n", infaxData->progNo);    
+    printf("Production code: %s\n", infaxData->prodCode);    
     printf("Duration: %02"PFi64":%02"PFi64":%02"PFi64"\n", 
         infaxData->duration / (60 * 60),
         (infaxData->duration % (60 * 60)) / 60,
@@ -1346,10 +1351,21 @@ int main(int argc, const char* argv[])
     
     reader->mxfFilename = mxfFilename;
     
-    if (!mxf_disk_file_open_read(mxfFilename, &reader->mxfFile))
+    if (strstr(mxfFilename, "%d") != NULL)
     {
-        mxf_log(MXF_ELOG, "Failed to open '%s'\n", mxfFilename);
-        goto fail;
+        if (!mxf_page_file_open_read(mxfFilename, &reader->mxfFile))
+        {
+            mxf_log(MXF_ELOG, "Failed to open page file '%s'\n", mxfFilename);
+            goto fail;
+        }
+    }
+    else
+    {
+        if (!mxf_disk_file_open_read(mxfFilename, &reader->mxfFile))
+        {
+            mxf_log(MXF_ELOG, "Failed to open disk file '%s'\n", mxfFilename);
+            goto fail;
+        }
     }
     
     if (!get_info(reader, showPSEFailures, showVTRErrors))

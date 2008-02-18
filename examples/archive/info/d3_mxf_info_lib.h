@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info_lib.h,v 1.1 2007/09/11 13:24:46 stuart_hc Exp $
+ * $Id: d3_mxf_info_lib.h,v 1.2 2008/02/18 10:18:49 philipn Exp $
  *
  * 
  *
@@ -24,8 +24,15 @@
 #define __D3_MXF_INFO_LIB_H__
 
 
+#ifdef __cplusplus
+extern "C" 
+{
+#endif
+
+
 #include <archive_types.h>
 #include <mxf/mxf.h>
+
 
 typedef struct
 {
@@ -45,6 +52,12 @@ int d3_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** err
 
 /* returns 1 if footer headermetadata was read, return 2 if none is present (*headerMetadata is NULL) */
 int d3_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata);
+
+
+#ifdef __cplusplus
+}
+#endif
+
 
 
 #endif

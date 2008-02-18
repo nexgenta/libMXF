@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.h,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: write_archive_mxf.h,v 1.2 2008/02/18 10:18:48 philipn Exp $
  *
  * 
  *
@@ -41,6 +41,10 @@ typedef struct _ArchiveMXFWriter ArchiveMXFWriter;
 /* create a new D3 MXF file and prepare for writing the essence */
 int prepare_archive_mxf_file(const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
 
+/* use the D3 MXF file (the filename is only used as metadata) and prepare for writing the essence */
+/* note: if this function returns 0 then check whether *mxfFile is not NULL and needs to be closed */
+int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
+
     
 /* write the essence, in order, starting with the timecode, followed by video and then 0 or more audio */
 int write_timecode(ArchiveMXFWriter* output, ArchiveTimecode vitc, ArchiveTimecode ltc);     
@@ -58,6 +62,10 @@ int complete_archive_mxf_file(ArchiveMXFWriter** output, const char* d3InfaxData
 
 /* update the file source package in the header metadata with the infax data */
 int update_archive_mxf_file(const char* filePath, const char* newFilename, const char* ltoInfaxDataString, int beStrict);
+
+/* use the D3 MXF file, update the file source package in the header metadata with the infax data */
+/* note: if this function returns 0 then check whether *mxfFile is not NULL and needs to be closed */
+int update_archive_mxf_file_2(MXFFile** mxfFile, const char* newFilename, const char* ltoInfaxDataString, int beStrict);
 
 
 #ifdef __cplusplus

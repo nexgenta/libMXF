@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info_lib.c,v 1.1 2007/09/11 13:24:46 stuart_hc Exp $
+ * $Id: d3_mxf_info_lib.c,v 1.2 2008/02/18 10:18:49 philipn Exp $
  *
  * 
  *
@@ -28,6 +28,7 @@
 
 #include <d3_mxf_info_lib.h>
 #include <mxf/mxf_uu_metadata.h>
+#include <mxf/mxf_page_file.h>
 
 
 #define CHK_OFAIL_NOMSG(cmd) \
@@ -108,6 +109,7 @@ static int get_infax_data(MXFMetadataSet* dmFrameworkSet, InfaxData* infaxData)
     GET_DATE_ITEM(D3P_TransmissionDate, txDate);
     GET_STRING_ITEM(D3P_MagazinePrefix, magPrefix);
     GET_STRING_ITEM(D3P_ProgrammeNumber, progNo);
+    GET_STRING_ITEM(D3P_ProductionCode, prodCode);
     GET_STRING_ITEM(D3P_SpoolStatus, spoolStatus);
     GET_DATE_ITEM(D3P_StockDate, stockDate);
     GET_STRING_ITEM(D3P_SpoolDescriptor, spoolDesc);
@@ -592,7 +594,14 @@ int d3_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, M
  
     
     /* open MXF file */    
-    CHK_OFAIL_NOMSG(mxf_disk_file_open_read(filename, &mxfFile));
+    if (strstr(filename, "%d") != NULL)
+    {
+        CHK_OFAIL_NOMSG(mxf_page_file_open_read(filename, &mxfFile));
+    }
+    else
+    {
+        CHK_OFAIL_NOMSG(mxf_disk_file_open_read(filename, &mxfFile));
+    }
     
     /* read the RIP */
     CHK_OFAIL_NOMSG(mxf_read_rip(mxfFile, &rip));

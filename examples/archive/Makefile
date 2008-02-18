@@ -5,7 +5,7 @@ INCLUDES = -I. -I$(LIBMXF_DIR)/include
 
 
 .PHONY: all
-all: test_timecode_index write info
+all: test_timecode_index test_mxf_page_file write info
 
 
 .PHONY: write
@@ -31,12 +31,20 @@ test_timecode_index.o: test_timecode_index.c archive_types.h
 	
 timecode_index.o: timecode_index.c timecode_index.h archive_types.h
 	$(CC) -c $(INCLUDES) timecode_index.c
+
+	
+
+test_mxf_page_file: libMXF.a test_mxf_page_file.o
+	$(CC) test_mxf_page_file.o -L$(LIBMXF_DIR) -lMXF -luuid -o $@
+
+test_mxf_page_file.o: test_mxf_page_file.c
+	$(CC) -c $(INCLUDES) test_mxf_page_file.c
 	
 	
 	
 .PHONY: clean
 clean:
-	@rm -f *.o *~ test_timecode_index
+	@rm -f *.o *~ test_timecode_index test_mxf_page_file
 	@cd write && $(MAKE) $@
 	@cd info && $(MAKE) $@
 	

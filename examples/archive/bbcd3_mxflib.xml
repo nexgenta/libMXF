@@ -9,6 +9,7 @@
 		<D3P_TransmissionDate detail="PUBLICATION_EVENT::PEV_Actual_Start_Date or PEV_Planned_Start_Date (TODO)" use="optional" type="Timestamp" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 04 00"/>
 		<D3P_MagazinePrefix detail="TV_RADIO_CONCEPT::TRC_Magazine_Prefix_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 05 00"/>
 		<D3P_ProgrammeNumber detail="TV_RADIO_CONCEPT::TRC_Core_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 06 00"/>
+		<D3P_ProductionCode detail="?" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0F 00"/>
 		<D3P_SpoolStatus detail="STORAGE::SGE_Status" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 07 00"/>
 		<D3P_StockDate detail="MEDIA_OBJECT_GROUP_INSTANCE::MOI_Creation_Date" use="optional" type="Timestamp" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 08 00"/>
 		<D3P_SpoolDescriptor detail="MEDIA_OBJECT_GROUP_INSTANCE::MOI_Description" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 09 00"/>

@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: test_write_archive_mxf.c,v 1.2 2008/02/18 10:18:48 philipn Exp $
  *
  * 
  *
@@ -27,11 +27,15 @@
 
 #include <write_archive_mxf.h>
 #include <mxf/mxf_utils.h>
+#include <mxf/mxf_page_file.h>
+
 
 #define VIDEO_FRAME_WIDTH       720
 #define VIDEO_FRAME_HEIGHT      576
 #define VIDEO_FRAME_SIZE        (VIDEO_FRAME_WIDTH * VIDEO_FRAME_HEIGHT * 2)
 #define AUDIO_FRAME_SIZE        5760
+
+#define MXF_PAGE_SIZE           (2 * 60 * 25 * 852628LL)
 
 
 // Represent the colour and position of a colour bar
@@ -158,10 +162,31 @@ int main(int argc, const char* argv[])
     }        
     mxfFilename = argv[2];
     
-    if (!prepare_archive_mxf_file(mxfFilename, 4, 0, 1, &output))
+    if (strstr(mxfFilename, "%d") != NULL)
     {
-        fprintf(stderr, "Failed to prepare file\n");
-        return 1;
+        MXFFile* mxfFile;
+        if (!mxf_page_file_open_new(mxfFilename, MXF_PAGE_SIZE, &mxfFile))
+        {
+            fprintf(stderr, "Failed to open page mxf file\n");
+            return 1;
+        }
+        if (!prepare_archive_mxf_file_2(&mxfFile, mxfFilename, 4, 0, 1, &output))
+        {
+            fprintf(stderr, "Failed to prepare file\n");
+            if (mxfFile != NULL)
+            {
+                mxf_file_close(&mxfFile);
+            }
+            return 1;
+        }
+    }
+    else
+    {
+        if (!prepare_archive_mxf_file(mxfFilename, 4, 0, 1, &output))
+        {
+            fprintf(stderr, "Failed to prepare file\n");
+            return 1;
+        }
     }
 
     create_colour_bars(uncData, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT, 0);
@@ -305,6 +330,7 @@ int main(int argc, const char* argv[])
             "2006-02-02|"
             "|"
             "LME1306H|"
+            "71|"
             "T|"
             "2006-01-01|"
             "PROGRAMME BACKING COPY|"
@@ -326,12 +352,6 @@ int main(int argc, const char* argv[])
         {
             
             /* update with LTO Infax data and filename */
-		const char* ltoInfaxDataString = 
-			"LTO|THE BROTHERS|5:THE PARTY|1972-04-07|"
-			"|LDL9114J|S|1993-12-02|PROGRAMME (DUB OF 64045)|NO ISSUE WITHOUT REF TO ARC."
-			"  SEL,TVLA MAN.OR ENQ.SERV.LIB|2875|DA 0010"
-			"46|DA1046|LONPROG";
-#if 0            
             const char* ltoInfaxDataString = 
                 "LTO|"
                 "D3 preservation programme|"
@@ -339,22 +359,43 @@ int main(int argc, const char* argv[])
                 "2006-02-02|"
                 "|"
                 "LME1306H|"
-                "T|"
+                "71|"
+                "M|"
                 "|"
-                "D3 PRESERVATION COPY|"
-                "|"
+                "PROGRAMME (DUB OF DGN377505)|"
+                "Bla bla bla|"
                 "1732|"
-                "XYZ1234|"
+                "LTA000001|"
                 "|"
                 "LONPROG";
-#endif
             const char* newMXFFilename = "XYZ.mxf";
 
             printf("Updating\n");
-            if (!update_archive_mxf_file(mxfFilename, newMXFFilename, ltoInfaxDataString, 1))
+            if (strstr(mxfFilename, "%d") != NULL)
             {
-                fprintf(stderr, "Failed to update file with LTO Infax data and new filename\n");
-                passed = 0;
+                MXFFile* mxfFile = NULL;
+                if (!mxf_page_file_open_modify(mxfFilename, MXF_PAGE_SIZE, &mxfFile))
+                {
+                    fprintf(stderr, "Failed to open page mxf file\n");
+                    return 1;
+                }
+                if (!update_archive_mxf_file_2(&mxfFile, newMXFFilename, ltoInfaxDataString, 1))
+                {
+                    fprintf(stderr, "Failed to update file with LTO Infax data and new filename\n");
+                    passed = 0;
+                    if (mxfFile != NULL)
+                    {
+                        mxf_file_close(&mxfFile);
+                    }
+                }
+            }
+            else
+            {
+                if (!update_archive_mxf_file(mxfFilename, newMXFFilename, ltoInfaxDataString, 1))
+                {
+                    fprintf(stderr, "Failed to update file with LTO Infax data and new filename\n");
+                    passed = 0;
+                }
             }
 
 #if 0            
@@ -366,6 +407,7 @@ int main(int argc, const char* argv[])
                     "2006-02-02|"
                     "|"
                     "LME1306H       |" /* will result in error message */
+                    "71|"
                     "T|"
                     "|"
                     "D3 PRESERVATION COPY|"
@@ -391,6 +433,10 @@ int main(int argc, const char* argv[])
     if (vtrErrors != NULL)
     {
         free(vtrErrors);
+    }
+    if (pseFailures != NULL)
+    {
+        free(pseFailures);
     }
     return 0;
 }

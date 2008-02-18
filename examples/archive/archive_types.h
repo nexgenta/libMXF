@@ -1,5 +1,5 @@
 /*
- * $Id: archive_types.h,v 1.1 2007/09/11 13:24:46 stuart_hc Exp $
+ * $Id: archive_types.h,v 1.2 2008/02/18 10:18:46 philipn Exp $
  *
  * 
  *
@@ -41,6 +41,7 @@ extern "C"
 #define EPTITLE_SIZE                    145
 #define MAGPREFIX_SIZE                  2
 #define PROGNO_SIZE                     9
+#define PRODCODE_SIZE                   3
 #define SPOOLSTATUS_SIZE                2
 #define SPOOLDESC_SIZE                  30
 #define MEMO_SIZE                       121
@@ -48,11 +49,11 @@ extern "C"
 #define ACCNO_SIZE                      15
 #define CATDETAIL_SIZE                  11
 
-/* "the string sizes above" * 2 + 2 * "timestamp size" + "duration size" + 
-14 * ("local tag" + "local length")
-= 430 * 2 + 2 * 8 + 8 + 14 * (2 + 2)
-= 940 */
-#define COMPLETE_INFAX_EXTERNAL_SIZE    940
+/* "the string sizes above" * 2 (utf16) + 2 * "timestamp size" + "duration size" + 
+15 * ("local tag" + "local length")
+= 433 * 2 + 2 * 8 + 8 + 15 * (2 + 2)
+= 950 */
+#define COMPLETE_INFAX_EXTERNAL_SIZE    950
 
 
 typedef struct
@@ -97,6 +98,7 @@ typedef struct
     mxfTimestamp txDate; /* only date part is relevant */
     char magPrefix[MAGPREFIX_SIZE];
     char progNo[PROGNO_SIZE];
+    char prodCode[PRODCODE_SIZE];
     char spoolStatus[SPOOLSTATUS_SIZE];
     mxfTimestamp stockDate; /* only date part is relevant */
     char spoolDesc[SPOOLDESC_SIZE];

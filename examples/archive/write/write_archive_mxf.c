@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: write_archive_mxf.c,v 1.2 2008/02/18 10:18:48 philipn Exp $
  *
  * 
  *
@@ -454,6 +454,17 @@ static int set_infax_data(MXFMetadataSet* dmFrameworkSet, InfaxData* infaxData)
         mxf_free_item(&item);
     }
     
+    if (!is_empty_string(infaxData->prodCode, 1))
+    {
+        CHK_OFAIL(convert_string(infaxData->prodCode, &tempString));
+        CHK_OFAIL(mxf_set_fixed_size_utf16string_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_ProductionCode), tempString, PRODCODE_SIZE));
+    }
+    else if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_ProductionCode)))
+    {
+        CHK_OFAIL(mxf_remove_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_ProductionCode), &item));
+        mxf_free_item(&item);
+    }
+    
     if (!is_empty_string(infaxData->spoolStatus, 1))
     {
         CHK_OFAIL(convert_string(infaxData->spoolStatus, &tempString));
@@ -645,27 +656,30 @@ static int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, i
                 PARSE_STRING(infaxData->progNo, PROGNO_SIZE, beStrict);
                 break;
             case 6:
-                PARSE_STRING(infaxData->spoolStatus, SPOOLSTATUS_SIZE, beStrict);
+                PARSE_STRING(infaxData->prodCode, PRODCODE_SIZE, beStrict);
                 break;
             case 7:
-                PARSE_DATE(infaxData->stockDate, beStrict);
+                PARSE_STRING(infaxData->spoolStatus, SPOOLSTATUS_SIZE, beStrict);
                 break;
             case 8:
-                PARSE_STRING(infaxData->spoolDesc, SPOOLDESC_SIZE, beStrict);
+                PARSE_DATE(infaxData->stockDate, beStrict);
                 break;
             case 9:
-                PARSE_STRING(infaxData->memo, MEMO_SIZE, beStrict);
+                PARSE_STRING(infaxData->spoolDesc, SPOOLDESC_SIZE, beStrict);
                 break;
             case 10:
-                PARSE_INT64(infaxData->duration, INVALID_DURATION_VALUE, beStrict);
+                PARSE_STRING(infaxData->memo, MEMO_SIZE, beStrict);
                 break;
             case 11:
-                PARSE_STRING(infaxData->spoolNo, SPOOLNO_SIZE, beStrict);
+                PARSE_INT64(infaxData->duration, INVALID_DURATION_VALUE, beStrict);
                 break;
             case 12:
-                PARSE_STRING(infaxData->accNo, ACCNO_SIZE, beStrict);
+                PARSE_STRING(infaxData->spoolNo, SPOOLNO_SIZE, beStrict);
                 break;
             case 13:
+                PARSE_STRING(infaxData->accNo, ACCNO_SIZE, beStrict);
+                break;
+            case 14:
                 PARSE_STRING(infaxData->catDetail, CATDETAIL_SIZE, beStrict);
                 break;
             default:
@@ -681,12 +695,31 @@ static int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, i
     }
     while (!done);
     
-    CHK_ORET(fieldIndex == 13); 
+    CHK_ORET(fieldIndex == 14); 
     
     return 1;
 }
 
 int prepare_archive_mxf_file(const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output)
+{
+    MXFFile* mxfFile = NULL;
+    int result;
+    
+    CHK_ORET(mxf_disk_file_open_new(filename, &mxfFile));
+    
+    result = prepare_archive_mxf_file_2(&mxfFile, filename, numAudioTracks, startPosition, beStrict, output);
+    if (!result)
+    {
+        if (mxfFile != NULL)
+        {
+            mxf_file_close(&mxfFile);
+        }
+    }
+    
+    return result;
+}
+
+int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output)
 {
     ArchiveMXFWriter* newOutput;
     int64_t filePos;
@@ -721,14 +754,14 @@ int prepare_archive_mxf_file(const char* filename, int numAudioTracks, int64_t s
     mxf_initialise_list(&newOutput->pseFailureTrackSets, NULL);
             
     
+    newOutput->mxfFile = *mxfFile;
+    *mxfFile = NULL;
     newOutput->numAudioTracks = numAudioTracks;
     newOutput->beStrict = beStrict;
     mxf_get_timestamp_now(&newOutput->now);
 
 
     CHK_OFAIL(mxf_create_file_partitions(&newOutput->partitions));
-    
-    CHK_OFAIL(mxf_disk_file_open_new(filename, &newOutput->mxfFile));
     
     
     /* minimum llen is 4 */
@@ -793,6 +826,8 @@ int prepare_archive_mxf_file(const char* filename, int numAudioTracks, int64_t s
     CHK_OFAIL(mxf_register_primer_entry(newOutput->headerMetadata->primerPack, &MXF_ITEM_K(D3P_InfaxFramework, D3P_MagazinePrefix), 
         g_Null_LocalTag, &assignedTag));
     CHK_OFAIL(mxf_register_primer_entry(newOutput->headerMetadata->primerPack, &MXF_ITEM_K(D3P_InfaxFramework, D3P_ProgrammeNumber), 
+        g_Null_LocalTag, &assignedTag));
+    CHK_OFAIL(mxf_register_primer_entry(newOutput->headerMetadata->primerPack, &MXF_ITEM_K(D3P_InfaxFramework, D3P_ProductionCode), 
         g_Null_LocalTag, &assignedTag));
     CHK_OFAIL(mxf_register_primer_entry(newOutput->headerMetadata->primerPack, &MXF_ITEM_K(D3P_InfaxFramework, D3P_SpoolStatus), 
         g_Null_LocalTag, &assignedTag));
@@ -1871,6 +1906,27 @@ fail:
 
 int update_archive_mxf_file(const char* filePath, const char* newFilename, const char* ltoInfaxDataString, int beStrict)
 {
+    MXFFile* mxfFile = NULL;
+    int result;
+    
+    CHK_ORET(filePath != NULL);
+    
+    CHK_ORET(mxf_disk_file_open_modify(filePath, &mxfFile));
+    
+    result = update_archive_mxf_file_2(&mxfFile, newFilename, ltoInfaxDataString, beStrict);
+    if (!result)
+    {
+        if (mxfFile != NULL)
+        {
+            mxf_file_close(&mxfFile);
+        }
+    }
+    
+    return result;
+}
+
+int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, const char* ltoInfaxDataString, int beStrict)
+{
     mxfKey key;
     uint8_t llen;
     uint64_t len;
@@ -1879,11 +1935,13 @@ int update_archive_mxf_file(const char* filePath, const char* newFilename, const
     InfaxData ltoInfaxData;
     MXFFile* mxfFile = NULL;
     
-    CHK_ORET(filePath != NULL && newFilename != NULL && ltoInfaxDataString != NULL);
+    CHK_ORET(*mxfFileIn != NULL && newFilename != NULL && ltoInfaxDataString != NULL);
     
+    /* take ownership */
+    mxfFile = *mxfFileIn;
+    *mxfFileIn = NULL;
 
     /* open mxf file */    
-    CHK_ORET(mxf_disk_file_open_modify(filePath, &mxfFile));
     mxf_file_set_min_llen(mxfFile, MIN_LLEN);
 
     

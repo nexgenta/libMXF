@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_uu_metadata.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_uu_metadata.c,v 1.3 2008/02/18 10:18:48 philipn Exp $
  *
  * Utility functions for processing header metadata
  *
@@ -115,15 +115,27 @@ int mxf_uu_get_track_reference(MXFMetadataSet* trackSet, mxfUMID* sourcePackageU
     MXFMetadataSet* sourceClipSet;
     uint32_t sequenceComponentCount;
     uint8_t* arrayElement;
+    uint32_t i;
     
     CHK_ORET(mxf_get_strongref_item(trackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
     if (!mxf_is_subclass_of(sequenceSet->headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(SourceClip)))
     {
-        /* move to single, contained SourceClip */
+        /* move to the first contained SourceClip, eg. skip preceding Filler components */
         CHK_ORET(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &sequenceComponentCount));
-        CHK_ORET(sequenceComponentCount == 1);
-        CHK_ORET(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
-        CHK_ORET(mxf_get_strongref(sequenceSet->headerMetadata, arrayElement, &sourceClipSet));
+        CHK_ORET(sequenceComponentCount >= 1);
+        for (i = 0; i < sequenceComponentCount; i++)
+        {
+            CHK_ORET(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), i, &arrayElement));
+            if (!mxf_get_strongref(sequenceSet->headerMetadata, arrayElement, &sourceClipSet))
+            {
+                /* probably a Filler if it hasn't been registered in the dictionary */
+                continue;
+            }
+            if (mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(SourceClip)))
+            {
+                break;
+            }
+        }
         CHK_ORET(mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(SourceClip)));
     }
     else
