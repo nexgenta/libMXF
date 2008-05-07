@@ -1,5 +1,5 @@
 /*
- * $Id: writeaviddv50.c,v 1.1 2007/09/11 13:24:49 stuart_hc Exp $
+ * $Id: writeaviddv50.c,v 1.2 2008/05/07 15:22:13 philipn Exp $
  *
  * Example showing how to create Avid supported MXF OP-Atom files containing DV-50 
  *
@@ -53,7 +53,7 @@ static const mxfUL MXF_EE_K(DVClipWrapped) =
  *
  */
 
-int write(FILE* dv50File, MXFFile* mxfFile)
+int write_dv50(FILE* dv50File, MXFFile* mxfFile, int test)
 {
     MXFFilePartitions partitions;
     MXFPartition* headerPartition;
@@ -168,7 +168,15 @@ int write(FILE* dv50File, MXFFile* mxfFile)
     CHK_ORET(mxf_set_uuid_item(identSet, &MXF_ITEM_K(Identification, ProductUID), &g_WrapDV50ProductUID_uuid));
     CHK_ORET(mxf_set_timestamp_item(identSet, &MXF_ITEM_K(Identification, ModificationDate), &now));
     CHK_ORET(mxf_set_product_version_item(identSet, &MXF_ITEM_K(Identification, ToolkitVersion), mxf_get_version()));
-    CHK_ORET(mxf_set_utf16string_item(identSet, &MXF_ITEM_K(Identification, Platform), mxf_get_platform_wstring()));
+    if (test)
+    {
+        /* use the same string on all platforms to make checking diffs easier */
+        CHK_ORET(mxf_set_utf16string_item(identSet, &MXF_ITEM_K(Identification, Platform), L"test platform string"));
+    }
+    else
+    {
+        CHK_ORET(mxf_set_utf16string_item(identSet, &MXF_ITEM_K(Identification, Platform), mxf_get_platform_wstring()));
+    }
     
     
     /* Preface - ContentStorage */
@@ -421,7 +429,7 @@ int write(FILE* dv50File, MXFFile* mxfFile)
 
 void usage(const char* cmd)
 {
-    fprintf(stderr, "%s <dv50 filename> <mxf filename>\n", cmd);
+    fprintf(stderr, "%s [--test] <dv50 filename> <mxf filename>\n", cmd);
 }
 
 int main(int argv, const char* argc[])
@@ -429,28 +437,44 @@ int main(int argv, const char* argc[])
     FILE* dv50File = NULL;
     MXFFile* mxfFile = NULL;
     int result;
+    int cmdlnIndex = 1;
+    int test = 0;
     
-    if (argv < 3)
+    if (argv < 3 || argv > 4)
     {
         usage(argc[0]);
         return 1;
     }
     
-    if ((dv50File = fopen(argc[1], "rb")) == NULL)
+    if (argv == 4)
+    {
+        if (strcmp(argc[cmdlnIndex], "--test") != 0)
+        {
+            usage(argc[0]);
+            return 1;
+        }
+        test = 1;
+        
+        cmdlnIndex++;
+    }
+    
+    if ((dv50File = fopen(argc[cmdlnIndex], "rb")) == NULL)
     {
         fprintf(stderr, "Failed to open %s for reading\n", argc[1]);
         return 1;
     }
+    cmdlnIndex++;
     
-    if (!mxf_disk_file_open_new(argc[2], &mxfFile))
+    if (!mxf_disk_file_open_new(argc[cmdlnIndex], &mxfFile))
     {
         fprintf(stderr, "Failed to open %s for writing\n", argc[2]);
         fclose(dv50File);
         return 1;
     }
+    cmdlnIndex++;
 
     
-    if (!write(dv50File, mxfFile))
+    if (!write_dv50(dv50File, mxfFile, test))
     {
         result = 1;
     }

@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.c,v 1.2 2007/09/11 13:24:53 stuart_hc Exp $
+ * $Id: package_definitions.c,v 1.3 2008/05/07 15:21:46 philipn Exp $
  *
  * Functions to create package definitions
  *
@@ -80,6 +80,16 @@ fail:
     return 0;
 }
 
+static int modify_user_comment(UserComment* userComment, const char* value)
+{
+    SAFE_FREE(&userComment->value);
+    
+    CHK_MALLOC_ARRAY_ORET(userComment->value, char, strlen(value) + 1);
+    strcpy(userComment->value, value);
+    
+    return 1;
+}
+
 static void free_track(Track** track)
 {
     if ((*track) == NULL)
@@ -115,7 +125,6 @@ static void free_package(Package** package)
     SAFE_FREE(&(*package)->name);
     mxf_clear_list(&(*package)->tracks);
     SAFE_FREE(&(*package)->filename);
-    mxf_clear_list(&(*package)->userComments);
 
     SAFE_FREE(package);    
 }
@@ -140,7 +149,6 @@ static int create_package(const mxfUMID* uid, const char* name, const mxfTimesta
     CHK_MALLOC_ORET(newPackage, Package);
     memset(newPackage, 0, sizeof(Package));
     mxf_initialise_list(&newPackage->tracks, free_track_in_list);
-    mxf_initialise_list(&newPackage->userComments, free_tagged_value_in_list);
     
     newPackage->uid = *uid;
     if (name != NULL)
@@ -170,6 +178,7 @@ int create_package_definitions(PackageDefinitions** definitions)
     CHK_MALLOC_ORET(newDefinitions, PackageDefinitions);
     memset(newDefinitions, 0, sizeof(PackageDefinitions));
     mxf_initialise_list(&newDefinitions->fileSourcePackages, free_package_in_list);
+    mxf_initialise_list(&newDefinitions->userComments, free_tagged_value_in_list);
     
     *definitions = newDefinitions;
     return 1;
@@ -184,6 +193,7 @@ void free_package_definitions(PackageDefinitions** definitions)
     
     free_package(&(*definitions)->materialPackage);
     mxf_clear_list(&(*definitions)->fileSourcePackages);
+    mxf_clear_list(&(*definitions)->userComments);
     free_package(&(*definitions)->tapeSourcePackage);
     
     SAFE_FREE(definitions);
@@ -228,17 +238,36 @@ int create_tape_source_package(PackageDefinitions* definitions, const mxfUMID* u
     return 1;
 }
 
-int add_user_comment(Package* package, const char* name, const char* value)
+int set_user_comment(PackageDefinitions* definitions, const char* name, const char* value)
 {
-    UserComment* newUserComment = NULL;
+    UserComment* userComment = NULL;
+    MXFListIterator iter;
     
-    CHK_ORET(create_user_comment(name, value, &newUserComment));
-    CHK_OFAIL(mxf_append_list_element(&package->userComments, newUserComment));
+    /* modify user comment if it one already exists with given name */
+    mxf_initialise_list_iter(&iter, &definitions->userComments);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        userComment = (UserComment*)mxf_get_iter_element(&iter);
+        if (strcmp(userComment->name, name) == 0)
+        {
+            CHK_ORET(modify_user_comment(userComment, value));
+            return 1;
+        }
+    }
+        
+    /* create a new user comment */
+    CHK_ORET(create_user_comment(name, value, &userComment));
+    CHK_OFAIL(mxf_append_list_element(&definitions->userComments, userComment));
     
     return 1;
 fail:
-    free_user_comment(&newUserComment);
+    free_user_comment(&userComment);
     return 0;
+}
+
+void clear_user_comments(PackageDefinitions* definitions)
+{
+    mxf_clear_list(&definitions->userComments);
 }
 
 int create_track(Package* package, uint32_t id, uint32_t number, const char* name, int isPicture, 

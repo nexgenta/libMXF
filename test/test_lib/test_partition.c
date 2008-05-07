@@ -20,7 +20,6 @@ int test_read(const char* filename)
     mxfKey key;
     uint8_t llen;
     uint64_t len;
-    mxfLocalTag tag;
     int i;
     MXFRIP rip;
 
@@ -153,9 +152,6 @@ int test_create_and_write(const char* filename)
     MXFPartition* bodyPartition2 = NULL;
     MXFPartition* footerPartition = NULL;
 
-    mxfLocalTag tag;
-    mxfLocalTag tag2;
-    
     
     if (!mxf_disk_file_open_new(filename, &mxfFile))
     {

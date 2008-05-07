@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.h,v 1.2 2008/02/18 10:18:48 philipn Exp $
+ * $Id: write_archive_mxf.h,v 1.3 2008/05/07 15:22:08 philipn Exp $
  *
  * 
  *
@@ -34,6 +34,8 @@ extern "C"
 #include <mxf/mxf_file.h>
 
 
+#define MAX_ARCHIVE_AUDIO_TRACKS        16
+
 
 typedef struct _ArchiveMXFWriter ArchiveMXFWriter;
 
@@ -55,17 +57,31 @@ int write_audio_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size);
 int abort_archive_mxf_file(ArchiveMXFWriter** output);
 
 /* write the header metadata, do misc. fixups, close the file and free output */
-int complete_archive_mxf_file(ArchiveMXFWriter** output, const char* d3InfaxDataString,
+int complete_archive_mxf_file(ArchiveMXFWriter** output, InfaxData* d3InfaxData,
     const PSEFailure* pseFailures, long numPSEFailures,
     const VTRError* vtrErrors, long numVTRErrors);
 
+int64_t get_archive_mxf_file_size(ArchiveMXFWriter* writer);
+
+mxfUMID get_material_package_uid(ArchiveMXFWriter* writer);
+mxfUMID get_file_package_uid(ArchiveMXFWriter* writer);
+mxfUMID get_tape_package_uid(ArchiveMXFWriter* writer);
+
 
 /* update the file source package in the header metadata with the infax data */
-int update_archive_mxf_file(const char* filePath, const char* newFilename, const char* ltoInfaxDataString, int beStrict);
+int update_archive_mxf_file(const char* filePath, const char* newFilename, InfaxData* ltoInfaxData);
 
 /* use the D3 MXF file, update the file source package in the header metadata with the infax data */
 /* note: if this function returns 0 then check whether *mxfFile is not NULL and needs to be closed */
-int update_archive_mxf_file_2(MXFFile** mxfFile, const char* newFilename, const char* ltoInfaxDataString, int beStrict);
+int update_archive_mxf_file_2(MXFFile** mxfFile, const char* newFilename, InfaxData* ltoInfaxData);
+
+
+/* returns the content package (system, video + x audio elements) size */
+int64_t get_archive_mxf_content_package_size(int numAudioTracks);
+
+
+int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, int beStrict);
+
 
 
 #ifdef __cplusplus

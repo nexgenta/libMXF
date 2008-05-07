@@ -193,6 +193,8 @@ int do_write(MXFFile* mxfFile)
     CHK_ORET(mxf_write_uuid(mxfFile, &someUUID));
     CHK_ORET(mxf_write_batch_header(mxfFile, 2, 16));
     CHK_ORET(mxf_write_array_header(mxfFile, 4, 32));
+
+    return 1;
 }
 
 int test_write(const char* filename)

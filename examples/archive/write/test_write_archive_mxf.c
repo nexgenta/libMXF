@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.2 2008/02/18 10:18:48 philipn Exp $
+ * $Id: test_write_archive_mxf.c,v 1.3 2008/05/07 15:22:07 philipn Exp $
  *
  * 
  *
@@ -130,7 +130,7 @@ static void increment_timecode(ArchiveTimecode* timecode)
 
 static void usage(const char* cmd)
 {
-    fprintf(stderr, "Usage: %s <num frames> <filename> \n", cmd);
+    fprintf(stderr, "Usage: %s [--num-audio <val>] <num frames> <filename> \n", cmd);
 }
 
 int main(int argc, const char* argv[])
@@ -139,9 +139,9 @@ int main(int argc, const char* argv[])
     long numFrames;
     ArchiveMXFWriter* output;
     unsigned char uncData[VIDEO_FRAME_SIZE];
-    unsigned char pcmDataC1[AUDIO_FRAME_SIZE];
     unsigned char pcmData[AUDIO_FRAME_SIZE];
     long i;
+    int j;
     int passed;
     ArchiveTimecode vitc;    
     ArchiveTimecode ltc;    
@@ -149,28 +149,61 @@ int main(int argc, const char* argv[])
     long numVTRErrors = 0;
     PSEFailure* pseFailures = NULL;
     long numPSEFailures = 0;
+    int numAudioTracks = 4;
+    int cmdlnIndex = 1;
+    
 
-    if (argc != 3)
+    while (cmdlnIndex + 2 < argc)
+    {
+        if (strcmp(argv[cmdlnIndex], "--num-audio") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing value for argument '%s'\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            if (sscanf(argv[cmdlnIndex + 1], "%d", &numAudioTracks) != 1 ||
+                numAudioTracks > MAX_ARCHIVE_AUDIO_TRACKS || numAudioTracks < 0)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Invalid value '%s' for argument '%s'\n", argv[cmdlnIndex + 1], argv[cmdlnIndex]);
+                return 1;
+            }
+            cmdlnIndex += 2;
+        }
+        else
+        {
+            usage(argv[0]);
+            fprintf(stderr, "Unknown argument '%s'\n", argv[cmdlnIndex]);
+            return 1;
+        }
+    }
+    if (cmdlnIndex + 2 != argc)
     {
         usage(argv[0]);
         return 1;
     }
-    if (sscanf(argv[1], "%ld", &numFrames) != 1)
+    if (sscanf(argv[cmdlnIndex], "%ld", &numFrames) != 1)
     {
         usage(argv[0]);
         return 1;
     }        
-    mxfFilename = argv[2];
+    cmdlnIndex++;
+    mxfFilename = argv[cmdlnIndex];
+    
     
     if (strstr(mxfFilename, "%d") != NULL)
     {
+        MXFPageFile* mxfPageFile;
         MXFFile* mxfFile;
-        if (!mxf_page_file_open_new(mxfFilename, MXF_PAGE_SIZE, &mxfFile))
+        if (!mxf_page_file_open_new(mxfFilename, MXF_PAGE_SIZE, &mxfPageFile))
         {
             fprintf(stderr, "Failed to open page mxf file\n");
             return 1;
         }
-        if (!prepare_archive_mxf_file_2(&mxfFile, mxfFilename, 4, 0, 1, &output))
+        mxfFile = mxf_page_file_get_file(mxfPageFile);
+        if (!prepare_archive_mxf_file_2(&mxfFile, mxfFilename, numAudioTracks, 0, 1, &output))
         {
             fprintf(stderr, "Failed to prepare file\n");
             if (mxfFile != NULL)
@@ -182,7 +215,7 @@ int main(int argc, const char* argv[])
     }
     else
     {
-        if (!prepare_archive_mxf_file(mxfFilename, 4, 0, 1, &output))
+        if (!prepare_archive_mxf_file(mxfFilename, numAudioTracks, 0, 1, &output))
         {
             fprintf(stderr, "Failed to prepare file\n");
             return 1;
@@ -190,16 +223,8 @@ int main(int argc, const char* argv[])
     }
 
     create_colour_bars(uncData, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT, 0);
-    create_tone(pcmDataC1, AUDIO_FRAME_SIZE);
+    create_tone(pcmData, AUDIO_FRAME_SIZE);
     
-    memset(pcmData, 0, AUDIO_FRAME_SIZE);
-    //for (i = 0; i < AUDIO_FRAME_SIZE; i++)
-    //{
-        //if (i % (3 * 5) == 0)
-        //{
-            //pcmData[i] |= 0xf0;
-        //}
-    //}
     
     vtrErrors = (VTRError*)malloc(sizeof(VTRError) * numFrames);
     pseFailures = (PSEFailure*)malloc(sizeof(PSEFailure) * numFrames);
@@ -222,29 +247,14 @@ int main(int argc, const char* argv[])
             fprintf(stderr, "Failed to write video\n");
             break;
         }
-        if (!write_audio_frame(output, pcmDataC1, AUDIO_FRAME_SIZE))
+        for (j = 0; j < numAudioTracks; j++)
         {
-            passed = 0;
-            fprintf(stderr, "Failed to write audio\n");
-            break;
-        }
-        if (!write_audio_frame(output, pcmData, AUDIO_FRAME_SIZE))
-        {
-            passed = 0;
-            fprintf(stderr, "Failed to write audio\n");
-            break;
-        }
-        if (!write_audio_frame(output, pcmData, AUDIO_FRAME_SIZE))
-        {
-            passed = 0;
-            fprintf(stderr, "Failed to write audio\n");
-            break;
-        }
-        if (!write_audio_frame(output, pcmData, AUDIO_FRAME_SIZE))
-        {
-            passed = 0;
-            fprintf(stderr, "Failed to write audio\n");
-            break;
+            if (!write_audio_frame(output, pcmData, AUDIO_FRAME_SIZE))
+            {
+                passed = 0;
+                fprintf(stderr, "Failed to write audio %d\n", j);
+                break;
+            }
         }
         
         if (i % 5 == 0)
@@ -338,10 +348,13 @@ int main(int argc, const char* argv[])
             "1732|"
             "DGN377505|"
             "DC193783|"
-            "LONPROG";
+            "LONPROG|"
+            "1";
+        InfaxData d3InfaxData;
+        parse_infax_data(d3InfaxDataString, &d3InfaxData, 1);
         
         printf("Completing\n");
-        if (!complete_archive_mxf_file(&output, d3InfaxDataString, pseFailures, numPSEFailures, vtrErrors, numVTRErrors))
+        if (!complete_archive_mxf_file(&output, &d3InfaxData, pseFailures, numPSEFailures, vtrErrors, numVTRErrors))
         {
             fprintf(stderr, "Failed to complete writing D3 MXF file\n");
             abort_archive_mxf_file(&output);
@@ -367,19 +380,25 @@ int main(int argc, const char* argv[])
                 "1732|"
                 "LTA000001|"
                 "|"
-                "LONPROG";
+                "LONPROG|"
+                "1";
             const char* newMXFFilename = "XYZ.mxf";
+
+            InfaxData ltoInfaxData;
+            parse_infax_data(ltoInfaxDataString, &ltoInfaxData, 1);
 
             printf("Updating\n");
             if (strstr(mxfFilename, "%d") != NULL)
             {
+                MXFPageFile* mxfPageFile;
                 MXFFile* mxfFile = NULL;
-                if (!mxf_page_file_open_modify(mxfFilename, MXF_PAGE_SIZE, &mxfFile))
+                if (!mxf_page_file_open_modify(mxfFilename, MXF_PAGE_SIZE, &mxfPageFile))
                 {
                     fprintf(stderr, "Failed to open page mxf file\n");
                     return 1;
                 }
-                if (!update_archive_mxf_file_2(&mxfFile, newMXFFilename, ltoInfaxDataString, 1))
+                mxfFile = mxf_page_file_get_file(mxfPageFile);
+                if (!update_archive_mxf_file_2(&mxfFile, newMXFFilename, &ltoInfaxData))
                 {
                     fprintf(stderr, "Failed to update file with LTO Infax data and new filename\n");
                     passed = 0;
@@ -391,7 +410,7 @@ int main(int argc, const char* argv[])
             }
             else
             {
-                if (!update_archive_mxf_file(mxfFilename, newMXFFilename, ltoInfaxDataString, 1))
+                if (!update_archive_mxf_file(mxfFilename, newMXFFilename, &ltoInfaxData))
                 {
                     fprintf(stderr, "Failed to update file with LTO Infax data and new filename\n");
                     passed = 0;
@@ -415,11 +434,15 @@ int main(int argc, const char* argv[])
                     "1732|"
                     "XYZ1234|"
                     "|"
-                    "LONPROG";
+                    "LONPROG|"
+                    "1";
                 const char* newMXFFilename = "ABC.mxf";
                 
+                InfaxData ltoInfaxData;
+                parse_infax_data(ltoInfaxDataString, &ltoInfaxData, 1);
+
                 printf("Updating again (NOTE: you should see an error message complaining about the prog no size)\n");
-                if (!update_archive_mxf_file(mxfFilename, newMXFFilename, ltoInfaxDataString, 0))
+                if (!update_archive_mxf_file(mxfFilename, newMXFFilename, &ltoInfaxData))
                 {
                     fprintf(stderr, "Failed to update 2nd time\n");
                     passed = 0;

@@ -1,5 +1,5 @@
 /*
- * $Id: archive_types.h,v 1.2 2008/02/18 10:18:46 philipn Exp $
+ * $Id: archive_types.h,v 1.3 2008/05/07 15:21:53 philipn Exp $
  *
  * 
  *
@@ -49,11 +49,11 @@ extern "C"
 #define ACCNO_SIZE                      15
 #define CATDETAIL_SIZE                  11
 
-/* "the string sizes above" * 2 (utf16) + 2 * "timestamp size" + "duration size" + 
-15 * ("local tag" + "local length")
-= 433 * 2 + 2 * 8 + 8 + 15 * (2 + 2)
-= 950 */
-#define COMPLETE_INFAX_EXTERNAL_SIZE    950
+/* "the string sizes above" * 2 (utf16) + 2 * "timestamp size" + "duration size" + "item no size" +
+16 * ("local tag" + "local length")
+= 433 * 2 + 2 * 8 + 8 + 4 + 16 * (2 + 2)
+= 958 */
+#define COMPLETE_INFAX_EXTERNAL_SIZE    958
 
 
 typedef struct
@@ -108,6 +108,7 @@ typedef struct
                       /* used as the tape SourcePackage name and part of the MaterialPackage name */
     char accNo[ACCNO_SIZE]; /* max 4 character prefix followed by integer (max 10 digits) */
     char catDetail[CATDETAIL_SIZE];
+    uint32_t itemNo;
 } InfaxData;
 
 

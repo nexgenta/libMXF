@@ -102,8 +102,8 @@ void extract_raw_blob(FILE* in, FILE* out)
     Key key;
     uint8_t llen;
     uint64_t len;
-    uint64_t startOffset = 0;
-    uint64_t endOffset = 0;
+    int64_t startOffset = 0;
+    int64_t endOffset = 0;
     uint32_t numRead;
     uint64_t totalRead;
     const uint32_t bufferSize = 1024;

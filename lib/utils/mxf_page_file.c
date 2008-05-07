@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_page_file.c,v 1.1 2008/02/07 15:02:08 john_f Exp $
+ * $Id: mxf_page_file.c,v 1.2 2008/05/07 15:22:27 philipn Exp $
  *
  * 
  *
@@ -24,9 +24,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <unistd.h>
+
+#if defined(_WIN32)
+#include <io.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 #include <mxf/mxf.h>
 #include <mxf/mxf_page_file.h>
@@ -51,21 +58,34 @@ typedef struct FileDescriptor
     
     struct Page* page;
     
+#if defined(_WIN32)
+    int fileId;
+#else
     FILE* file;
+#endif
 } FileDescriptor;
 
 typedef struct Page
 {
+    int wasRemoved;
+    
     FileDescriptor* fileDescriptor;
     int wasOpenedBefore;
-    int64_t index;
+    int index;
     
     int64_t size;
     int64_t offset;
 } Page;
 
+struct MXFPageFile
+{
+    MXFFile* mxfFile;
+};
+
 struct MXFFileSysData
 {
+    MXFPageFile mxfPageFile;
+    
     int64_t pageSize;
     FileMode mode;
     char* filenameTemplate;
@@ -73,8 +93,8 @@ struct MXFFileSysData
     int64_t position;
     
     Page* pages;
-    int64_t numPages;
-    int64_t numPagesAllocated;
+    int numPages;
+    int numPagesAllocated;
 
     FileDescriptor* fileDescriptorHead;
     FileDescriptor* fileDescriptorTail;
@@ -82,12 +102,90 @@ struct MXFFileSysData
 };
 
 
+static void disk_file_close(FileDescriptor* fileDesc)
+{
+#if defined(_WIN32)
+    if (fileDesc->fileId >= 0)
+    {
+        close(fileDesc->fileId);
+        fileDesc->fileId = -1;
+    }
+#else
+    if (fileDesc->file != NULL)
+    {
+        fclose(fileDesc->file);
+        fileDesc->file = NULL;
+    }
+#endif
+}
+
+static uint32_t disk_file_read(FileDescriptor* fileDesc, uint8_t* data, uint32_t count)
+{
+#if defined(_WIN32)
+    return read(fileDesc->fileId, data, count);
+#else
+    return fread(data, 1, count, fileDesc->file);
+#endif
+}
+
+static uint32_t disk_file_write(FileDescriptor* fileDesc, const uint8_t* data, uint32_t count)
+{
+#if defined(_WIN32)
+    return write(fileDesc->fileId, data, count);
+#else
+    return fwrite(data, 1, count, fileDesc->file);
+#endif
+}
+
+static int disk_file_seek(FileDescriptor* fileDesc, int64_t offset, int whence)
+{
+#if defined(_WIN32)
+    return _lseeki64(fileDesc->fileId, offset, whence) != -1;
+#else
+    return fseeko(fileDesc->file, offset, whence) == 0;
+#endif
+}
+
+static int64_t disk_file_size(const char* filename)
+{
+#if defined(_WIN32)
+    struct _stati64 statBuf;
+#else
+    struct stat statBuf;
+#endif
+
+#if defined(_WIN32)
+    if (_stati64(filename, &statBuf) != 0) 
+    {
+        return -1;
+    }
+    return statBuf.st_size;
+#else
+    if (stat(filename, &statBuf) != 0) 
+    {
+        return -1;
+    }
+    return statBuf.st_size;
+#endif
+}
+
+
+
 static int open_file(MXFFileSysData* sysData, Page* page)
 {
+#if defined(_WIN32)
+    int newFile = -1;
+#else
     FILE* newFile = NULL;
+#endif    
     char filename[4096];
     FileDescriptor* newFileDescriptor = NULL;
-    
+
+    if (page->wasRemoved)
+    {
+        mxf_log(MXF_WLOG, "Failed to open mxf page file which was removed after truncation\n");
+        return 0;
+    }
 
     /* move file descriptor to tail if already open, and return */    
     if (page->fileDescriptor != NULL)
@@ -132,8 +230,8 @@ static int open_file(MXFFileSysData* sysData, Page* page)
             /* single file descriptor */
             
             sysData->fileDescriptorHead->page->fileDescriptor = NULL;
-            fclose(sysData->fileDescriptorHead->file);
-            free(sysData->fileDescriptorHead);
+            disk_file_close(sysData->fileDescriptorHead);
+            SAFE_FREE(&sysData->fileDescriptorHead);
             
             sysData->fileDescriptorHead = NULL;
             sysData->fileDescriptorTail = NULL;
@@ -146,7 +244,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
             FileDescriptor* newHead = sysData->fileDescriptorHead->next;
             
             sysData->fileDescriptorHead->page->fileDescriptor = NULL;
-            fclose(sysData->fileDescriptorHead->file);
+            disk_file_close(sysData->fileDescriptorHead);
             SAFE_FREE(&sysData->fileDescriptorHead);
     
             sysData->fileDescriptorHead = newHead;
@@ -160,27 +258,51 @@ static int open_file(MXFFileSysData* sysData, Page* page)
     switch (sysData->mode)
     {
         case READ_MODE:
+#if defined(_WIN32)
+            newFile = open(filename, _O_BINARY | _O_RDONLY);
+#else
             newFile = fopen(filename, "rb");
+#endif
             break;
         case WRITE_MODE:
             if (!page->wasOpenedBefore)
             {
+#if defined(_WIN32)
+                newFile = open(filename, _O_BINARY | _O_RDWR | _O_CREAT | _O_TRUNC, _S_IREAD | _S_IWRITE);
+#else
                 newFile = fopen(filename, "w+b");
+#endif
             }
             else
             {
+#if defined(_WIN32)
+                newFile = open(filename, _O_BINARY | _O_RDWR);
+#else
                 newFile = fopen(filename, "r+b");
+#endif
             }
             break;
         case MODIFY_MODE:
+#if defined(_WIN32)
+            newFile = open(filename, _O_BINARY | _O_RDWR);
+            if (newFile < 0)
+            {
+                newFile = open(filename, _O_BINARY | _O_RDWR | _O_CREAT | _O_TRUNC, _S_IREAD | _S_IWRITE);
+            }
+#else
             newFile = fopen(filename, "r+b");
             if (newFile == NULL)
             {
                 newFile = fopen(filename, "w+b");
             }
+#endif
             break;
     }
+#if defined(_WIN32)
+    if (newFile < 0)
+#else
     if (newFile == NULL)
+#endif
     {
         mxf_log(MXF_ELOG, "Failed to open paged mxf file '%s': %s\n", filename, strerror(errno));
         return 0;
@@ -189,8 +311,13 @@ static int open_file(MXFFileSysData* sysData, Page* page)
     /* create the new file descriptor */
     CHK_MALLOC_OFAIL(newFileDescriptor, FileDescriptor);
     memset(newFileDescriptor, 0, sizeof(*newFileDescriptor));
+#if defined(_WIN32)
+    newFileDescriptor->fileId = newFile;
+    newFile = -1;
+#else
     newFileDescriptor->file = newFile;
     newFile = NULL;
+#endif
     newFileDescriptor->page = page;
     
     page->fileDescriptor = newFileDescriptor;
@@ -213,17 +340,23 @@ static int open_file(MXFFileSysData* sysData, Page* page)
     return 1;
     
 fail:
+#if defined(_WIN32)
+    if (newFile >= 0)
+    {
+        close(newFile);
+    }
+#else
     if (newFile != NULL)
     {
         fclose(newFile);
     }
+#endif        
     return 0;
 }
 
-
 static Page* open_page(MXFFileSysData* sysData, int64_t position)
 {
-    int64_t page = position / sysData->pageSize;
+    int page = (int)(position / sysData->pageSize);
     if (page > sysData->numPages)
     {
         /* only allowed to open pages 0 .. last + 1 */
@@ -245,7 +378,7 @@ static Page* open_page(MXFFileSysData* sysData, int64_t position)
             Page* newPages;
             CHK_MALLOC_ARRAY_ORET(newPages, Page, sysData->numPagesAllocated + PAGE_ALLOC_INCR);
             memcpy(newPages, sysData->pages, sizeof(Page) * sysData->numPagesAllocated);
-            free(sysData->pages);
+            SAFE_FREE(&sysData->pages);
             sysData->pages = newPages;
             sysData->numPagesAllocated += PAGE_ALLOC_INCR;
             
@@ -296,7 +429,7 @@ static uint32_t read_from_page(MXFFileSysData* sysData, uint8_t* data, uint32_t 
         sysData->position != sysData->pageSize * page->index + page->offset)
     {
         int64_t offset = sysData->position - sysData->pageSize * page->index;
-        if (fseeko(page->fileDescriptor->file, offset, SEEK_SET) != 0)
+        if (!disk_file_seek(page->fileDescriptor, offset, SEEK_SET))
         {
             page->offset = -1; /* invalidate the position within the page */
             return 0;
@@ -308,7 +441,7 @@ static uint32_t read_from_page(MXFFileSysData* sysData, uint8_t* data, uint32_t 
     /* read count bytes or 'till the end of the page */
     uint32_t numRead = (count > (uint32_t)(sysData->pageSize - page->offset)) ? 
         (uint32_t)(sysData->pageSize - page->offset) : count;
-    numRead = fread(data, 1, numRead, page->fileDescriptor->file);
+    numRead = disk_file_read(page->fileDescriptor, data, numRead);
     
     page->offset += numRead;
     page->size = (page->offset > page->size) ? page->offset : page->size;
@@ -338,7 +471,7 @@ static uint32_t write_to_page(MXFFileSysData* sysData, const uint8_t* data, uint
         sysData->position != sysData->pageSize * page->index + page->offset)
     {
         int64_t offset = sysData->position - sysData->pageSize * page->index;
-        if (fseeko(page->fileDescriptor->file, offset, SEEK_SET) != 0)
+        if (!disk_file_seek(page->fileDescriptor, offset, SEEK_SET))
         {
             page->offset = -1; /* invalidate the position within the page */
             return 0;
@@ -350,7 +483,7 @@ static uint32_t write_to_page(MXFFileSysData* sysData, const uint8_t* data, uint
     /* write count bytes or 'till the end of the page */
     uint32_t numWrite = (count > (uint32_t)(sysData->pageSize - page->offset)) ? 
         (uint32_t)(sysData->pageSize - page->offset) : count;
-    numWrite = fwrite(data, 1, numWrite, page->fileDescriptor->file);
+    numWrite = disk_file_write(page->fileDescriptor, data, numWrite);
 
     page->offset += numWrite;
     page->size = (page->offset > page->size) ? page->offset : page->size;
@@ -392,10 +525,7 @@ static void page_file_close(MXFFileSysData* sysData)
     FileDescriptor* nextFd;
     while (fd != NULL)
     {
-        if (fd->file != NULL)
-        {
-            fclose(fd->file);
-        }
+        disk_file_close(fd);
         nextFd = fd->next;
         SAFE_FREE(&fd);
         fd = nextFd;
@@ -540,7 +670,7 @@ static int page_file_is_seekable(MXFFileSysData* sysData)
 
 
 
-int mxf_page_file_open_new(const char* filenameTemplate, int64_t pageSize, MXFFile** mxfFile)
+int mxf_page_file_open_new(const char* filenameTemplate, int64_t pageSize, MXFPageFile** mxfPageFile)
 {
     MXFFile* newMXFFile = NULL;
     
@@ -556,8 +686,8 @@ int mxf_page_file_open_new(const char* filenameTemplate, int64_t pageSize, MXFFi
     newMXFFile->close = page_file_close;
     newMXFFile->read = page_file_read;
     newMXFFile->write = page_file_write;
-    newMXFFile->getchar = page_file_getchar;
-    newMXFFile->putchar = page_file_putchar;
+    newMXFFile->get_char = page_file_getchar;
+    newMXFFile->put_char = page_file_putchar;
     newMXFFile->eof = page_file_eof;
     newMXFFile->seek = page_file_seek;
     newMXFFile->tell = page_file_tell;
@@ -573,9 +703,10 @@ int mxf_page_file_open_new(const char* filenameTemplate, int64_t pageSize, MXFFi
     strcpy(newMXFFile->sysData->filenameTemplate, filenameTemplate);
     newMXFFile->sysData->pageSize = pageSize;
     newMXFFile->sysData->mode = WRITE_MODE;
+    newMXFFile->sysData->mxfPageFile.mxfFile = newMXFFile;
     
     
-    *mxfFile = newMXFFile;
+    *mxfPageFile = &newMXFFile->sysData->mxfPageFile;
     return 1;
     
 fail:
@@ -586,7 +717,7 @@ fail:
     return 0;
 }
 
-int mxf_page_file_open_read(const char* filenameTemplate, MXFFile** mxfFile)
+int mxf_page_file_open_read(const char* filenameTemplate, MXFPageFile** mxfPageFile)
 {
     MXFFile* newMXFFile = NULL;
     int pageCount;
@@ -628,8 +759,8 @@ int mxf_page_file_open_read(const char* filenameTemplate, MXFFile** mxfFile)
     newMXFFile->close = page_file_close;
     newMXFFile->read = page_file_read;
     newMXFFile->write = page_file_write;
-    newMXFFile->getchar = page_file_getchar;
-    newMXFFile->putchar = page_file_putchar;
+    newMXFFile->get_char = page_file_getchar;
+    newMXFFile->put_char = page_file_putchar;
     newMXFFile->eof = page_file_eof;
     newMXFFile->seek = page_file_seek;
     newMXFFile->tell = page_file_tell;
@@ -644,6 +775,7 @@ int mxf_page_file_open_read(const char* filenameTemplate, MXFFile** mxfFile)
     CHK_MALLOC_ARRAY_OFAIL(newMXFFile->sysData->filenameTemplate, char, strlen(filenameTemplate) + 1);
     strcpy(newMXFFile->sysData->filenameTemplate, filenameTemplate);
     newMXFFile->sysData->mode = READ_MODE;
+    newMXFFile->sysData->mxfPageFile.mxfFile = newMXFFile;
     
     
     
@@ -678,7 +810,7 @@ int mxf_page_file_open_read(const char* filenameTemplate, MXFFile** mxfFile)
     newMXFFile->sysData->pages[newMXFFile->sysData->numPages - 1].size = st.st_size;
 
     
-    *mxfFile = newMXFFile;
+    *mxfPageFile = &newMXFFile->sysData->mxfPageFile;
     return 1;
     
 fail:
@@ -689,14 +821,14 @@ fail:
     return 0;
 }
 
-int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MXFFile** mxfFile)
+int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MXFPageFile** mxfPageFile)
 {
     MXFFile* newMXFFile = NULL;
     int pageCount;
     int allocatedPages;
     char filename[4096];
     FILE* file;
-    struct stat st;
+    int64_t fileSize;
     
     
     if (strstr(filenameTemplate, "%d") == NULL)
@@ -728,14 +860,15 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
     if (pageCount > 1)
     {
         sprintf(filename, filenameTemplate, 0);
-        if (stat(filename, &st) != 0)
+        fileSize = disk_file_size(filename);
+        if (fileSize < 0)
         {
             mxf_log(MXF_ELOG, "Failed to stat file '%s': %s\n", filename, strerror(errno));
             return 0;
         }
-        if (pageSize != st.st_size)
+        if (pageSize != fileSize)
         {
-            mxf_log(MXF_ELOG, "Size of first file '%s' (%"PRId64" does not equal page size %"PRId64"\n", filename, st.st_size, pageSize);
+            mxf_log(MXF_ELOG, "Size of first file '%s' (%"PRId64" does not equal page size %"PRId64"\n", filename, fileSize, pageSize);
             return 0;
         }
     }
@@ -747,8 +880,8 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
     newMXFFile->close = page_file_close;
     newMXFFile->read = page_file_read;
     newMXFFile->write = page_file_write;
-    newMXFFile->getchar = page_file_getchar;
-    newMXFFile->putchar = page_file_putchar;
+    newMXFFile->get_char = page_file_getchar;
+    newMXFFile->put_char = page_file_putchar;
     newMXFFile->eof = page_file_eof;
     newMXFFile->seek = page_file_seek;
     newMXFFile->tell = page_file_tell;
@@ -764,6 +897,7 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
     strcpy(newMXFFile->sysData->filenameTemplate, filenameTemplate);
     newMXFFile->sysData->pageSize = pageSize;
     newMXFFile->sysData->mode = MODIFY_MODE;
+    newMXFFile->sysData->mxfPageFile.mxfFile = newMXFFile;
     
     
     /* allocate pages */
@@ -780,15 +914,16 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
     
     /* set the files size of the last file, which could have size < pageSize */
     sprintf(filename, filenameTemplate, newMXFFile->sysData->numPages - 1);
-    if (stat(filename, &st) != 0)
+    fileSize = disk_file_size(filename);
+    if (fileSize < 0)
     {
         mxf_log(MXF_ELOG, "Failed to stat file '%s': %s\n", filename, strerror(errno));
         goto fail;
     }
-    newMXFFile->sysData->pages[newMXFFile->sysData->numPages - 1].size = st.st_size;
+    newMXFFile->sysData->pages[newMXFFile->sysData->numPages - 1].size = fileSize;
     
     
-    *mxfFile = newMXFFile;
+    *mxfPageFile = &newMXFFile->sysData->mxfPageFile;
     return 1;
     
 fail:
@@ -799,6 +934,111 @@ fail:
     return 0;
 }
 
+MXFFile* mxf_page_file_get_file(MXFPageFile* mxfPageFile)
+{
+    return mxfPageFile->mxfFile;
+}
+
+int64_t mxf_page_file_get_page_size(MXFPageFile* mxfPageFile)
+{
+    return mxfPageFile->mxfFile->sysData->pageSize;
+}
+
+int mxf_page_file_is_page_filename(const char* filename)
+{
+    return strstr(filename, "%d") != NULL;
+}
+
+int mxf_page_file_forward_truncate(MXFPageFile* mxfPageFile)
+{
+    MXFFileSysData* sysData = mxfPageFile->mxfFile->sysData;
+    int page = (int)(sysData->position / sysData->pageSize);
+    int i;
+    char filename[4096];
+    
+    if (sysData->mode == READ_MODE)
+    {
+        mxf_log(MXF_ELOG, "Cannot forward truncate read-only mxf page file\n");
+        return 0;
+    }
+    
+    /* close and truncate to zero length page files before the current one */
+    for (i = 0; i < page; i++)
+    {
+        if (sysData->pages[i].wasRemoved)
+        {
+            continue;
+        }
+        
+        if (sysData->pages[i].fileDescriptor != NULL)
+        {
+            /* close the file */
+            disk_file_close(sysData->pages[i].fileDescriptor);
+            
+            /* remove the file descriptor from the list */
+            if (sysData->fileDescriptorHead == sysData->pages[i].fileDescriptor)
+            {
+                sysData->fileDescriptorHead = sysData->fileDescriptorHead->next;
+            }
+            else
+            {
+                sysData->pages[i].fileDescriptor->prev->next = sysData->pages[i].fileDescriptor->next;
+            }
+            if (sysData->fileDescriptorTail == sysData->pages[i].fileDescriptor)
+            {
+                sysData->fileDescriptorTail = sysData->fileDescriptorTail->prev;
+            }
+            else
+            {
+                sysData->pages[i].fileDescriptor->next->prev = sysData->pages[i].fileDescriptor->prev;
+            }
+            SAFE_FREE(&sysData->pages[i].fileDescriptor);
+        }
+
+        /* truncate the file to zero length */
+        sprintf(filename, sysData->filenameTemplate, sysData->pages[i].index);
+
+#if defined(_WIN32)
+        /* WIN32 does not have truncate() so open the file with _O_TRUNC then close it */
+        int fileid;
+        if ((fileid = open(filename, _O_CREAT | _O_TRUNC, _S_IWRITE)) == -1 ||
+            close(fileid) == -1)
+#else
+        if (truncate(filename, 0) != 0)
+#endif
+        {
+            mxf_log(MXF_WLOG, "Failed to truncate '%s' to zero length: %s\n", filename, strerror(errno));
+        }
+        sysData->pages[i].wasRemoved = 1;
+    }
+    
+    return 1;
+}
+
+int mxf_page_file_remove(const char* filenameTemplate)
+{
+    int index = 0;
+    char filename[4096];
+    
+    while (1)
+    {
+        sprintf(filename, filenameTemplate, index);
+        if (remove(filename) != 0)
+        {
+            break;
+        }
+        
+        index++;
+    }
+    
+    if (index == 0)
+    {
+        /* first file couldn't be removed or does not exist */
+        return 0;
+    }
+    
+    return 1;
+}
 
 
 

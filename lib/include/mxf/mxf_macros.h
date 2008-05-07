@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_macros.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_macros.h,v 1.3 2008/05/07 15:22:22 philipn Exp $
  *
  * General purpose macros
  *
@@ -96,6 +96,15 @@ extern "C"
 #define PFi64 "lld"
 #define PFu64 "llu"
 #define PFoff "lld"
+#endif
+
+/*
+* size_t printf formatting varies by platform
+*/
+#if defined(__APPLE__) || defined(__x86_64__)
+#define PFszt "lu"
+#else
+#define PFszt "u"
 #endif
 
 

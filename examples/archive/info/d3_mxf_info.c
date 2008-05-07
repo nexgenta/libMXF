@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info.c,v 1.2 2008/02/18 10:18:49 philipn Exp $
+ * $Id: d3_mxf_info.c,v 1.3 2008/05/07 15:21:57 philipn Exp $
  *
  * 
  *
@@ -71,6 +71,7 @@ typedef struct
     int numVideoTracks;
     int numAudioTracks;
     mxfLength duration;
+    int64_t contentPackageLen;
     
     MXFList pseFailures;
     MXFList vtrErrors;
@@ -121,11 +122,6 @@ typedef struct
 
 static const mxfKey g_TimecodeSysItemElementKey = MXF_SS1_ELEMENT_KEY(0x01, 0x00);
 
-/* timecode element size + video element size + 4 * audio element size 
-= (16 + 4 + 28) + (16 + 4 + 720 * 576 * 2) + 4 * (16 + 4 + 1920 * 3)
-= 852628 */
-static const uint32_t g_ContentPackageSize = 852628;
-
 static const uint32_t g_timecodeElementLen = 28;
 
 
@@ -149,6 +145,71 @@ static int load_bbc_d3_extensions(MXFDataModel* dataModel)
 }
 
 
+static void get_content_package_len(Reader* reader)
+{
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    int64_t filePos;
+
+    /* record file pos which is restored later */
+    filePos = mxf_file_tell(reader->mxfFile);
+
+    
+    /* seek to the start of the essence */
+    CHK_OFAIL(mxf_file_seek(reader->mxfFile, 0, SEEK_SET));
+    while (1)
+    {
+        CHK_OFAIL(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
+
+        if (mxf_equals_key(&key, &g_TimecodeSysItemElementKey))
+        {
+            break;
+        }
+        else if (mxf_is_footer_partition_pack(&key))
+        {
+            mxf_log(MXF_ILOG, "MXF file contains no essence data\n");
+            
+            /* restore file to the original position */
+            mxf_file_seek(reader->mxfFile, filePos, SEEK_SET);
+            
+            return;
+        }
+        else
+        {
+            CHK_OFAIL(mxf_skip(reader->mxfFile, len));
+        }
+    }
+    
+    /* read the first content package */
+    reader->contentPackageLen = mxfKey_extlen + llen;
+    while (1)
+    {
+        CHK_OFAIL(mxf_skip(reader->mxfFile, len));
+        reader->contentPackageLen += len;
+
+        CHK_OFAIL(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
+        if (mxf_equals_key(&key, &g_TimecodeSysItemElementKey) || mxf_is_partition_pack(&key))
+        {
+            break;
+        }
+        reader->contentPackageLen += mxfKey_extlen + llen;
+    }
+    
+    /* restore file to the original position */
+    mxf_file_seek(reader->mxfFile, filePos, SEEK_SET);
+
+    return;
+
+    
+fail:
+    mxf_log(MXF_WLOG, "Failed to determine the content package length in the MXF file\n");
+    reader->contentPackageLen = 0;
+
+    /* restore file to the original position */
+    mxf_file_seek(reader->mxfFile, filePos, SEEK_SET);
+}
+
 static void report_actual_frame_count(Reader* reader)
 {
     mxfKey key;
@@ -159,6 +220,7 @@ static void report_actual_frame_count(Reader* reader)
     struct stat statBuf;
     int64_t frameCount;
 
+    
     /* record file pos which is restored later */
     filePos = mxf_file_tell(reader->mxfFile);
 
@@ -178,17 +240,17 @@ static void report_actual_frame_count(Reader* reader)
             CHK_OFAIL(mxf_skip(reader->mxfFile, len));
         }
     }
-    CHK_OFAIL(mxf_file_seek(reader->mxfFile, -(llen + mxfKey_extlen), SEEK_CUR));
+    CHK_OFAIL(mxf_file_seek(reader->mxfFile, -(mxfKey_extlen + llen), SEEK_CUR));
 
     /* calculate the number of frames present using the file size */
     essenceStartPos = mxf_file_tell(reader->mxfFile);
     CHK_OFAIL(stat(reader->mxfFilename, &statBuf) == 0);
     if (statBuf.st_size - essenceStartPos > 0)
     {
-        frameCount = (statBuf.st_size - essenceStartPos) / 852628 /* size of frame */;
+        frameCount = (statBuf.st_size - essenceStartPos) / reader->contentPackageLen;
         
         if (reader->headerPartition->footerPartition == 0 ||
-            essenceStartPos + frameCount * 852628 < (int64_t)reader->headerPartition->footerPartition)
+            essenceStartPos + frameCount * reader->contentPackageLen < (int64_t)reader->headerPartition->footerPartition)
         {
             mxf_log(MXF_WLOG, "%"PRId64" complete frames are present in the MXF file\n", frameCount);
         }
@@ -293,7 +355,7 @@ static int read_timecode_at_position(Reader* reader, mxfPosition position,
     
     /* position at frame */
     CHK_ORET(mxf_file_seek(reader->mxfFile, 
-        reader->essenceDataStart + position * g_ContentPackageSize,
+        reader->essenceDataStart + position * reader->contentPackageLen,
         SEEK_SET));
         
     /* read and check the kl */
@@ -481,6 +543,12 @@ static void free_reader(Reader** reader)
         CHK_ORET(mxf_get_int64_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
     } 
 
+#define GET_UINT32_ITEM(name, cName) \
+    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    { \
+        CHK_ORET(mxf_get_uint32_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+    } 
+
 static int get_infax_data(Reader* reader, InfaxData* infaxData)
 {
     GET_STRING_ITEM(D3P_Format, format);
@@ -498,6 +566,7 @@ static int get_infax_data(Reader* reader, InfaxData* infaxData)
     GET_STRING_ITEM(D3P_SpoolNumber, spoolNo);
     GET_STRING_ITEM(D3P_AccessionNumber, accNo);
     GET_STRING_ITEM(D3P_CatalogueDetail, catDetail);
+    GET_UINT32_ITEM(D3P_ItemNumber, itemNo);
     
     return 1;
 }
@@ -570,10 +639,23 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     }
     
     
+    /* get the content package length */
+    get_content_package_len(reader);
+    
+    
     /* report number of frames actually present if the file is incomplete */
     if (!fileIsComplete)
     {
-        report_actual_frame_count(reader);
+        /* don't bother if were unable to read the content package length */
+        if (reader->contentPackageLen <= 0)
+        {
+            mxf_log(MXF_WLOG, "Cannot check the actual frame count because failed to read the first content package\n");
+            mxf_log(MXF_WLOG, "Assuming 0 complete frames are present in the MXF file\n");
+        }
+        else
+        {    
+            report_actual_frame_count(reader);
+        }
     }
     
     
@@ -946,6 +1028,7 @@ static void write_infax_data(InfaxData* infaxData)
     printf("    Spool number: %s\n", infaxData->spoolNo);    
     printf("    Accession number: %s\n", infaxData->accNo);    
     printf("    Catalogue detail: %s\n", infaxData->catDetail);    
+    printf("    Item number: %d\n", infaxData->itemNo);    
 }
 
 static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, int noSourceTimecode)
@@ -1154,6 +1237,7 @@ static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors,
     printf("Spool number: %s\n", infaxData->spoolNo);    
     printf("Accession number: %s\n", infaxData->accNo);    
     printf("Catalogue detail: %s\n", infaxData->catDetail);    
+    printf("Item number: %d\n", infaxData->itemNo);    
 
     /* initialise the timecode reading if showing source vitc and ltc */
     if (!noSourceTimecode)
@@ -1353,11 +1437,13 @@ int main(int argc, const char* argv[])
     
     if (strstr(mxfFilename, "%d") != NULL)
     {
-        if (!mxf_page_file_open_read(mxfFilename, &reader->mxfFile))
+        MXFPageFile* mxfPageFile;
+        if (!mxf_page_file_open_read(mxfFilename, &mxfPageFile))
         {
             mxf_log(MXF_ELOG, "Failed to open page file '%s'\n", mxfFilename);
             goto fail;
         }
+        reader->mxfFile = mxf_page_file_get_file(mxfPageFile);
     }
     else
     {
@@ -1372,6 +1458,12 @@ int main(int argc, const char* argv[])
     {
         mxf_log(MXF_ELOG, "Failed to extract info from '%s'\n", mxfFilename);
         goto fail;
+    }
+    
+    if (!noSourceTimecode && reader->contentPackageLen <= 0)
+    {
+        mxf_log(MXF_WLOG, "Not including source timecodes - no essence data?\n");
+        noSourceTimecode = 1;
     }
         
     if (summary)

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_vlc.c,v 1.1 2007/09/11 13:24:49 stuart_hc Exp $
+ * $Id: mxf_vlc.c,v 1.2 2008/05/07 15:22:11 philipn Exp $
  *
  * VLC MXF demux module
  *
@@ -688,8 +688,8 @@ static int create_mxf_reader( stream_t *p_stream, MXFReader **pp_mxfReader )
     p_newMXFFile->close = vlcstream_file_close;
     p_newMXFFile->read = vlcstream_file_read;
     p_newMXFFile->write = vlcstream_file_write;
-    p_newMXFFile->getchar = vlcstream_file_getchar;
-    p_newMXFFile->putchar = vlcstream_file_putchar;
+    p_newMXFFile->get_char = vlcstream_file_getchar;
+    p_newMXFFile->put_char = vlcstream_file_putchar;
     p_newMXFFile->eof = vlcstream_file_eof;
     p_newMXFFile->seek = vlcstream_file_seek;
     p_newMXFFile->tell = vlcstream_file_tell;
@@ -859,8 +859,8 @@ static int wrap_byte_array( demux_t *p_demux, byte_t *p_data, int64_t i_size, MX
     p_newMXFFile->close = vlcbytearray_file_close;
     p_newMXFFile->read = vlcbytearray_file_read;
     p_newMXFFile->write = vlcbytearray_file_write;
-    p_newMXFFile->getchar = vlcbytearray_file_getchar;
-    p_newMXFFile->putchar = vlcbytearray_file_putchar;
+    p_newMXFFile->get_char = vlcbytearray_file_getchar;
+    p_newMXFFile->put_char = vlcbytearray_file_putchar;
     p_newMXFFile->eof = vlcbytearray_file_eof;
     p_newMXFFile->seek = vlcbytearray_file_seek;
     p_newMXFFile->tell = vlcbytearray_file_tell;

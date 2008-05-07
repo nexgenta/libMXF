@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.4 2008/02/06 16:58:54 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.5 2008/05/07 15:21:47 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -63,6 +63,7 @@ typedef struct
     EssenceType essenceType;
     
     uint32_t materialTrackID;
+    mxfUMID fileSourcePackageUID;
     
     
     /* used when using the start..., write..., end... functions to write a frame */
@@ -443,6 +444,26 @@ static int get_track_writer(AvidClipWriter* clipWriter, uint32_t materialTrackID
     return 0;
 }
 
+static int get_file_package(TrackWriter* trackWriter, PackageDefinitions* packageDefinitions, Package** filePackage)
+{
+    MXFListIterator iter;
+    Package* package;
+
+    mxf_initialise_list_iter(&iter, &packageDefinitions->fileSourcePackages);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        package = mxf_get_iter_element(&iter);
+        
+        if (mxf_equals_umid(&trackWriter->fileSourcePackageUID, &package->uid))
+        {
+            *filePackage = package;
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
 static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions* packageDefinitions, 
     Package* filePackage, TrackWriter* writer)
 {
@@ -467,9 +488,20 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     
     /* load the data model, plus AVID extensions */
     
-    CHK_ORET(mxf_load_data_model(&writer->dataModel));
-    CHK_ORET(mxf_avid_load_extensions(writer->dataModel));
-    CHK_ORET(mxf_finalise_data_model(writer->dataModel));
+    if (writer->dataModel == NULL)
+    {
+        CHK_ORET(mxf_load_data_model(&writer->dataModel));
+        CHK_ORET(mxf_avid_load_extensions(writer->dataModel));
+        CHK_ORET(mxf_finalise_data_model(writer->dataModel));
+    }
+    
+    
+    /* delete existing header metadata */
+    
+    if (writer->headerMetadata != NULL)
+    {
+        mxf_free_header_metadata(&writer->headerMetadata);
+    }
     
     
     /* create the header metadata and associated primer pack */
@@ -537,7 +569,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         {
             CHK_ORET(mxf_set_ul_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &writer->soundDataDef));
         }
-        CHK_ORET(mxf_set_length_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, Duration), 0)); /* to be filled in */
+        CHK_ORET(mxf_set_length_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, Duration), -1)); /* to be filled in */
 
         CHK_ORET(mxf_get_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, Duration), &writer->durationItems[writer->numDurationItems].item));
         writer->durationItems[writer->numDurationItems].editRate = track->editRate;
@@ -556,7 +588,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         {
             CHK_ORET(mxf_set_ul_item(writer->sourceClipSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &writer->soundDataDef));
         }
-        CHK_ORET(mxf_set_length_item(writer->sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), 0)); /* to be filled in */
+        CHK_ORET(mxf_set_length_item(writer->sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), -1)); /* to be filled in */
         CHK_ORET(mxf_set_position_item(writer->sourceClipSet, &MXF_ITEM_K(SourceClip, StartPosition), track->startPosition));
         CHK_ORET(mxf_set_umid_item(writer->sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &track->sourcePackageUID));
         CHK_ORET(mxf_set_uint32_item(writer->sourceClipSet, &MXF_ITEM_K(SourceClip, SourceTrackID), track->sourceTrackID));
@@ -575,7 +607,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     }
 
     /* attach user comments to the material package*/
-    mxf_initialise_list_iter(&iter, &materialPackage->userComments);
+    mxf_initialise_list_iter(&iter, &packageDefinitions->userComments);
     while (mxf_next_list_iter_element(&iter))
     {
         userComment = (UserComment*)mxf_get_iter_element(&iter);
@@ -627,7 +659,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     {
         CHK_ORET(mxf_set_ul_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &writer->soundDataDef));
     }
-    CHK_ORET(mxf_set_length_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, Duration), 0));  /* to be filled in */
+    CHK_ORET(mxf_set_length_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, Duration), -1));  /* to be filled in */
 
     CHK_ORET(mxf_get_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, Duration), &writer->durationItems[writer->numDurationItems].item));
     writer->durationItems[writer->numDurationItems].editRate = track->editRate;
@@ -646,7 +678,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     {
         CHK_ORET(mxf_set_ul_item(writer->sourceClipSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &writer->soundDataDef));
     }
-    CHK_ORET(mxf_set_length_item(writer->sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), 0)); /* to be filled in */
+    CHK_ORET(mxf_set_length_item(writer->sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), -1)); /* to be filled in */
     CHK_ORET(mxf_set_position_item(writer->sourceClipSet, &MXF_ITEM_K(SourceClip, StartPosition), track->startPosition));
     CHK_ORET(mxf_set_umid_item(writer->sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &track->sourcePackageUID));
     CHK_ORET(mxf_set_uint32_item(writer->sourceClipSet, &MXF_ITEM_K(SourceClip, SourceTrackID), track->sourceTrackID));
@@ -749,24 +781,6 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     if (clipWriter->wProjectName != NULL)
     {
         CHK_ORET(mxf_avid_attach_mob_attribute(writer->headerMetadata, writer->sourcePackageSet, L"_PJ", clipWriter->wProjectName));
-    }
-    
-    /* attach user comments to the file source package*/
-    mxf_initialise_list_iter(&iter, &filePackage->userComments);
-    while (mxf_next_list_iter_element(&iter))
-    {
-        userComment = (UserComment*)mxf_get_iter_element(&iter);
-        
-        if (userComment->name != NULL && userComment->value != NULL)
-        {
-            CHK_ORET(convert_string(clipWriter, userComment->name));
-            SAFE_FREE(&clipWriter->wTmpString2);
-            clipWriter->wTmpString2 = clipWriter->wTmpString;
-            clipWriter->wTmpString = NULL;
-            CHK_ORET(convert_string(clipWriter, userComment->value));
-            CHK_ORET(mxf_avid_attach_user_comment(writer->headerMetadata, writer->sourcePackageSet,
-                clipWriter->wTmpString2, clipWriter->wTmpString));
-        }
     }
     
     
@@ -885,25 +899,6 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
             CHK_ORET(mxf_avid_attach_mob_attribute(writer->headerMetadata, writer->sourcePackageSet, L"_PJ", clipWriter->wProjectName));
         }
 
-        /* attach user comments to the tape source package*/
-        mxf_initialise_list_iter(&iter, &tapePackage->userComments);
-        while (mxf_next_list_iter_element(&iter))
-        {
-            userComment = (UserComment*)mxf_get_iter_element(&iter);
-            
-            if (userComment->name != NULL && userComment->value != NULL)
-            {
-                CHK_ORET(convert_string(clipWriter, userComment->name));
-                SAFE_FREE(&clipWriter->wTmpString2);
-                clipWriter->wTmpString2 = clipWriter->wTmpString;
-                clipWriter->wTmpString = NULL;
-                CHK_ORET(convert_string(clipWriter, userComment->value));
-                CHK_ORET(mxf_avid_attach_user_comment(writer->headerMetadata, writer->sourcePackageSet,
-                    clipWriter->wTmpString2, clipWriter->wTmpString));
-            }
-        }
-        
-        
     }
 
     /* Preface - Identification */
@@ -922,7 +917,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     return 1;
 }
 
-static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer)
+static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer, PackageDefinitions* packageDefinitions, Package* filePackage)
 {
     MXFListIterator iter;
     MJPEGOffsetsArray* offsetsArray;
@@ -1018,6 +1013,15 @@ static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer)
     CHK_ORET(mxf_write_rip(writer->mxfFile, writer->partitions));
 
     
+    /* update the header metadata if the package definitions have changed */
+    
+    if (packageDefinitions != NULL)
+    {
+        writer->numDurationItems = 0;
+        writer->descriptorSet = NULL;
+        
+        CHK_ORET(create_header_metadata(clipWriter, packageDefinitions, filePackage, writer));
+    }
     
     
     /* update the header metadata with durations */
@@ -1100,6 +1104,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     strcpy(newTrackWriter->filename, filePackage->filename);
     
     newTrackWriter->essenceType = filePackage->essenceType;
+    newTrackWriter->fileSourcePackageUID = filePackage->uid;
     
     
     /* get the material track id that references this file package */
@@ -1794,6 +1799,13 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     }
     
     
+    /* update the partitions */
+    
+    CHK_OFAIL((filePos = mxf_file_tell(newTrackWriter->mxfFile)) >= 0);
+    CHK_OFAIL(mxf_update_partitions(newTrackWriter->mxfFile, newTrackWriter->partitions));
+    CHK_OFAIL(mxf_file_seek(newTrackWriter->mxfFile, filePos, SEEK_SET));
+
+    
     /* open the essence element, ready for writing */
     
     CHK_OFAIL(mxf_open_essence_element_write(newTrackWriter->mxfFile, &newTrackWriter->essenceElementKey, 
@@ -2046,14 +2058,42 @@ void abort_writing(AvidClipWriter** clipWriter, int deleteFile)
 
 int complete_writing(AvidClipWriter** clipWriter)
 {
+    return update_and_complete_writing(clipWriter, NULL, NULL);
+}
+
+int update_and_complete_writing(AvidClipWriter** clipWriter, PackageDefinitions* packageDefinitions, const char* projectName)
+{
     int i;
+    Package* filePackage = NULL;
+
+    if (packageDefinitions != NULL)
+    {
+        if (projectName != NULL)
+        {
+            SAFE_FREE(&(*clipWriter)->wProjectName);
+            
+            CHK_ORET(convert_string((*clipWriter), projectName));
+            (*clipWriter)->wProjectName = (*clipWriter)->wTmpString;
+            (*clipWriter)->wTmpString = NULL;
+        }
+    }
     
     for (i = 0; i < (*clipWriter)->numTracks; i++)
     {
-        CHK_ORET(complete_track(*clipWriter, (*clipWriter)->tracks[i]));
+        if (packageDefinitions != NULL)
+        {
+            CHK_ORET(get_file_package((*clipWriter)->tracks[i], packageDefinitions, &filePackage));
+            CHK_ORET(complete_track(*clipWriter, (*clipWriter)->tracks[i], packageDefinitions, filePackage));
+        }
+        else
+        {
+            CHK_ORET(complete_track(*clipWriter, (*clipWriter)->tracks[i], NULL, NULL));
+        }
     }
     
     free_avid_clip_writer(clipWriter);
     
     return 1;
 }
+
+

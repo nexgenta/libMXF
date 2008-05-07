@@ -423,7 +423,7 @@ void gen_blob(FILE* in)
     printf("const uint8_t g_AvidMetaDictBlob[] = \n");
     printf("{\n");
         
-    const int bufferSize = 16;
+    const size_t bufferSize = 16;
     unsigned char buffer[bufferSize];
     size_t numRead;
     size_t i;

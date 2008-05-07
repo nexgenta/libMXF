@@ -18,6 +18,7 @@
 		<D3P_SpoolNumber detail="OFFLINE_STORAGE::OFS_Spool_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0C 00"/>
 		<D3P_AccessionNumber detail="OFFLINE_STORAGE::OFS_Library_Accession_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0D 00"/>
 		<D3P_CatalogueDetail detail="CATALOGUE::Cat_Code" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 0E 00"/>
+		<D3P_ItemNumber detail="?" use="optional" type="UInt32" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 10 00"/>
 	</D3P_InfaxFramework>
 	<D3P_PSEAnalysisFramework base="DM_Framework" detail="BBC D3 transfer PSE analysis framework" type="localSet" key="06 0E 2B 34 02 53 01 01 0D 04 01 01 01 02 00 00">
 		<D3P_RedFlash detail="The HardingFPA photosensitive epilepsy red flash analysis result" type="Int16" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 02 01 00"/>

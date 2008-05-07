@@ -1,12 +1,32 @@
-LIBMXF_DIR = ../../lib
+#
+# $Id: Makefile,v 1.3 2008/05/07 15:22:11 philipn Exp $
+#
+# Makefile for building transfertop2
+#
+# Copyright (C) 2007  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+#
+TOPLEVEL = ../..
+include $(TOPLEVEL)/vars.mk
 
-
-CPP_CC = g++ -g -Wall -Wundef -Wno-non-virtual-dtor -Werror -D_DEBUG -DOM_DEBUG -DOM_STACK_TRACE_ON_ASSERT -fsigned-char -DOM_USE_SCHEMASOFT_SS -I/usr/local/lib/include -DUSE_LIBDV  -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_XOPEN_SOURCE=500 -DLITTLEENDIAN=1
-CPP_INCLUDES = -I. -I$(LIBMXF_DIR) -I$(AAFSDKINSTALL)/include
+CPP_CC = g++ -g -Wall -Wundef -Wno-non-virtual-dtor -Werror -D_DEBUG -DOM_DEBUG -DOM_STACK_TRACE_ON_ASSERT -fsigned-char -DOM_USE_SCHEMASOFT_SS -I/usr/local/lib/include -DUSE_LIBDV -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_XOPEN_SOURCE=500 -DLITTLEENDIAN=1
+CPP_INCLUDES = -I. -I$(LIBMXF_DIR)/include -I$(AAFSDKINSTALL)/include
 CPP_OBJECTS = avidp2transfer.o
 
-C_CC = gcc -Wall -W -Werror -g -O2 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
-C_INCLUDES = -I. -I$(LIBMXF_DIR)/include
 C_OBJECTS = xml_writer.o avid_mxf_to_p2.o
 
 ifeq "$(OS)" "Windows_NT"
@@ -14,28 +34,35 @@ ifeq "$(OS)" "Windows_NT"
   EXTRA_LIBS=-lole32
 else
   CPP_LD = g++ -ldl -rdynamic
-  EXTRA_LIBS=-luuid
+  EXTRA_LIBS=$(UUIDLIB)
 endif
 
 .PHONY: all
-all: libMXF test_avid_mxf_to_p2 test_avidp2transfer
+ifndef AAFSDKINSTALL
+# The test_avidp2transfer application depends on the AAFSDK, so skip if AAFSDKINSTALL path not set
+# AAFSDKINSTALL is path to installed AAF SDK includes and libs (i.e. after an SDK make install)
+# e.g. lib/debug/libaaflib.a lib/debug/libaafiid.a include/AAF.h etc
+all: test_avid_mxf_to_p2
+	@echo "*** AAFSDKINSTALL not set, test_avidp2transfer skipped ***"
+else
+all: test_avid_mxf_to_p2 test_avidp2transfer
+endif
 
-.PHONY: libMXF
-libMXF:
-	@cd $(LIBMXF_DIR) && $(MAKE)
+$(LIBMXF_DIR)/libMXF.a:
+	$(MAKE) -C $(LIBMXF_DIR)
 
 
 test_avid_mxf_to_p2: $(LIBMXF_DIR)/libMXF.a test_avid_mxf_to_p2.o $(C_OBJECTS)
-	$(C_CC) test_avid_mxf_to_p2.o $(C_OBJECTS) -L$(LIBMXF_DIR) -lMXF $(EXTRA_LIBS) -o $@
+	$(CC) test_avid_mxf_to_p2.o $(C_OBJECTS) -L$(LIBMXF_DIR) -lMXF $(EXTRA_LIBS) -o $@
 
 test_avid_mxf_to_p2.o: test_avid_mxf_to_p2.c avid_mxf_to_p2.h
-	$(C_CC) -c $(C_INCLUDES) test_avid_mxf_to_p2.c
+	$(CC) $(CFLAGS) -c test_avid_mxf_to_p2.c
 
 avid_mxf_to_p2.o: avid_mxf_to_p2.c icon_avid_to_p2.h $(LIBMXF_DIR)/include/mxf/mxf.h
-	$(C_CC) -c $(C_INCLUDES) avid_mxf_to_p2.c
+	$(CC) $(CFLAGS) -c avid_mxf_to_p2.c
 
 xml_writer.o: xml_writer.c xml_writer.h
-	$(C_CC) -c $(C_INCLUDES) xml_writer.c
+	$(CC) $(CFLAGS) -c xml_writer.c
 
 
 test_avidp2transfer: $(LIBMXF_DIR)/libMXF.a test_avidp2transfer.o $(CPP_OBJECTS) $(C_OBJECTS)
@@ -50,12 +77,7 @@ test_avidp2transfer.o: test_avidp2transfer.cpp avidp2transfer.h
 	$(CPP_CC) -c $(CPP_INCLUDES) test_avidp2transfer.cpp
 
 avidp2transfer.o: avidp2transfer.cpp avidp2transfer.h
-ifndef AAFSDKINSTALL
-	# AAFSDKINSTALL is path to installed AAF SDK includes and libs (i.e. after an SDK make install)
-	$(error Please set the AAFSDKINSTALL environment variable to the location of your installed AAFSDK files i.e. path to lib/debug/libaaflib.a lib/debug/libaafiid.a include/AAF.h etc)
-endif
 	$(CPP_CC) -c $(CPP_INCLUDES) avidp2transfer.cpp
-
 
 
 .PHONY: clean
@@ -64,5 +86,4 @@ clean:
 
 .PHONY: libclean
 libclean: clean
-	@cd $(LIBMXF_DIR) && $(MAKE) clean
-
+	$(MAKE) -C $(LIBMXF_DIR) clean

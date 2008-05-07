@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_file.c,v 1.3 2008/05/07 15:22:25 philipn Exp $
  *
  * Wraps a files, buffers etc. in an MXF file and provides low-level functions
  *
@@ -471,8 +471,8 @@ int mxf_disk_file_open_new(const char* filename, MXFFile** mxfFile)
     newMXFFile->close = disk_file_close;
     newMXFFile->read = disk_file_read;
     newMXFFile->write = disk_file_write;
-    newMXFFile->getchar = disk_file_getchar;
-    newMXFFile->putchar = disk_file_putchar;
+    newMXFFile->get_char = disk_file_getchar;
+    newMXFFile->put_char = disk_file_putchar;
     newMXFFile->eof = disk_file_eof;
     newMXFFile->seek = disk_file_seek;
     newMXFFile->tell = disk_file_tell;
@@ -512,8 +512,8 @@ int mxf_disk_file_open_read(const char* filename, MXFFile** mxfFile)
     newMXFFile->close = disk_file_close;
     newMXFFile->read = disk_file_read;
     newMXFFile->write = disk_file_write;
-    newMXFFile->getchar = disk_file_getchar;
-    newMXFFile->putchar = disk_file_putchar;
+    newMXFFile->get_char = disk_file_getchar;
+    newMXFFile->put_char = disk_file_putchar;
     newMXFFile->eof = disk_file_eof;
     newMXFFile->seek = disk_file_seek;
     newMXFFile->tell = disk_file_tell;
@@ -553,8 +553,8 @@ int mxf_disk_file_open_modify(const char* filename, MXFFile** mxfFile)
     newMXFFile->close = disk_file_close;
     newMXFFile->read = disk_file_read;
     newMXFFile->write = disk_file_write;
-    newMXFFile->getchar = disk_file_getchar;
-    newMXFFile->putchar = disk_file_putchar;
+    newMXFFile->get_char = disk_file_getchar;
+    newMXFFile->put_char = disk_file_putchar;
     newMXFFile->eof = disk_file_eof;
     newMXFFile->seek = disk_file_seek;
     newMXFFile->tell = disk_file_tell;
@@ -592,8 +592,8 @@ int mxf_stdin_wrap_read(MXFFile** mxfFile)
     newMXFFile->close = stdin_file_close;
     newMXFFile->read = stdin_file_read;
     newMXFFile->write = stdin_file_write;
-    newMXFFile->getchar = stdin_file_getchar;
-    newMXFFile->putchar = stdin_file_putchar;
+    newMXFFile->get_char = stdin_file_getchar;
+    newMXFFile->put_char = stdin_file_putchar;
     newMXFFile->eof = stdin_file_eof;
     newMXFFile->seek = stdin_file_seek;
     newMXFFile->tell = stdin_file_tell;
@@ -633,8 +633,8 @@ int mxf_byte_array_wrap_read(const uint8_t* data, int64_t dataSize, MXFFile **mx
     newMXFFile->close = byte_array_file_close;
     newMXFFile->read = byte_array_file_read;
     newMXFFile->write = byte_array_file_write;
-    newMXFFile->getchar = byte_array_file_getchar;
-    newMXFFile->putchar = byte_array_file_putchar;
+    newMXFFile->get_char = byte_array_file_getchar;
+    newMXFFile->put_char = byte_array_file_putchar;
     newMXFFile->eof = byte_array_file_eof;
     newMXFFile->seek = byte_array_file_seek;
     newMXFFile->tell = byte_array_file_tell;
@@ -686,12 +686,12 @@ uint32_t mxf_file_write(MXFFile* mxfFile, const uint8_t* data, uint32_t count)
 
 int mxf_file_getc(MXFFile* mxfFile)
 {
-    return mxfFile->getchar(mxfFile->sysData);
+    return mxfFile->get_char(mxfFile->sysData);
 }
 
 int mxf_file_putc(MXFFile* mxfFile, int c)
 {
-    return mxfFile->putchar(mxfFile->sysData, c);
+    return mxfFile->put_char(mxfFile->sysData, c);
 }
 
 int mxf_file_eof(MXFFile* mxfFile)

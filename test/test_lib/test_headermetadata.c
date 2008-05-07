@@ -98,6 +98,8 @@ EXT_DATA_MODEL
 
 #undef MXF_SET_DEFINITION
 #undef MXF_ITEM_DEFINITION
+
+    return 1;
 }
 
 typedef struct
@@ -169,12 +171,9 @@ int test_read(const char* filename)
     MXFMetadataSet* set1;
     MXFMetadataSet* set2;
     MXFMetadataSet* set3;
-    MXFListIterator iter;
     mxfKey key;
     uint8_t llen;
     uint64_t len;
-    mxfLocalTag tag;
-    int i;
     uint8_t value1;
     uint16_t value2;
     uint32_t value3;
@@ -202,7 +201,6 @@ int test_read(const char* filename)
     uint32_t arrayElementLength;
     mxfProductVersion value26;
     MXFMetadataSet* set;
-    mxfUUID uuid;
     mxfUL ul;
     int64_t headerMetadataFilePos;
     MXFListIterator setsIter;
@@ -412,9 +410,6 @@ int test_create_and_write(const char* filename)
     MXFMetadataSet* set3;
     uint8_t* arrayElement;
 
-    mxfLocalTag tag;
-    mxfLocalTag tag2;
-    
     
     if (!mxf_disk_file_open_new(filename, &mxfFile))
     {

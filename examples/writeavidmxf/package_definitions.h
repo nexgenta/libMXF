@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.3 2008/02/06 16:58:54 john_f Exp $
+ * $Id: package_definitions.h,v 1.4 2008/05/07 15:21:46 philipn Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -94,6 +94,7 @@ typedef struct
     char* value;
 } UserComment;
 
+
 typedef struct
 {
     mxfUMID uid;
@@ -103,7 +104,6 @@ typedef struct
     char* filename;
     EssenceType essenceType;    
     EssenceInfo essenceInfo;
-    MXFList userComments;
 } Package;
 
 
@@ -121,11 +121,13 @@ typedef struct
 } Track;
 
 
-typedef struct
+typedef struct _PackageDefinitions
 {
     Package* materialPackage;
     MXFList fileSourcePackages;
     Package* tapeSourcePackage; 
+    // user comments are attached to the material package
+    MXFList userComments;
 } PackageDefinitions;
 
 
@@ -141,7 +143,8 @@ int create_file_source_package(PackageDefinitions* definitions, const mxfUMID* u
 int create_tape_source_package(PackageDefinitions* definitions, const mxfUMID* uid, 
     const char* name, const mxfTimestamp* creationDate);
 
-int add_user_comment(Package* package, const char* name, const char* value);
+int set_user_comment(PackageDefinitions* definitions, const char* name, const char* value);
+void clear_user_comments(PackageDefinitions* definitions);
 
 /* note: number is ignored for file source packages */
 int create_track(Package* package, uint32_t id, uint32_t number, const char* name, int isPicture, 

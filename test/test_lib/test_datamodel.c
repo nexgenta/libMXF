@@ -81,8 +81,6 @@ int test()
     MXFSetDef* setDef;
     MXFItemDef* itemDef;
     unsigned int extTypeIds[16];
-    size_t i;
-    size_t j;
     MXFItemType* type;
     int typeIndex = 0;
     int memberIndex = 0;

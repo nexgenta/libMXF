@@ -1,5 +1,5 @@
 /*
- * $Id: test_timecode_index.c,v 1.1 2007/09/11 13:24:46 stuart_hc Exp $
+ * $Id: test_timecode_index.c,v 1.2 2008/05/07 15:21:55 philipn Exp $
  *
  * 
  *
@@ -105,7 +105,7 @@ static void decrement_timecode(ArchiveTimecode* timecode)
 }
 
 
-int main(int argc, const char* argv[])
+int main()
 {
     TimecodeIndex vitcIndex;
     TimecodeIndex ltcIndex;

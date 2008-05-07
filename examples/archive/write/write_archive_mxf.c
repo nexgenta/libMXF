@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.2 2008/02/18 10:18:48 philipn Exp $
+ * $Id: write_archive_mxf.c,v 1.3 2008/05/07 15:22:08 philipn Exp $
  *
  * 
  *
@@ -56,7 +56,6 @@
 /* the size of the System Item in the essence data */
 #define SYSTEM_ITEM_SIZE                28    
 
-#define MAX_AUDIO_TRACKS                4    
 
     
 /* the maximum number of D3 VTR errors in which a check is made that a timeode can be
@@ -88,6 +87,10 @@ struct _ArchiveMXFWriter
     int beStrict;
     
     MXFFile* mxfFile;
+    
+    mxfUMID tapeSourcePackageUID;
+    mxfUMID fileSourcePackageUID;
+    mxfUMID materialPackageUID;
     
     MXFList pseFailures;
     
@@ -138,10 +141,10 @@ struct _ArchiveMXFWriter
     MXFMetadataSet* networkLocatorSet;
     
     /* duration items that are updated when writing is completed */
-    MXFMetadataItem* durationItems[2 + (MAX_AUDIO_TRACKS + 1) * 4];
+    MXFMetadataItem* durationItems[2 + (MAX_ARCHIVE_AUDIO_TRACKS + 1) * 4];
     int numDurationItems;
     /* container duration items that are created when writing is completed */
-    MXFMetadataSet* descriptorSets[MAX_AUDIO_TRACKS + 2];
+    MXFMetadataSet* descriptorSets[MAX_ARCHIVE_AUDIO_TRACKS + 2];
     int numDescriptorSets;
     
     MXFList d3VTRErrorTrackSets;
@@ -155,8 +158,8 @@ static const uint64_t g_fixedBodyOffset = 0x8000;
 static const mxfUUID g_mxfIdentProductUID = 
     {0x9e, 0x26, 0x08, 0xb1, 0xc9, 0xfe, 0x44, 0x48, 0x88, 0xdf, 0x26, 0x94, 0xcf, 0x77, 0x59, 0x9a};
 static const mxfUTF16Char* g_mxfIdentCompanyName = L"BBC";
-static const mxfUTF16Char* g_mxfIdentProductName = L"D3 Preservation MXF Writer";
-static const mxfUTF16Char* g_mxfIdentVersionString = L"Version March 2007";
+static const mxfUTF16Char* g_mxfIdentProductName = L"BBC Archive MXF Writer";
+static const mxfUTF16Char* g_mxfIdentVersionString = L"Version Feb 2008";
 
 
 static const mxfUL MXF_DM_L(D3P_D3PreservationDescriptiveScheme) = 
@@ -190,7 +193,6 @@ static const uint32_t g_videoVerticalSubSampling = 1;
 static const uint32_t g_videoFrameSize = 720 * 576 * 2; /* W x H x (Y + Cr/2 + Cb/2) */
 
 static const int64_t g_tapeLen = 120 * 25 * 60 * 60;
-static const int g_numTapeAudioTracks = MAX_AUDIO_TRACKS;
 
 static const mxfUTF16Char* g_vtrErrorsTrackName = L"D3 VTR Errors";
 static const mxfUTF16Char* g_pseFailuresTrackName = L"PSE Failures";
@@ -546,6 +548,8 @@ static int set_infax_data(MXFMetadataSet* dmFrameworkSet, InfaxData* infaxData)
         CHK_OFAIL(mxf_remove_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_CatalogueDetail), &item));
         mxf_free_item(&item);
     }
+
+    CHK_OFAIL(mxf_set_uint32_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_ItemNumber), infaxData->itemNo));
     
     SAFE_FREE(&tempString);
     return 1;
@@ -555,150 +559,6 @@ fail:
     return 0;
 }
 
-
-#define PARSE_STRING(member, size, beStrict) \
-{ \
-    int cpySize = endField - startField; \
-    if (cpySize < 0) \
-    { \
-        mxf_log(MXF_ELOG, "invalid infax string field" LOG_LOC_FORMAT, LOG_LOC_PARAMS); \
-        return 0; \
-    } \
-    else if (cpySize >= size) \
-    { \
-        if (beStrict) \
-        { \
-            mxf_log(MXF_ELOG, "Infax string size (%d) exceeds limit (%d)" \
-                LOG_LOC_FORMAT, endField - startField, size, LOG_LOC_PARAMS); \
-            return 0; \
-        } \
-        else \
-        { \
-            mxf_log(MXF_WLOG, "Infax string size (%d) exceeds limit (%d) - string will be truncated" \
-                LOG_LOC_FORMAT, endField - startField, size, LOG_LOC_PARAMS); \
-            cpySize = size - 1; \
-        } \
-    } \
-    \
-    if (cpySize > 0) \
-    { \
-        strncpy(member, startField, cpySize); \
-    } \
-    member[cpySize] = '\0'; \
-}
-
-
-#define PARSE_DATE(member, beStrict) \
-{ \
-    if (endField - startField > 0) \
-    { \
-        int year, month, day; \
-        CHK_ORET(sscanf(startField, "%d-%u-%u", &year, &month, &day) == 3); \
-        member.year = (int16_t)year; \
-        member.month = (uint8_t)month; \
-        member.day = (uint8_t)day; \
-    } \
-    else \
-    { \
-        member.month = INVALID_MONTH_VALUE; \
-    } \
-}
-#define PARSE_INT64(member, invalid, beStrict) \
-{ \
-    if (endField - startField > 0) \
-    { \
-        CHK_ORET(sscanf(startField, "%"PRIi64"", &member) == 1); \
-    } \
-    else \
-    { \
-        member = invalid; \
-    } \
-}
-
-static int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, int beStrict)
-{
-    const char* startField = infaxDataString;
-    const char* endField = NULL;
-    int fieldIndex = 0;
-    int done = 0;
-    
-    CHK_ORET(infaxDataString != NULL);
-    
-    set_null_infax_data(infaxData);
-    
-    do
-    {
-        endField = strchr(startField, g_infaxDataStringSeparator);
-        if (endField == NULL)
-        {
-            done = 1;
-            endField = startField + strlen(startField);
-        }
-        
-        switch (fieldIndex)
-        {
-            case 0:
-                PARSE_STRING(infaxData->format, FORMAT_SIZE, beStrict);
-                break;
-            case 1:
-                PARSE_STRING(infaxData->progTitle, PROGTITLE_SIZE, beStrict);
-                break;
-            case 2:
-                PARSE_STRING(infaxData->epTitle, EPTITLE_SIZE, beStrict);
-                break;
-            case 3:
-                PARSE_DATE(infaxData->txDate, beStrict);
-                break;
-            case 4:
-                PARSE_STRING(infaxData->magPrefix, MAGPREFIX_SIZE, beStrict);
-                break;
-            case 5:
-                PARSE_STRING(infaxData->progNo, PROGNO_SIZE, beStrict);
-                break;
-            case 6:
-                PARSE_STRING(infaxData->prodCode, PRODCODE_SIZE, beStrict);
-                break;
-            case 7:
-                PARSE_STRING(infaxData->spoolStatus, SPOOLSTATUS_SIZE, beStrict);
-                break;
-            case 8:
-                PARSE_DATE(infaxData->stockDate, beStrict);
-                break;
-            case 9:
-                PARSE_STRING(infaxData->spoolDesc, SPOOLDESC_SIZE, beStrict);
-                break;
-            case 10:
-                PARSE_STRING(infaxData->memo, MEMO_SIZE, beStrict);
-                break;
-            case 11:
-                PARSE_INT64(infaxData->duration, INVALID_DURATION_VALUE, beStrict);
-                break;
-            case 12:
-                PARSE_STRING(infaxData->spoolNo, SPOOLNO_SIZE, beStrict);
-                break;
-            case 13:
-                PARSE_STRING(infaxData->accNo, ACCNO_SIZE, beStrict);
-                break;
-            case 14:
-                PARSE_STRING(infaxData->catDetail, CATDETAIL_SIZE, beStrict);
-                break;
-            default:
-                mxf_log(MXF_ELOG, "Invalid Infax data string ('%s')" LOG_LOC_FORMAT, infaxDataString, LOG_LOC_PARAMS);
-                return 0;            
-        }
-        
-        if (!done)
-        {
-            startField = endField + 1;
-            fieldIndex++;
-        }
-    }
-    while (!done);
-    
-    CHK_ORET(fieldIndex == 14); 
-    
-    return 1;
-}
 
 int prepare_archive_mxf_file(const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output)
 {
@@ -725,9 +585,6 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     int64_t filePos;
     mxfUUID uuid;
     int i;
-    mxfUMID tapeSourcePackageUID;
-    mxfUMID fileSourcePackageUID;
-    mxfUMID materialPackageUID;
     uint32_t videoTrackNum = MXF_UNC_TRACK_NUM(0x00, 0x00, 0x00);
     uint32_t audioTrackNum = MXF_AES3BWF_TRACK_NUM(0x00, 0x00, 0x00);
     uint32_t deltaOffset;
@@ -738,16 +595,15 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     InfaxData nullInfaxData;
     mxfLocalTag assignedTag;
 
-    CHK_ORET(numAudioTracks <= MAX_AUDIO_TRACKS);
+    CHK_ORET(numAudioTracks <= MAX_ARCHIVE_AUDIO_TRACKS);
     
-    mxf_generate_umid(&tapeSourcePackageUID);
-    mxf_generate_umid(&fileSourcePackageUID);
-    mxf_generate_umid(&materialPackageUID);
-
     set_null_infax_data(&nullInfaxData);
 
     CHK_MALLOC_ORET(newOutput, ArchiveMXFWriter);
     memset(newOutput, 0, sizeof(ArchiveMXFWriter));
+    mxf_generate_umid(&newOutput->tapeSourcePackageUID);
+    mxf_generate_umid(&newOutput->fileSourcePackageUID);
+    mxf_generate_umid(&newOutput->materialPackageUID);
     initialise_timecode_index(&newOutput->vitcIndex, 512);
     initialise_timecode_index(&newOutput->ltcIndex, 512);
     mxf_initialise_list(&newOutput->d3VTRErrorTrackSets, NULL);
@@ -845,6 +701,8 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
         g_Null_LocalTag, &assignedTag));
     CHK_OFAIL(mxf_register_primer_entry(newOutput->headerMetadata->primerPack, &MXF_ITEM_K(D3P_InfaxFramework, D3P_CatalogueDetail), 
         g_Null_LocalTag, &assignedTag));
+    CHK_OFAIL(mxf_register_primer_entry(newOutput->headerMetadata->primerPack, &MXF_ITEM_K(D3P_InfaxFramework, D3P_ItemNumber), 
+        g_Null_LocalTag, &assignedTag));
     
     
     /* Preface */
@@ -891,7 +749,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     /* Preface - ContentStorage - EssenceContainerData */    
     CHK_OFAIL(mxf_create_set(newOutput->headerMetadata, &MXF_SET_K(EssenceContainerData), &newOutput->essContainerDataSet));
     CHK_OFAIL(mxf_add_array_item_strongref(newOutput->contentStorageSet, &MXF_ITEM_K(ContentStorage, EssenceContainerData), newOutput->essContainerDataSet));
-    CHK_OFAIL(mxf_set_umid_item(newOutput->essContainerDataSet, &MXF_ITEM_K(EssenceContainerData, LinkedPackageUID), &fileSourcePackageUID));
+    CHK_OFAIL(mxf_set_umid_item(newOutput->essContainerDataSet, &MXF_ITEM_K(EssenceContainerData, LinkedPackageUID), &newOutput->fileSourcePackageUID));
     CHK_OFAIL(mxf_set_uint32_item(newOutput->essContainerDataSet, &MXF_ITEM_K(EssenceContainerData, IndexSID), g_indexSID));
     CHK_OFAIL(mxf_set_uint32_item(newOutput->essContainerDataSet, &MXF_ITEM_K(EssenceContainerData, BodySID), g_bodySID));
 
@@ -899,7 +757,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     /* Preface - ContentStorage - MaterialPackage */
     CHK_OFAIL(mxf_create_set(newOutput->headerMetadata, &MXF_SET_K(MaterialPackage), &newOutput->materialPackageSet));
     CHK_OFAIL(mxf_add_array_item_strongref(newOutput->contentStorageSet, &MXF_ITEM_K(ContentStorage, Packages), newOutput->materialPackageSet));
-    CHK_OFAIL(mxf_set_umid_item(newOutput->materialPackageSet, &MXF_ITEM_K(GenericPackage, PackageUID), &materialPackageUID));
+    CHK_OFAIL(mxf_set_umid_item(newOutput->materialPackageSet, &MXF_ITEM_K(GenericPackage, PackageUID), &newOutput->materialPackageUID));
     CHK_OFAIL(mxf_set_timestamp_item(newOutput->materialPackageSet, &MXF_ITEM_K(GenericPackage, PackageCreationDate), &newOutput->now));
     CHK_OFAIL(mxf_set_timestamp_item(newOutput->materialPackageSet, &MXF_ITEM_K(GenericPackage, PackageModifiedDate), &newOutput->now));
     CHK_OFAIL(mxf_set_utf16string_item(newOutput->materialPackageSet, &MXF_ITEM_K(GenericPackage, Name), L"D3 ingested material"));
@@ -992,7 +850,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
         }
         CHK_OFAIL(mxf_set_position_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, StartPosition), 0));
         CHK_OFAIL(mxf_set_uint32_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, SourceTrackID), i + 1));
-        CHK_OFAIL(mxf_set_umid_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &fileSourcePackageUID));
+        CHK_OFAIL(mxf_set_umid_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &newOutput->fileSourcePackageUID));
 
         CHK_OFAIL(mxf_get_item(newOutput->sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), &newOutput->durationItems[newOutput->numDurationItems++]));
     }
@@ -1002,7 +860,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     /* Preface - ContentStorage - SourcePackage */
     CHK_OFAIL(mxf_create_set(newOutput->headerMetadata, &MXF_SET_K(SourcePackage), &newOutput->sourcePackageSet));
     CHK_OFAIL(mxf_add_array_item_strongref(newOutput->contentStorageSet, &MXF_ITEM_K(ContentStorage, Packages), newOutput->sourcePackageSet));
-    CHK_OFAIL(mxf_set_umid_item(newOutput->sourcePackageSet, &MXF_ITEM_K(GenericPackage, PackageUID), &fileSourcePackageUID));
+    CHK_OFAIL(mxf_set_umid_item(newOutput->sourcePackageSet, &MXF_ITEM_K(GenericPackage, PackageUID), &newOutput->fileSourcePackageUID));
     CHK_OFAIL(mxf_set_timestamp_item(newOutput->sourcePackageSet, &MXF_ITEM_K(GenericPackage, PackageCreationDate), &newOutput->now));
     CHK_OFAIL(mxf_set_timestamp_item(newOutput->sourcePackageSet, &MXF_ITEM_K(GenericPackage, PackageModifiedDate), &newOutput->now));
 
@@ -1075,7 +933,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
             CHK_OFAIL(mxf_set_uint32_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, SourceTrackID), i + 1));
             CHK_OFAIL(mxf_set_position_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, StartPosition), getPosition(startPosition, &g_audioEditRate)));
         }
-        CHK_OFAIL(mxf_set_umid_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &tapeSourcePackageUID));
+        CHK_OFAIL(mxf_set_umid_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &newOutput->tapeSourcePackageUID));
 
         CHK_OFAIL(mxf_get_item(newOutput->sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), &newOutput->durationItems[newOutput->numDurationItems++]));
     }
@@ -1165,7 +1023,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     /* Preface - ContentStorage - tape SourcePackage */
     CHK_ORET(mxf_create_set(newOutput->headerMetadata, &MXF_SET_K(SourcePackage), &newOutput->tapeSourcePackageSet));
     CHK_ORET(mxf_add_array_item_strongref(newOutput->contentStorageSet, &MXF_ITEM_K(ContentStorage, Packages), newOutput->tapeSourcePackageSet));
-    CHK_ORET(mxf_set_umid_item(newOutput->tapeSourcePackageSet, &MXF_ITEM_K(GenericPackage, PackageUID), &tapeSourcePackageUID));
+    CHK_ORET(mxf_set_umid_item(newOutput->tapeSourcePackageSet, &MXF_ITEM_K(GenericPackage, PackageUID), &newOutput->tapeSourcePackageUID));
     CHK_ORET(mxf_set_timestamp_item(newOutput->tapeSourcePackageSet, &MXF_ITEM_K(GenericPackage, PackageCreationDate), &newOutput->now));
     CHK_ORET(mxf_set_timestamp_item(newOutput->tapeSourcePackageSet, &MXF_ITEM_K(GenericPackage, PackageModifiedDate), &newOutput->now));
     CHK_ORET(mxf_set_utf16string_item(newOutput->tapeSourcePackageSet, &MXF_ITEM_K(GenericPackage, Name), L"D3 tape"));
@@ -1198,7 +1056,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     CHK_ORET(mxf_set_uint32_item(newOutput->sourceClipSet, &MXF_ITEM_K(SourceClip, SourceTrackID), 0));
 
     
-    for (i = 0; i < g_numTapeAudioTracks; i++)
+    for (i = 0; i < newOutput->numAudioTracks; i++)
     {
         /* Preface - ContentStorage - tape SourcePackage - audio Timeline Track */    
         CHK_ORET(mxf_create_set(newOutput->headerMetadata, &MXF_SET_K(Track), &newOutput->sourcePackageTrackSet));
@@ -1230,7 +1088,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     /* Preface - ContentStorage - tape SourcePackage - timecode Timeline Track */    
     CHK_ORET(mxf_create_set(newOutput->headerMetadata, &MXF_SET_K(Track), &newOutput->sourcePackageTrackSet));
     CHK_ORET(mxf_add_array_item_strongref(newOutput->tapeSourcePackageSet, &MXF_ITEM_K(GenericPackage, Tracks), newOutput->sourcePackageTrackSet));
-    CHK_ORET(mxf_set_uint32_item(newOutput->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), g_numTapeAudioTracks + 2));
+    CHK_ORET(mxf_set_uint32_item(newOutput->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), newOutput->numAudioTracks + 2));
     CHK_ORET(mxf_set_uint32_item(newOutput->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), 0));
     sprintf(cNameBuffer, "T%d", 1);
     mbstowcs(wNameBuffer, cNameBuffer, NAME_BUFFER_SIZE);
@@ -1260,7 +1118,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     sprintf(cNameBuffer, "DM%d", 1);
     mbstowcs(wNameBuffer, cNameBuffer, NAME_BUFFER_SIZE);
     CHK_OFAIL(mxf_set_utf16string_item(newOutput->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackName), wNameBuffer));
-    CHK_OFAIL(mxf_set_uint32_item(newOutput->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), g_numTapeAudioTracks + 3));
+    CHK_OFAIL(mxf_set_uint32_item(newOutput->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), newOutput->numAudioTracks + 3));
     CHK_OFAIL(mxf_set_uint32_item(newOutput->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), 0));
 
     /* Preface - ContentStorage - tape SourcePackage - DM Track - Sequence */    
@@ -1424,7 +1282,7 @@ int abort_archive_mxf_file(ArchiveMXFWriter** output)
     return 1;
 }
 
-int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, const char* d3InfaxDataString,
+int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* d3InfaxData,
     const PSEFailure* pseFailures, long numPSEFailures,
     const VTRError* vtrErrors, long numVTRErrors)
 {
@@ -1444,7 +1302,6 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, const char* d3InfaxD
     long errorIndex;
     long failureIndex;
     char mpName[64];
-    InfaxData d3InfaxData;
     
 
     /* update the PSE failure and D3 VTR error counts */
@@ -1466,17 +1323,16 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, const char* d3InfaxD
     
     /* add the D3 tape Infax items to the set */
 
-    CHK_ORET(parse_infax_data(d3InfaxDataString, &d3InfaxData, output->beStrict));
-    CHK_ORET(set_infax_data(output->tapeDMFrameworkSet, &d3InfaxData));
+    CHK_ORET(set_infax_data(output->tapeDMFrameworkSet, d3InfaxData));
 
     
     /* update the header metadata MaterialPackage and tape SourcePackage Names */
 
-    CHK_ORET(convert_string(d3InfaxData.spoolNo, &output->tempString));
+    CHK_ORET(convert_string(d3InfaxData->spoolNo, &output->tempString));
     CHK_ORET(mxf_set_utf16string_item(output->tapeSourcePackageSet, &MXF_ITEM_K(GenericPackage, Name), output->tempString));
-    
+
     strcpy(mpName, "D3 preservation ");
-    strcat(mpName, d3InfaxData.spoolNo);
+    strcat(mpName, d3InfaxData->spoolNo);
     CHK_ORET(convert_string(mpName, &output->tempString));
     CHK_ORET(mxf_set_utf16string_item(output->materialPackageSet, &MXF_ITEM_K(GenericPackage, Name), output->tempString));
     
@@ -1904,7 +1760,7 @@ fail:
     return 0;
 }
 
-int update_archive_mxf_file(const char* filePath, const char* newFilename, const char* ltoInfaxDataString, int beStrict)
+int update_archive_mxf_file(const char* filePath, const char* newFilename, InfaxData* ltoInfaxData)
 {
     MXFFile* mxfFile = NULL;
     int result;
@@ -1913,7 +1769,7 @@ int update_archive_mxf_file(const char* filePath, const char* newFilename, const
     
     CHK_ORET(mxf_disk_file_open_modify(filePath, &mxfFile));
     
-    result = update_archive_mxf_file_2(&mxfFile, newFilename, ltoInfaxDataString, beStrict);
+    result = update_archive_mxf_file_2(&mxfFile, newFilename, ltoInfaxData);
     if (!result)
     {
         if (mxfFile != NULL)
@@ -1925,17 +1781,16 @@ int update_archive_mxf_file(const char* filePath, const char* newFilename, const
     return result;
 }
 
-int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, const char* ltoInfaxDataString, int beStrict)
+int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, InfaxData* ltoInfaxData)
 {
     mxfKey key;
     uint8_t llen;
     uint64_t len;
     MXFPartition* headerPartition = NULL;
     MXFPartition* footerPartition = NULL;
-    InfaxData ltoInfaxData;
     MXFFile* mxfFile = NULL;
     
-    CHK_ORET(*mxfFileIn != NULL && newFilename != NULL && ltoInfaxDataString != NULL);
+    CHK_ORET(*mxfFileIn != NULL && newFilename != NULL);
     
     /* take ownership */
     mxfFile = *mxfFileIn;
@@ -1943,10 +1798,6 @@ int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, cons
 
     /* open mxf file */    
     mxf_file_set_min_llen(mxfFile, MIN_LLEN);
-
-    
-    /* parse the LTO infax data string */
-    CHK_OFAIL(parse_infax_data(ltoInfaxDataString, &ltoInfaxData, beStrict));
 
     
     /* update the header partition header metadata LTO Infax data set */ 
@@ -1961,7 +1812,7 @@ int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, cons
     }
     CHK_OFAIL(mxf_read_partition(mxfFile, &key, &headerPartition));
 
-    CHK_OFAIL(update_header_metadata(mxfFile, headerPartition->headerByteCount, &ltoInfaxData, 
+    CHK_OFAIL(update_header_metadata(mxfFile, headerPartition->headerByteCount, ltoInfaxData, 
         newFilename));
 
     
@@ -1978,7 +1829,7 @@ int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, cons
     }
     CHK_OFAIL(mxf_read_partition(mxfFile, &key, &footerPartition));
 
-    CHK_OFAIL(update_header_metadata(mxfFile, footerPartition->headerByteCount, &ltoInfaxData,
+    CHK_OFAIL(update_header_metadata(mxfFile, footerPartition->headerByteCount, ltoInfaxData,
         newFilename));
 
 
@@ -2000,6 +1851,185 @@ fail:
     mxf_free_partition(&headerPartition);
     mxf_free_partition(&footerPartition);
     return 0;
+}
+
+int64_t get_archive_mxf_file_size(ArchiveMXFWriter* writer)
+{
+    return mxf_file_size(writer->mxfFile);
+}
+
+mxfUMID get_material_package_uid(ArchiveMXFWriter* writer)
+{
+    return writer->materialPackageUID;
+}
+
+mxfUMID get_file_package_uid(ArchiveMXFWriter* writer)
+{
+    return writer->fileSourcePackageUID;
+}
+
+mxfUMID get_tape_package_uid(ArchiveMXFWriter* writer)
+{
+    return writer->tapeSourcePackageUID;
+}
+
+int64_t get_archive_mxf_content_package_size(int numAudioTracks)
+{
+    return mxfKey_extlen + 4 + SYSTEM_ITEM_SIZE +
+        mxfKey_extlen + 4 + g_videoFrameSize +  
+        numAudioTracks * (mxfKey_extlen + 4 + g_audioFrameSize);  
+}
+
+#define PARSE_STRING(member, size, beStrict) \
+{ \
+    int cpySize = endField - startField; \
+    if (cpySize < 0) \
+    { \
+        mxf_log(MXF_ELOG, "invalid infax string field" LOG_LOC_FORMAT, LOG_LOC_PARAMS); \
+        return 0; \
+    } \
+    else if (cpySize >= size) \
+    { \
+        if (beStrict) \
+        { \
+            mxf_log(MXF_ELOG, "Infax string size (%d) exceeds limit (%d)" \
+                LOG_LOC_FORMAT, endField - startField, size, LOG_LOC_PARAMS); \
+            return 0; \
+        } \
+        else \
+        { \
+            mxf_log(MXF_WLOG, "Infax string size (%d) exceeds limit (%d) - string will be truncated" \
+                LOG_LOC_FORMAT, endField - startField, size, LOG_LOC_PARAMS); \
+            cpySize = size - 1; \
+        } \
+    } \
+    \
+    if (cpySize > 0) \
+    { \
+        strncpy(member, startField, cpySize); \
+    } \
+    member[cpySize] = '\0'; \
+}
+
+
+#define PARSE_DATE(member, beStrict) \
+{ \
+    if (endField - startField > 0) \
+    { \
+        int year, month, day; \
+        CHK_ORET(sscanf(startField, "%d-%u-%u", &year, &month, &day) == 3); \
+        member.year = (int16_t)year; \
+        member.month = (uint8_t)month; \
+        member.day = (uint8_t)day; \
+    } \
+    else \
+    { \
+        member.month = INVALID_MONTH_VALUE; \
+    } \
+}
+#define PARSE_INT64(member, invalid, beStrict) \
+{ \
+    if (endField - startField > 0) \
+    { \
+        CHK_ORET(sscanf(startField, "%"PRIi64"", &member) == 1); \
+    } \
+    else \
+    { \
+        member = invalid; \
+    } \
+}
+#define PARSE_UINT32(member, beStrict) \
+{ \
+    CHK_ORET(endField - startField > 0); \
+    CHK_ORET(sscanf(startField, "%u", &member) == 1); \
+}
+
+int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, int beStrict)
+{
+    const char* startField = infaxDataString;
+    const char* endField = NULL;
+    int fieldIndex = 0;
+    int done = 0;
+    
+    CHK_ORET(infaxDataString != NULL);
+    
+    set_null_infax_data(infaxData);
+    
+    do
+    {
+        endField = strchr(startField, g_infaxDataStringSeparator);
+        if (endField == NULL)
+        {
+            done = 1;
+            endField = startField + strlen(startField);
+        }
+        
+        switch (fieldIndex)
+        {
+            case 0:
+                PARSE_STRING(infaxData->format, FORMAT_SIZE, beStrict);
+                break;
+            case 1:
+                PARSE_STRING(infaxData->progTitle, PROGTITLE_SIZE, beStrict);
+                break;
+            case 2:
+                PARSE_STRING(infaxData->epTitle, EPTITLE_SIZE, beStrict);
+                break;
+            case 3:
+                PARSE_DATE(infaxData->txDate, beStrict);
+                break;
+            case 4:
+                PARSE_STRING(infaxData->magPrefix, MAGPREFIX_SIZE, beStrict);
+                break;
+            case 5:
+                PARSE_STRING(infaxData->progNo, PROGNO_SIZE, beStrict);
+                break;
+            case 6:
+                PARSE_STRING(infaxData->prodCode, PRODCODE_SIZE, beStrict);
+                break;
+            case 7:
+                PARSE_STRING(infaxData->spoolStatus, SPOOLSTATUS_SIZE, beStrict);
+                break;
+            case 8:
+                PARSE_DATE(infaxData->stockDate, beStrict);
+                break;
+            case 9:
+                PARSE_STRING(infaxData->spoolDesc, SPOOLDESC_SIZE, beStrict);
+                break;
+            case 10:
+                PARSE_STRING(infaxData->memo, MEMO_SIZE, beStrict);
+                break;
+            case 11:
+                PARSE_INT64(infaxData->duration, INVALID_DURATION_VALUE, beStrict);
+                break;
+            case 12:
+                PARSE_STRING(infaxData->spoolNo, SPOOLNO_SIZE, beStrict);
+                break;
+            case 13:
+                PARSE_STRING(infaxData->accNo, ACCNO_SIZE, beStrict);
+                break;
+            case 14:
+                PARSE_STRING(infaxData->catDetail, CATDETAIL_SIZE, beStrict);
+                break;
+            case 15:
+                PARSE_UINT32(infaxData->itemNo, beStrict);
+                break;
+            default:
+                mxf_log(MXF_ELOG, "Invalid Infax data string ('%s')" LOG_LOC_FORMAT, infaxDataString, LOG_LOC_PARAMS);
+                return 0;            
+        }
+        
+        if (!done)
+        {
+            startField = endField + 1;
+            fieldIndex++;
+        }
+    }
+    while (!done);
+    
+    CHK_ORET(fieldIndex == 15); 
+    
+    return 1;
 }
 
 

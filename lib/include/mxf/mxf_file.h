@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_file.h,v 1.3 2008/05/07 15:22:22 philipn Exp $
  *
  * Wraps a C-file and provides low-level MXF file functions
  *
@@ -42,8 +42,8 @@ typedef struct
     void (*close)(MXFFileSysData* sysData);
     uint32_t (*read)(MXFFileSysData* sysData, uint8_t* data, uint32_t count); 
     uint32_t (*write)(MXFFileSysData* sysData, const uint8_t* data, uint32_t count); 
-    int (*getchar)(MXFFileSysData* sysData); 
-    int (*putchar)(MXFFileSysData* sysData, int c); 
+    int (*get_char)(MXFFileSysData* sysData); 
+    int (*put_char)(MXFFileSysData* sysData, int c); 
     int (*eof)(MXFFileSysData* sysData); 
     int (*seek)(MXFFileSysData* sysData, int64_t offset, int whence);
     int64_t (*tell)(MXFFileSysData* sysData);

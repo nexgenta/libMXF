@@ -1,21 +1,59 @@
-CPP_CC = g++ -g -Wall -Wundef -Wno-non-virtual-dtor -Werror -D_DEBUG -DOM_DEBUG -DOM_STACK_TRACE_ON_ASSERT -fsigned-char -DOM_USE_SCHEMASOFT_SS -I/usr/local/lib/include -DUSE_LIBDV  -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_XOPEN_SOURCE=500 -DLITTLEENDIAN=1
-CPP_INCLUDES = -I. 
+#
+# $Id: Makefile,v 1.2 2008/05/07 15:22:31 philipn Exp $
+#
+# Makefile for building MXFDump utility from the AAFSDK
+#
+# Copyright (C) 2006  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+#
+TOPLEVEL = ../..
+include $(TOPLEVEL)/vars.mk
 
-ifeq "$(OS)" "Windows_NT"
-  CPP_LD = g++
-else
-  CPP_LD = g++ -ldl -rdynamic
+CPP_CC = g++ -g -Wall -W -Werror -O2
+
+CPP_LD = g++
+ifeq ($(OSNAME),Darwin)
+CPP_LD = g++ -framework CoreServices
 endif
 
 .PHONY: all
 all: MXFDump
 
+ifeq ($(AAFSDK),)
+MXFDump.cpp:
+	@echo "*** MXFDump.cpp does not exist and AAFSDK is not set"
+	@echo "*** libMXF tests cannot be run without MXFDump - install AAFSDK (see README.txt)"
+MXFDump: MXFDump.cpp
+	@echo "*** AAFSDK is not set"
+	true
+
+else
 MXFDump: MXFDump.o
-	$(CPP_LD) MXFDump.o -Xlinker -rpath -Xlinker . -o $@
+	$(CPP_LD) MXFDump.o -o $@
 
 MXFDump.o: MXFDump.cpp MXFLabels.h MXFMetaDictionary.h
-	$(CPP_CC) -c $(CPP_INCLUDES) MXFDump.cpp
+	$(CPP_CC) -c MXFDump.cpp
 
+MXFDump.cpp:
+	cp $(AAFSDK)/DevUtils/MXFDump/MXFLabels.h .
+	cp $(AAFSDK)/DevUtils/MXFDump/MXFMetaDictionary.h .
+	cp $(AAFSDK)/DevUtils/MXFDump/MXFDump.cpp .
+	cp $(AAFSDK)/ref-impl/include/AAFMetaDictionary.h .
+endif
 
 .PHONY: clean
 clean:
@@ -24,5 +62,3 @@ clean:
 .PHONY: srcclean
 srcclean:
 	@rm -f *~ *.o *.so *.a
-
-

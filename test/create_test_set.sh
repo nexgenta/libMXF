@@ -17,7 +17,7 @@ $LIBMXF_TEST_PATH/MXFDump/MXFDump --diff-friendly --show-dark "${1}.mxf_2" > "${
 
 # diff dumps and extract lines that can be ignored
 diff "${1}.dump" "${1}.dump_2" > diff_dump
-$LIBMXF_TEST_PATH/extract_ignore_lines.py diff_dump > "${1}.ignore"
+python $LIBMXF_TEST_PATH/extract_ignore_lines.py diff_dump > "${1}.ignore"
 
 # cleanup
 rm -f "${1}.dump_2" diff_dump

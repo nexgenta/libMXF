@@ -15,7 +15,6 @@ int test_read(const char* filename)
     mxfKey key;
     uint8_t llen;
     uint64_t len;
-    mxfLocalTag tag;
     int i;
     int k;
     MXFIndexTableSegment* indexSegment = NULL;
@@ -61,7 +60,7 @@ int test_read(const char* filename)
         
         CHK_OFAIL(deltaEntry->posTableIndex == i);
         CHK_OFAIL(deltaEntry->slice == i);
-        CHK_OFAIL(deltaEntry->elementData == i);
+        CHK_OFAIL((int)deltaEntry->elementData == i);
         
         deltaEntry = deltaEntry->next;
     }
@@ -90,11 +89,11 @@ int test_read(const char* filename)
         CHK_OFAIL(indexEntry->temporalOffset == i);
         CHK_OFAIL(indexEntry->keyFrameOffset == i);
         CHK_OFAIL(indexEntry->flags == i);
-        CHK_OFAIL(indexEntry->streamOffset == i);
+        CHK_OFAIL((int)indexEntry->streamOffset == i);
         
         for (k = 0; k < indexSegment->sliceCount; k++)
         {
-            CHK_OFAIL(indexEntry->sliceOffset[k] == i);
+            CHK_OFAIL((int)indexEntry->sliceOffset[k] == i);
         }
         
         for (k = 0; k < indexSegment->posTableCount; k++)
@@ -130,9 +129,6 @@ int test_create_and_write(const char* filename)
     int i;
     int k;
 
-    mxfLocalTag tag;
-    mxfLocalTag tag2;
-    
     
     if (!mxf_disk_file_open_new(filename, &mxfFile))
     {

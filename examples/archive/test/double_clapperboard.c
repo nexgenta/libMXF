@@ -1,5 +1,5 @@
 /*
- * $Id: double_clapperboard.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: double_clapperboard.c,v 1.2 2008/05/07 15:22:04 philipn Exp $
  *
  * 
  *
@@ -26,6 +26,11 @@
 #include <inttypes.h>
 
 #include "avsync_eval.h"
+
+#ifdef __MINGW32__
+#define fseeko(x,y,z)  fseeko64(x,y,z)
+#define ftello(x)      ftello64(x)
+#endif
 
 
 #define CHECK_ARGUMENT_PRESENT(arg) \

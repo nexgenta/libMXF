@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.2 2008/02/06 16:58:54 john_f Exp $
+ * $Id: main.c,v 1.3 2008/05/07 15:21:45 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -396,7 +396,7 @@ static int get_wave_data(WAVInput* input, unsigned char* buffer, size_t dataSize
     
     if ((actualRead = fread(buffer, 1, numToRead, input->file)) != numToRead)
     {
-        fprintf(stderr, "Failed to read %d bytes of wave data. Actual read was %d\n", numToRead, actualRead);
+        fprintf(stderr, "Failed to read %"PFszt" bytes of wave data. Actual read was %"PFszt"\n", numToRead, actualRead);
         return 0;
     }
     
@@ -1357,11 +1357,11 @@ int main(int argc, const char* argv[])
     create_material_package(packageDefinitions, &materialPackageUID, clipName, &now);
     if (comment != NULL)
     {
-        add_user_comment(packageDefinitions->materialPackage, "Comments", comment);
+        set_user_comment(packageDefinitions, "Comments", comment);
     }
     if (desc != NULL)
     {
-        add_user_comment(packageDefinitions->materialPackage, "Descript", desc);
+        set_user_comment(packageDefinitions, "Descript", desc);
     }
 
     mxf_generate_old_aafsdk_umid(&tapePackageUID);

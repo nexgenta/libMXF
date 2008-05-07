@@ -1,9 +1,9 @@
 #
-# $Id: Makefile,v 1.2 2008/05/07 15:22:43 philipn Exp $
+# $Id: Makefile,v 1.1 2008/05/07 15:21:48 philipn Exp $
 #
-# Makefile for building blob tools
+# Makefile for building tools directory
 #
-# Copyright (C) 2006  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
+# Copyright (C) 2008  BBC Research, Stuart Cunningham <stuart_hc@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,26 +20,19 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 #
-TOPLEVEL = ../..
-include $(TOPLEVEL)/vars.mk
-
 
 .PHONY: all
-all: extract_blob gen_blob_source
-
-gen_blob_source: gen_blob_source.o
-	$(CC) gen_blob_source.o -o gen_blob_source
-
-gen_blob_source.o: gen_blob_source.c
-	$(CC) $(CFLAGS) -c gen_blob_source.c
-
-extract_blob: extract_blob.o
-	$(CC) extract_blob.o -o extract_blob
-
-extract_blob.o: extract_blob.c
-	$(CC) $(CFLAGS) -c extract_blob.c
-
+all:
+	$(MAKE) -C avid_metadict_blob
 
 .PHONY: clean
 clean:
-	@rm -f *~ *.o gen_blob_source extract_blob
+	$(MAKE) -C avid_metadict_blob $@
+
+.PHONY: check
+check: all
+	$(MAKE) -C avid_metadict_blob $@
+
+.PHONY: valgrind-check
+valgrind-check: all
+	$(MAKE) -C avid_metadict_blob $@

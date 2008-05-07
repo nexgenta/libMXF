@@ -19,11 +19,9 @@ int test_read(const char* filename)
     MXFPartition* bodyPartition1 = NULL;
     MXFPartition* bodyPartition2 = NULL;
     MXFPartition* footerPartition = NULL;
-    MXFListIterator iter;
     mxfKey key;
     uint8_t llen;
     uint64_t len;
-    int i;
     uint8_t essenceData[1024];
     MXFEssenceElement* essenceElement = NULL;
     uint32_t numRead;

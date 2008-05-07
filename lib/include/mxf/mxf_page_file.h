@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_page_file.h,v 1.1 2008/02/07 14:58:21 john_f Exp $
+ * $Id: mxf_page_file.h,v 1.2 2008/05/07 15:22:23 philipn Exp $
  *
  * 
  *
@@ -33,10 +33,22 @@ extern "C"
 #include <mxf/mxf_file.h>
 
 
-int mxf_page_file_open_new(const char* filenameTemplate, int64_t pageSize, MXFFile** mxfFile);
-int mxf_page_file_open_read(const char* filenameTemplate, MXFFile** mxfFile);
-int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MXFFile** mxfFile);
+typedef struct MXFPageFile MXFPageFile;
 
+int mxf_page_file_open_new(const char* filenameTemplate, int64_t pageSize, MXFPageFile** mxfPageFile);
+int mxf_page_file_open_read(const char* filenameTemplate, MXFPageFile** mxfPageFile);
+int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MXFPageFile** mxfPageFile);
+
+MXFFile* mxf_page_file_get_file(MXFPageFile* mxfPageFile);
+
+int64_t mxf_page_file_get_page_size(MXFPageFile* mxfPageFile);
+int mxf_page_file_is_page_filename(const char* filename);
+
+/* truncate the file from the front, setting the file sizes to zero; 
+the file can be continued to be read but cannot seek backwards or be reopened */ 
+int mxf_page_file_forward_truncate(MXFPageFile* mxfPageFile);
+
+int mxf_page_file_remove(const char* filenameTemplate);
 
 
 #ifdef __cplusplus

@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.h,v 1.3 2008/02/06 16:58:54 john_f Exp $
+ * $Id: write_avid_mxf.h,v 1.4 2008/05/07 15:21:48 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -71,6 +71,9 @@ void abort_writing(AvidClipWriter** clipWriter, int deleteFile);
 
 /* complete and save the output files and free the writer */
 int complete_writing(AvidClipWriter** clipWriter);
+
+/* update the metadata, complete and save the output files and free the writer */
+int update_and_complete_writing(AvidClipWriter** clipWriter, PackageDefinitions* packageDefinitions, const char* projectName);
 
 
 

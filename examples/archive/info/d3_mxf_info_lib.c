@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info_lib.c,v 1.2 2008/02/18 10:18:49 philipn Exp $
+ * $Id: d3_mxf_info_lib.c,v 1.3 2008/05/07 15:21:57 philipn Exp $
  *
  * 
  *
@@ -99,6 +99,12 @@ int d3_mxf_load_extensions(MXFDataModel* dataModel)
         CHK_OFAIL(mxf_get_int64_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
     } 
 
+#define GET_UINT32_ITEM(name, cName) \
+    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    { \
+        CHK_OFAIL(mxf_get_uint32_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+    } 
+
 static int get_infax_data(MXFMetadataSet* dmFrameworkSet, InfaxData* infaxData)
 {
     mxfUTF16Char* tempWString = NULL;
@@ -118,6 +124,7 @@ static int get_infax_data(MXFMetadataSet* dmFrameworkSet, InfaxData* infaxData)
     GET_STRING_ITEM(D3P_SpoolNumber, spoolNo);
     GET_STRING_ITEM(D3P_AccessionNumber, accNo);
     GET_STRING_ITEM(D3P_CatalogueDetail, catDetail);
+    GET_UINT32_ITEM(D3P_ItemNumber, itemNo);
     
     SAFE_FREE(&tempWString);
     return 1;
@@ -580,6 +587,7 @@ fail:
 
 int d3_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata)
 {
+    MXFPageFile* mxfPageFile = NULL;
     MXFFile* mxfFile = NULL;
     MXFRIP rip;
     MXFRIPEntry* lastRIPEntry = NULL;
@@ -596,7 +604,8 @@ int d3_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, M
     /* open MXF file */    
     if (strstr(filename, "%d") != NULL)
     {
-        CHK_OFAIL_NOMSG(mxf_page_file_open_read(filename, &mxfFile));
+        CHK_OFAIL_NOMSG(mxf_page_file_open_read(filename, &mxfPageFile));
+        mxfFile = mxf_page_file_get_file(mxfPageFile);
     }
     else
     {
