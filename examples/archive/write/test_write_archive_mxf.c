@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.3 2008/05/07 15:22:07 philipn Exp $
+ * $Id: test_write_archive_mxf.c,v 1.4 2008/07/08 15:17:18 philipn Exp $
  *
  * 
  *
@@ -130,7 +130,7 @@ static void increment_timecode(ArchiveTimecode* timecode)
 
 static void usage(const char* cmd)
 {
-    fprintf(stderr, "Usage: %s [--num-audio <val>] <num frames> <filename> \n", cmd);
+    fprintf(stderr, "Usage: %s [--num-audio <val> --no-lto-update] <num frames> <filename> \n", cmd);
 }
 
 int main(int argc, const char* argv[])
@@ -150,6 +150,7 @@ int main(int argc, const char* argv[])
     PSEFailure* pseFailures = NULL;
     long numPSEFailures = 0;
     int numAudioTracks = 4;
+    int ltoUpdate = 1;
     int cmdlnIndex = 1;
     
 
@@ -171,6 +172,11 @@ int main(int argc, const char* argv[])
                 return 1;
             }
             cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--no-lto-update") == 0)
+        {
+            ltoUpdate = 0;
+            cmdlnIndex++;
         }
         else
         {
@@ -361,7 +367,7 @@ int main(int argc, const char* argv[])
             passed = 0;
         }
         
-        if (passed)
+        if (passed && ltoUpdate)
         {
             
             /* update with LTO Infax data and filename */

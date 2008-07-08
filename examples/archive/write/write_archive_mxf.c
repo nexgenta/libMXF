@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.3 2008/05/07 15:22:08 philipn Exp $
+ * $Id: write_archive_mxf.c,v 1.4 2008/07/08 15:17:19 philipn Exp $
  *
  * 
  *
@@ -60,7 +60,7 @@
     
 /* the maximum number of D3 VTR errors in which a check is made that a timeode can be
    converted to a position. If not, then no errors are stored and a warning is given */
-#define MAXIMUM_ERROR_CHECK             20
+#define MAXIMUM_ERROR_CHECK             100
 
 /* we expect the URL to be the filename used on the LTO tape which is around 16 characters */
 /* the value is much larger here to allow for unforseen changes or for testing purposes */

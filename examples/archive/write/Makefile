@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.2 2008/05/07 15:22:06 philipn Exp $
+# $Id: Makefile,v 1.3 2008/07/08 15:17:18 philipn Exp $
 #
 # Makefile for building archive examples
 #
@@ -25,7 +25,7 @@ include $(TOPLEVEL)/vars.mk
 
 
 .PHONY: all
-all: libwritearchivemxf.a test_write_archive_mxf
+all: libwritearchivemxf.a update_archive_mxf test_write_archive_mxf
 
 CFLAGS += -I..
 
@@ -42,20 +42,28 @@ write_archive_mxf.o: write_archive_mxf.c write_archive_mxf.h ../archive_types.h 
 	$(CC) $(CFLAGS) -c ../timecode_index.c -o ../timecode_index.o
 
 
+update_archive_mxf: $(LIBMXF_DIR)/libMXF.a libwritearchivemxf.a update_archive_mxf.o
+	$(CC) update_archive_mxf.o -L$(LIBMXF_DIR) -L. -lwritearchivemxf -lMXF $(UUIDLIB) -o $@
+
+update_archive_mxf.o: update_archive_mxf.c write_archive_mxf.h ../archive_types.h
+	$(CC) $(CFLAGS) -c update_archive_mxf.c
+
 test_write_archive_mxf: $(LIBMXF_DIR)/libMXF.a libwritearchivemxf.a test_write_archive_mxf.o
 	$(CC) test_write_archive_mxf.o -L$(LIBMXF_DIR) -L. -lwritearchivemxf -lMXF $(UUIDLIB) -o $@
 
 test_write_archive_mxf.o: test_write_archive_mxf.c write_archive_mxf.h ../archive_types.h
 	$(CC) $(CFLAGS) -c test_write_archive_mxf.c
 
+
 .PHONY: install
 install: libwritearchivemxf.a
 	cp libwritearchivemxf.a $(MXF_INSTALL_PREFIX)/lib
+	cp update_archive_mxf $(MXF_INSTALL_PREFIX)/bin
 	cp write_archive_mxf.h $(MXF_INSTALL_PREFIX)/include
 
 .PHONY: clean
 clean:
-	@rm -f *~ *.o *.a test_write_archive_mxf
+	@rm -f *~ *.o *.a update_archive_mxf test_write_archive_mxf
 
 .PHONY: check
 check: test_write_archive_mxf
