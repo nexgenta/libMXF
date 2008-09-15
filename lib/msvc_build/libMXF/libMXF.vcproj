@@ -135,6 +135,9 @@
 				RelativePath="..\..\products\mxf_p2.c">
 			</File>
 			<File
+				RelativePath="..\..\utils\mxf_page_file.c">
+			</File>
+			<File
 				RelativePath="..\..\mxf\mxf_partition.c">
 			</File>
 			<File
@@ -204,6 +207,9 @@
 			</File>
 			<File
 				RelativePath="..\..\include\mxf\mxf_p2_extensions_data_model.h">
+			</File>
+			<File
+				RelativePath="..\..\include\mxf\mxf_page_file.h">
 			</File>
 			<File
 				RelativePath="..\..\include\mxf\mxf_partition.h">

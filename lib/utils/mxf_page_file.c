@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_page_file.c,v 1.2 2008/05/07 15:22:27 philipn Exp $
+ * $Id: mxf_page_file.c,v 1.3 2008/09/15 13:45:17 philipn Exp $
  *
  * 
  *
@@ -24,13 +24,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <unistd.h>
 
 #if defined(_WIN32)
 #include <io.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #else
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #endif
@@ -356,7 +356,10 @@ fail:
 
 static Page* open_page(MXFFileSysData* sysData, int64_t position)
 {
-    int page = (int)(position / sysData->pageSize);
+    int i;
+    int page;
+    
+    page = (int)(position / sysData->pageSize);
     if (page > sysData->numPages)
     {
         /* only allowed to open pages 0 .. last + 1 */
@@ -383,7 +386,6 @@ static Page* open_page(MXFFileSysData* sysData, int64_t position)
             sysData->numPagesAllocated += PAGE_ALLOC_INCR;
             
             /* reset the link back from file descriptors to the new pages */
-            int i;
             for (i = 0; i < sysData->numPages; i++)
             {
                 if (sysData->pages[i].fileDescriptor != NULL)
@@ -411,7 +413,10 @@ static Page* open_page(MXFFileSysData* sysData, int64_t position)
 
 static uint32_t read_from_page(MXFFileSysData* sysData, uint8_t* data, uint32_t count)
 {
-    Page* page = open_page(sysData, sysData->position);
+    uint32_t numRead;
+    Page* page;
+    
+    page = open_page(sysData, sysData->position);
     if (page == 0)
     {
         return 0;
@@ -439,7 +444,7 @@ static uint32_t read_from_page(MXFFileSysData* sysData, uint8_t* data, uint32_t 
     }
     
     /* read count bytes or 'till the end of the page */
-    uint32_t numRead = (count > (uint32_t)(sysData->pageSize - page->offset)) ? 
+    numRead = (count > (uint32_t)(sysData->pageSize - page->offset)) ? 
         (uint32_t)(sysData->pageSize - page->offset) : count;
     numRead = disk_file_read(page->fileDescriptor, data, numRead);
     
@@ -453,7 +458,10 @@ static uint32_t read_from_page(MXFFileSysData* sysData, uint8_t* data, uint32_t 
 
 static uint32_t write_to_page(MXFFileSysData* sysData, const uint8_t* data, uint32_t count)
 {
-    Page* page = open_page(sysData, sysData->position);
+    uint32_t numWrite;
+    Page* page;
+    
+    page = open_page(sysData, sysData->position);
     if (page == 0)
     {
         return 0;
@@ -481,7 +489,7 @@ static uint32_t write_to_page(MXFFileSysData* sysData, const uint8_t* data, uint
     }
     
     /* write count bytes or 'till the end of the page */
-    uint32_t numWrite = (count > (uint32_t)(sysData->pageSize - page->offset)) ? 
+    numWrite = (count > (uint32_t)(sysData->pageSize - page->offset)) ? 
         (uint32_t)(sysData->pageSize - page->offset) : count;
     numWrite = disk_file_write(page->fileDescriptor, data, numWrite);
 
@@ -510,6 +518,9 @@ static void free_page_file(MXFFileSysData* sysData)
 
 static void page_file_close(MXFFileSysData* sysData)
 {
+    FileDescriptor* fd;
+    FileDescriptor* nextFd;
+
     if (sysData == NULL)
     {
         return;
@@ -521,8 +532,7 @@ static void page_file_close(MXFFileSysData* sysData)
     sysData->numPages = 0;
     sysData->numPagesAllocated = 0;
     
-    FileDescriptor* fd = sysData->fileDescriptorHead;
-    FileDescriptor* nextFd;
+    fd = sysData->fileDescriptorHead;
     while (fd != NULL)
     {
         disk_file_close(fd);
@@ -626,13 +636,15 @@ static int page_file_eof(MXFFileSysData* sysData)
 
 static int page_file_seek(MXFFileSysData* sysData, int64_t offset, int whence)
 {
-    int64_t size = page_file_size(sysData);
+    int64_t position;
+    int64_t size;
+    
+    size = page_file_size(sysData);
     if (size < 0)
     {
         return 0;
     }
     
-    int64_t position;
     switch (whence)
     {
         case SEEK_SET:
@@ -868,7 +880,7 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
         }
         if (pageSize != fileSize)
         {
-            mxf_log(MXF_ELOG, "Size of first file '%s' (%"PRId64" does not equal page size %"PRId64"\n", filename, fileSize, pageSize);
+            mxf_log(MXF_ELOG, "Size of first file '%s' (%"PFi64" does not equal page size %"PFi64"\n", filename, fileSize, pageSize);
             return 0;
         }
     }
@@ -955,6 +967,9 @@ int mxf_page_file_forward_truncate(MXFPageFile* mxfPageFile)
     int page = (int)(sysData->position / sysData->pageSize);
     int i;
     char filename[4096];
+#if defined(_WIN32)
+    int fileid;
+#endif
     
     if (sysData->mode == READ_MODE)
     {
@@ -1000,7 +1015,6 @@ int mxf_page_file_forward_truncate(MXFPageFile* mxfPageFile)
 
 #if defined(_WIN32)
         /* WIN32 does not have truncate() so open the file with _O_TRUNC then close it */
-        int fileid;
         if ((fileid = open(filename, _O_CREAT | _O_TRUNC, _S_IWRITE)) == -1 ||
             close(fileid) == -1)
 #else
