@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.3 2008/05/07 15:21:45 philipn Exp $
+ * $Id: main.c,v 1.4 2008/09/16 17:20:13 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -129,7 +129,7 @@ static int read_next_mjpeg_image_data(FILE* file, MJPEGState* state,
             return 0;
         }
         
-        if ((state->dataSize = fread(state->buffer, 1, state->bufferSize, file)) == 0)
+        if ((state->dataSize = (long)fread(state->buffer, 1, state->bufferSize, file)) == 0)
         {
             /* EOF if nothing was read */
             return 0;
@@ -306,8 +306,7 @@ static int prepare_wave_file(const char* filename, WAVInput* input)
                 fprintf(stderr, "Failed to read the wav format chunk (common part)\n");
                 return 0;
             }
-            uint16_t format = get_uint16_le(buffer);
-            if (format != WAVE_FORMAT_PCM)
+            if (get_uint16_le(buffer) != WAVE_FORMAT_PCM)
             {
                 fprintf(stderr, "Unexpected wav format - expecting WAVE_FORMAT_PCM (0x0001)\n");
                 return 0;
@@ -334,7 +333,7 @@ static int prepare_wave_file(const char* filename, WAVInput* input)
                     "Assuming value is %d\n", input->nBlockAlign, input->numAudioChannels * ((input->audioSampleBits + 7) / 8));
                 input->nBlockAlign = input->numAudioChannels * ((input->audioSampleBits + 7) / 8);                     
             }
-            if (fseek(input->file, size - 14 - 2, SEEK_CUR) < 0)
+            if (fseek(input->file, (long)(size - 14 - 2), SEEK_CUR) < 0)
             {
                 fprintf(stderr, "Failed to seek to end of wav chunk\n");
                 return 0;
@@ -347,7 +346,7 @@ static int prepare_wave_file(const char* filename, WAVInput* input)
             
             input->dataOffset = ftell(input->file);
             input->dataSize = size;
-            if (fseek(input->file, size, SEEK_CUR) < 0)
+            if (fseek(input->file, (long)size, SEEK_CUR) < 0)
             {
                 fprintf(stderr, "Failed to seek to end of wav chunk\n");
                 return 0;
@@ -356,7 +355,7 @@ static int prepare_wave_file(const char* filename, WAVInput* input)
         }
         else
         {
-            if (fseek(input->file, size, SEEK_CUR) < 0)
+            if (fseek(input->file, (long)size, SEEK_CUR) < 0)
             {
                 fprintf(stderr, "Failed to seek to end of wav chunk\n");
                 return 0;
@@ -365,7 +364,7 @@ static int prepare_wave_file(const char* filename, WAVInput* input)
     }
 
     /* position at wave data */
-    if (fseek(input->file, input->dataOffset, SEEK_SET) < 0)
+    if (fseek(input->file, (long)input->dataOffset, SEEK_SET) < 0)
     {
         fprintf(stderr, "Failed to seek to start of wav data chunk\n");
         return 0;
@@ -644,7 +643,7 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for --start-tc\n");
                 return 1;
             }
-            if ((result = sscanf(argv[cmdlnIndex + 1], "%"PRId64"", &videoStartPosition)) != 1 ||
+            if ((result = sscanf(argv[cmdlnIndex + 1], "%"PFi64"", &videoStartPosition)) != 1 ||
                 videoStartPosition < 0)
             {
                 usage(argv[0]);
@@ -1631,7 +1630,7 @@ int main(int argc, const char* argv[])
                         numRead = inputs[i].frameSize * inputs[i].wavInput.numAudioChannels;
                     }
 
-                    numSamples = numRead / (inputs[i].wavInput.numAudioChannels  * 
+                    numSamples = (uint32_t)numRead / (inputs[i].wavInput.numAudioChannels  * 
                         ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8));
                         
                     get_wave_channel(&inputs[i].wavInput, numRead, inputs[i - inputs[i].channelIndex].buffer, 

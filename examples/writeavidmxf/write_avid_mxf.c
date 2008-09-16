@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.5 2008/05/07 15:21:47 philipn Exp $
+ * $Id: write_avid_mxf.c,v 1.6 2008/09/16 17:20:13 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -756,7 +756,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
             CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ResolutionID), writer->resolutionID));
         }
         CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameSampleSize), writer->frameSize));
-        CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageSize), writer->essenceLength));
+        CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageSize), (int32_t)writer->essenceLength));
 
         writer->descriptorSet = writer->cdciDescriptorSet;  /* ContainerDuration and ImageSize updated when writing completed */
     }
@@ -1050,7 +1050,7 @@ static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer, Packa
     CHK_ORET(mxf_set_length_item(writer->descriptorSet, &MXF_ITEM_K(FileDescriptor, ContainerDuration), writer->duration));
     if (mxf_have_item(writer->descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageSize)))
     {
-        CHK_ORET(mxf_set_int32_item(writer->descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageSize), writer->essenceLength));
+        CHK_ORET(mxf_set_int32_item(writer->descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageSize), (int32_t)writer->essenceLength));
     }
     
 
