@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.4 2008/09/16 17:20:13 john_f Exp $
+ * $Id: main.c,v 1.5 2008/09/23 12:45:22 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -32,6 +32,10 @@
 
 #define MAX_INPUTS      17
 
+/* allow the last ntsc audio frame to be x samples less than the average */
+#define MAX_AUDIO_VARIATION     5
+
+
 
 typedef struct
 {
@@ -43,6 +47,8 @@ typedef struct
     mxfRational audioSamplingRate;
     uint16_t nBlockAlign;
     uint16_t audioSampleBits;
+
+    int bytesPerSample;
 
     size_t totalRead;
 } WAVInput;
@@ -92,8 +98,11 @@ typedef struct
     FILE* file;  
     unsigned long frameSize;
     unsigned long frameSizeSeq[5]; /* PCM for NTSC */
+    unsigned long minFrameSize;
+    unsigned long availFrameSize;
     int seqIndex;
     unsigned char* buffer;
+    int bufferOffset;
 
     /* used when writing MJPEG */    
     MJPEGState mjpegState;
@@ -102,6 +111,7 @@ typedef struct
     int channelIndex; /* Note: channel 0 will own the WAVInput */
     WAVInput wavInput;
     unsigned char* channelBuffer;
+    int bytesPerSample;
 } Input;
 
 
@@ -327,17 +337,21 @@ static int prepare_wave_file(const char* filename, WAVInput* input)
                 return 0;
             }
             input->audioSampleBits = get_uint16_le(buffer);
-            if (input->numAudioChannels * ((input->audioSampleBits + 7) / 8) != input->nBlockAlign)
+            input->bytesPerSample = (input->audioSampleBits + 7) / 8; 
+            if (input->numAudioChannels * input->bytesPerSample != input->nBlockAlign)
             {
                 fprintf(stderr, "WARNING: Block alignment in file, %d, is incorrect. "
-                    "Assuming value is %d\n", input->nBlockAlign, input->numAudioChannels * ((input->audioSampleBits + 7) / 8));
-                input->nBlockAlign = input->numAudioChannels * ((input->audioSampleBits + 7) / 8);                     
+                    "Assuming value is %d\n", input->nBlockAlign, input->numAudioChannels * input->bytesPerSample);
+                input->nBlockAlign = input->numAudioChannels * input->bytesPerSample;                     
             }
+            
+            
             if (fseek(input->file, (long)(size - 14 - 2), SEEK_CUR) < 0)
             {
                 fprintf(stderr, "Failed to seek to end of wav chunk\n");
                 return 0;
             }
+            
             haveFormatData = 1;
         }
         else if (memcmp(buffer, DATA_ID, 4) == 0)
@@ -378,7 +392,7 @@ static int get_wave_data(WAVInput* input, unsigned char* buffer, size_t dataSize
     size_t numToRead;
     size_t actualRead;
     
-    if (input->totalRead>= input->dataSize)
+    if (input->totalRead >= input->dataSize)
     {
         *numRead = 0;
         return 1;
@@ -408,15 +422,16 @@ static int get_wave_data(WAVInput* input, unsigned char* buffer, size_t dataSize
 static void get_wave_channel(WAVInput* input, size_t dataSize, unsigned char* buffer, 
     int channelIndex, unsigned char* channelBuffer)
 {
-    size_t i;
+    int i;
     int j;
+    int channelOffset = channelIndex * input->bytesPerSample;
+    int numSamples = dataSize / input->nBlockAlign;
     
-    for (i = 0; i < dataSize / (input->nBlockAlign * input->numAudioChannels) ; i++)
+    for (i = 0; i < numSamples; i++)
     {
-        for (j = 0; j < input->nBlockAlign; j++)
+        for (j = 0; j < input->bytesPerSample; j++)
         {
-            channelBuffer[i * input->nBlockAlign + j] = 
-                buffer[i * input->nBlockAlign * input->numAudioChannels + channelIndex * input->nBlockAlign + j];
+            channelBuffer[i * input->bytesPerSample + j] = buffer[i * input->nBlockAlign + channelOffset + j];
         }
     }
 }
@@ -451,6 +466,85 @@ static void get_track_name(int isVideo, int typeTrackNum, char* trackName)
     }
 }
  
+
+static int parse_timestamp(const char* timestampStr, mxfTimestamp* ts)
+{
+    int data[7];
+    int result;
+    
+    result = sscanf(timestampStr, "%u-%u-%uT%u:%u:%u:%u", &data[0], &data[1],
+        &data[2], &data[3], &data[4], &data[5], &data[6]);
+    if (result != 7)
+    {
+        return 0;
+    }
+    
+    ts->year = data[0];
+    ts->month = data[1];
+    ts->day = data[2];
+    ts->hour = data[3];
+    ts->min = data[4];
+    ts->sec = data[5];
+    ts->qmsec = data[6];
+    
+    return 1;
+}
+
+static int parse_umid(const char* umidStr, mxfUMID* umid)
+{
+    int bytes[32];
+    int result;
+    
+    result = sscanf(umidStr, 
+        "%02x%02x%02x%02x%02x%02x%02x%02x"
+        "%02x%02x%02x%02x%02x%02x%02x%02x"
+        "%02x%02x%02x%02x%02x%02x%02x%02x"
+        "%02x%02x%02x%02x%02x%02x%02x%02x",
+        &bytes[0], &bytes[1], &bytes[2], &bytes[3], &bytes[4], &bytes[5], &bytes[6], &bytes[7], 
+        &bytes[8], &bytes[9], &bytes[10], &bytes[11], &bytes[12], &bytes[13], &bytes[14], &bytes[15], 
+        &bytes[16], &bytes[17], &bytes[18], &bytes[19], &bytes[20], &bytes[21], &bytes[22], &bytes[23], 
+        &bytes[24], &bytes[25], &bytes[26], &bytes[27], &bytes[28], &bytes[29], &bytes[30], &bytes[31]);
+    if (result != 32)
+    {
+        return 0;
+    }
+    
+    umid->octet0 = bytes[0] & 0xff;
+    umid->octet1 = bytes[1] & 0xff;
+    umid->octet2 = bytes[2] & 0xff;
+    umid->octet3 = bytes[3] & 0xff;
+    umid->octet4 = bytes[4] & 0xff;
+    umid->octet5 = bytes[5] & 0xff;
+    umid->octet6 = bytes[6] & 0xff;
+    umid->octet7 = bytes[7] & 0xff;
+    umid->octet8 = bytes[8] & 0xff;
+    umid->octet9 = bytes[9] & 0xff;
+    umid->octet10 = bytes[10] & 0xff;
+    umid->octet11 = bytes[11] & 0xff;
+    umid->octet12 = bytes[12] & 0xff;
+    umid->octet13 = bytes[13] & 0xff;
+    umid->octet14 = bytes[14] & 0xff;
+    umid->octet15 = bytes[15] & 0xff;
+    umid->octet16 = bytes[16] & 0xff;
+    umid->octet17 = bytes[17] & 0xff;
+    umid->octet18 = bytes[18] & 0xff;
+    umid->octet19 = bytes[19] & 0xff;
+    umid->octet20 = bytes[20] & 0xff;
+    umid->octet21 = bytes[21] & 0xff;
+    umid->octet22 = bytes[22] & 0xff;
+    umid->octet23 = bytes[23] & 0xff;
+    umid->octet24 = bytes[24] & 0xff;
+    umid->octet25 = bytes[25] & 0xff;
+    umid->octet26 = bytes[26] & 0xff;
+    umid->octet27 = bytes[27] & 0xff;
+    umid->octet28 = bytes[28] & 0xff;
+    umid->octet29 = bytes[29] & 0xff;
+    umid->octet30 = bytes[30] & 0xff;
+    umid->octet31 = bytes[31] & 0xff;
+    
+    return 1;
+}
+
 static void usage(const char* cmd)
 {
     fprintf(stderr, "Usage: %s <<options>> <<inputs>>\n", cmd);
@@ -467,6 +561,10 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --comment <string>         add 'Comments' user comment to material package\n");
     fprintf(stderr, "  --desc <string>            add 'Descript' user comment to material package\n");
     fprintf(stderr, "  --start-tc <count>         set the start timecode to given count of video frames\n");
+    fprintf(stderr, "  --mp-uid <umid>            set the Material Package UMID. Default is autogen\n");
+    fprintf(stderr, "  --mp-created <timestamp>   set the Material Package creation date. Default is now\n");
+    fprintf(stderr, "  --tp-uid <umid>            set the tape Source Package UMID. Default is autogen\n");
+    fprintf(stderr, "  --tp-created <timestamp>   set the tape Source Package creation date. Default is now\n");
     fprintf(stderr, "Inputs:\n");
     fprintf(stderr, "  --mjpeg <filename>         Avid MJPEG\n");
     fprintf(stderr, "       --res <resolution>    Resolution '2:1' (default), '3:1', '10:1', '10:1m', '15:1s' or '20:1'\n");
@@ -490,12 +588,15 @@ static void usage(const char* cmd)
     fprintf(stderr, "       --bps <bits per sample>    # bits per sample. Default is 16\n");
     fprintf(stderr, "  --wavpcm <filename>        raw 48kHz PCM audio contained in a WAV file\n");
     fprintf(stderr, "\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "<umid> format is [0-9a-fA-F]{64}, a sequence of 32 hexadecimal bytes\n");
+    fprintf(stderr, "<timestamp> format is YYYY-MM-DDThh:mm:ss:qm where qm is in units of 1/250th second\n");
 }
 
 
 int main(int argc, const char* argv[])
 {
-    AvidClipWriter* clipWriter;
+    AvidClipWriter* clipWriter = NULL;
     const char* filenamePrefix = NULL;
     const char* projectName = NULL;
     const char* clipName = NULL;
@@ -505,7 +606,8 @@ int main(int argc, const char* argv[])
     int inputIndex = 0;
     int cmdlnIndex = 1;
     mxfRational imageAspectRatio = {4, 3};
-    mxfRational sampleRate = {25, 1};
+    mxfRational videoSampleRate = {25, 1};
+    mxfRational audioSampleRate = {48000, 1};
     int numAudioTracks = 0;
     int i;
     char filename[FILENAME_MAX];
@@ -516,19 +618,29 @@ int main(int argc, const char* argv[])
     size_t numRead;
     uint16_t numAudioChannels;
     int haveImage;
-    unsigned char* data;
+    unsigned char* data = NULL;
     long dataSize;
     PackageDefinitions* packageDefinitions = NULL;
-    mxfTimestamp now;
     mxfUMID materialPackageUID;
     mxfUMID filePackageUID;
     mxfUMID tapePackageUID;
+    mxfTimestamp materialPackageCreated;
+    mxfTimestamp filePackageCreated;
+    mxfTimestamp tapePackageCreated;
     char trackName[4];
     const char* comment = NULL;
     const char* desc = NULL;
     int64_t videoStartPosition = 0; 
+    mxfRational projectEditRate;
+    int64_t tapeLen;
     
-    memset(inputs, 0, sizeof(Input) * MAX_INPUTS);    
+    memset(inputs, 0, sizeof(Input) * MAX_INPUTS);
+    mxf_get_timestamp_now(&materialPackageCreated);
+    memcpy(&filePackageCreated, &materialPackageCreated, sizeof(filePackageCreated));
+    memcpy(&tapePackageCreated, &materialPackageCreated, sizeof(tapePackageCreated));
+    mxf_generate_old_aafsdk_umid(&materialPackageUID);
+    mxf_generate_old_aafsdk_umid(&tapePackageUID);
+
 
     while (cmdlnIndex < argc)
     {
@@ -543,7 +655,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --prefix\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             filenamePrefix = argv[cmdlnIndex + 1];
@@ -554,7 +666,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --clip\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             clipName = argv[cmdlnIndex + 1];
@@ -565,7 +677,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --tape\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             tapeName = argv[cmdlnIndex + 1];
@@ -576,7 +688,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --project\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             projectName = argv[cmdlnIndex + 1];
@@ -585,8 +697,8 @@ int main(int argc, const char* argv[])
         else if (strcmp(argv[cmdlnIndex], "--ntsc") == 0)
         {
             isPAL = 0;
-            sampleRate.numerator = 30000;
-            sampleRate.denominator = 1001;
+            videoSampleRate.numerator = 30000;
+            videoSampleRate.denominator = 1001;
             cmdlnIndex++;
         }
         else if (strcmp(argv[cmdlnIndex], "--nolegacy") == 0)
@@ -600,7 +712,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --aspect\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             if ((result = sscanf(argv[cmdlnIndex + 1], "%d:%d", &imageAspectRatio.numerator, 
@@ -617,7 +729,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --comment\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             comment = argv[cmdlnIndex + 1];
@@ -628,7 +740,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --desc\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             desc = argv[cmdlnIndex + 1];
@@ -640,7 +752,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --start-tc\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             if ((result = sscanf(argv[cmdlnIndex + 1], "%"PFi64"", &videoStartPosition)) != 1 ||
@@ -652,12 +764,76 @@ int main(int argc, const char* argv[])
             }
             cmdlnIndex += 2;
         }
+        else if (strcmp(argv[cmdlnIndex], "--mp-uid") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            if (!parse_umid(argv[cmdlnIndex + 1], &materialPackageUID))
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Failed to accept --mp-uid umid value '%s'\n", argv[cmdlnIndex + 1]);
+                return 1;
+            }
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--mp-created") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            if (!parse_timestamp(argv[cmdlnIndex + 1], &materialPackageCreated))
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Failed to accept --mp-created timestamp value '%s'\n", argv[cmdlnIndex + 1]);
+                return 1;
+            }
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--tp-uid") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            if (!parse_umid(argv[cmdlnIndex + 1], &tapePackageUID))
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Failed to accept --tp-uid umid value '%s'\n", argv[cmdlnIndex + 1]);
+                return 1;
+            }
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--tp-created") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            if (!parse_timestamp(argv[cmdlnIndex + 1], &tapePackageCreated))
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Failed to accept --tp-created timestamp value '%s'\n", argv[cmdlnIndex + 1]);
+                return 1;
+            }
+            cmdlnIndex += 2;
+        }
         else if (strcmp(argv[cmdlnIndex], "--mjpeg") == 0)
         {
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --mjpeg\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             inputs[inputIndex].isVideo = 1;
@@ -673,7 +849,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --res\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             if (inputIndex == 0 || inputs[inputIndex - 1].essenceType != AvidMJPEG)
@@ -719,7 +895,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --dv25\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             inputs[inputIndex].isVideo = 1;
@@ -734,7 +910,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --dv50\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             inputs[inputIndex].isVideo = 1;
@@ -749,7 +925,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --dv1080i50\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             inputs[inputIndex].isVideo = 1;
@@ -764,7 +940,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --dv720p50\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             inputs[inputIndex].isVideo = 1;
@@ -802,7 +978,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD720p120\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             imageAspectRatio.numerator = 16;
@@ -819,7 +995,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD720p185\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             imageAspectRatio.numerator = 16;
@@ -836,7 +1012,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD1080i120\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             imageAspectRatio.numerator = 16;
@@ -853,7 +1029,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD1080i185\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             imageAspectRatio.numerator = 16;
@@ -870,7 +1046,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD1080p36\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             imageAspectRatio.numerator = 16;
@@ -887,7 +1063,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD1080p120\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             imageAspectRatio.numerator = 16;
@@ -904,7 +1080,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --DNxHD1080p185\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             imageAspectRatio.numerator = 16;
@@ -921,7 +1097,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --unc\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             inputs[inputIndex].isVideo = 1;
@@ -936,7 +1112,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --unc1080i\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             inputs[inputIndex].isVideo = 1;
@@ -951,13 +1127,14 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --pcm\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             inputs[inputIndex].isVideo = 0;
             inputs[inputIndex].essenceType = PCM;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].essenceInfo.pcmInfo.bitsPerSample = 16;
+            inputs[inputIndex].bytesPerSample = 2;
             inputs[inputIndex].trackNumber = ++audioTrackNumber;
             inputIndex++;
             numAudioTracks++;
@@ -968,7 +1145,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --pcm\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             if (!prepare_wave_file(argv[cmdlnIndex + 1], &inputs[inputIndex].wavInput))
@@ -991,6 +1168,7 @@ int main(int argc, const char* argv[])
                 inputs[inputIndex].wavInput = inputs[inputIndex - i].wavInput;
                 inputs[inputIndex].essenceInfo.pcmInfo.bitsPerSample = 
                     inputs[inputIndex].wavInput.audioSampleBits;
+                inputs[inputIndex].bytesPerSample = inputs[inputIndex].wavInput.bytesPerSample;
                 inputs[inputIndex].trackNumber = ++audioTrackNumber;
                 inputIndex++;
                 numAudioTracks++;
@@ -1004,7 +1182,7 @@ int main(int argc, const char* argv[])
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
-                fprintf(stderr, "Missing argument for --bps\n");
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
             if (inputIndex == 0 || inputs[inputIndex - 1].essenceType != PCM)
@@ -1058,14 +1236,14 @@ int main(int argc, const char* argv[])
         clipName = filenamePrefix;
     }
 
-    /* calculate frame sizes, ... */
+    /* set essence parameters etc. */
     for (i = 0; i < inputIndex; i++)
     {
         if (inputs[i].essenceType == AvidMJPEG)
         {
-            inputs[i].frameSize = -1;
+            inputs[i].frameSize = 0; /* variable frame size */
             memset(&inputs[i].mjpegState, 0, sizeof(MJPEGState));
-            inputs[i].mjpegState.buffer = (unsigned char*)malloc(8192);
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].mjpegState.buffer, unsigned char, 8192);
             inputs[i].mjpegState.bufferSize = 8192;
             inputs[i].mjpegState.dataSize = inputs[i].mjpegState.bufferSize;
             inputs[i].mjpegState.position = inputs[i].mjpegState.bufferSize;
@@ -1077,296 +1255,184 @@ int main(int argc, const char* argv[])
             if (isPAL)
             {
                 inputs[i].frameSize = 144000;
-                inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-                if (inputs[i].buffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
             }
             else
             {
                 inputs[i].frameSize = 120000;
-                inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-                if (inputs[i].buffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
             }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DVBased50)
         {
             if (isPAL)
             {
                 inputs[i].frameSize = 288000;
-                inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-                if (inputs[i].buffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
             }
             else
             {
                 inputs[i].frameSize = 240000;
-                inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-                if (inputs[i].buffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
             }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DV1080i50)
         {
             inputs[i].frameSize = 576000;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DV720p50)
         {
             inputs[i].frameSize = 576000;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == IMX30)
         {
             inputs[i].frameSize = 150000;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == IMX40)
         {
             inputs[i].frameSize = 200000;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == IMX50)
         {
             inputs[i].frameSize = 250000;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DNxHD720p120)
         {
-            sampleRate.numerator = 50;
-            sampleRate.denominator = 1;
+            videoSampleRate.numerator = 50;
+            videoSampleRate.denominator = 1;
             inputs[i].frameSize = 303104;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DNxHD720p185)
         {
-            sampleRate.numerator = 50;
-            sampleRate.denominator = 1;
+            videoSampleRate.numerator = 50;
+            videoSampleRate.denominator = 1;
             inputs[i].frameSize = 458752;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DNxHD1080p36)
         {
             inputs[i].frameSize = 188416;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DNxHD1080i120 || inputs[i].essenceType == DNxHD1080p120)
         {
             inputs[i].frameSize = 606208;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DNxHD1080i185 || inputs[i].essenceType == DNxHD1080p185)
         {
             inputs[i].frameSize = 917504;
-            inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-            if (inputs[i].buffer == NULL)
-            {
-                fprintf(stderr, "Out of memory\n");
-                return 1;
-            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == UncUYVY)
         {
             if (isPAL)
             {
                 inputs[i].frameSize = 720 * 576 * 2;
-                inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-                if (inputs[i].buffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
             }
             else
             {
                 fprintf(stderr, "Uncompressed NTSC not yet implemented\n");
                 return 1;
             }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == Unc1080iUYVY)
         {
             if (isPAL)
             {
                 inputs[i].frameSize = 1920 * 1080 * 2;
-                inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-                if (inputs[i].buffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
             }
             else
             {
                 fprintf(stderr, "Uncompressed 1080i NTSC not yet implemented\n");
                 return 1;
             }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == PCM && !inputs[i].isWAVFile)
         {
             if (isPAL)
             {
-                inputs[i].frameSize = 1920 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].buffer = (unsigned char*)malloc(inputs[i].frameSize);
-                if (inputs[i].buffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
-            }
+                inputs[i].frameSize = 1920 * inputs[i].bytesPerSample;
+             }
             else
             {
-                inputs[i].frameSize = 1601 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[0] = 1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[1] = 1601 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[2] = 1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[3] = 1601 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[4] = 1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].buffer = (unsigned char*)malloc(1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8));
-                if (inputs[i].buffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
+                /* frame size is 1601.6 samples on average and a maximum of 1602 + MAX_AUDIO_VARIATION */
+                inputs[i].frameSize = (1602 + MAX_AUDIO_VARIATION) * inputs[i].bytesPerSample;
+                inputs[i].minFrameSize = (1602 - MAX_AUDIO_VARIATION) * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[0] = 1602 * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[1] = 1601 * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[2] = 1602 * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[3] = 1601 * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[4] = 1602 * inputs[i].bytesPerSample;
             }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == PCM && inputs[i].isWAVFile)
         {
             if (isPAL)
             {
-                inputs[i].frameSize = 1920 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                if (inputs[i].channelIndex == 0)
-                {
-                    inputs[i].buffer = (unsigned char*)malloc(inputs[i].wavInput.numAudioChannels * 
-                        inputs[i].frameSize);
-                    if (inputs[i].buffer == NULL)
-                    {
-                        fprintf(stderr, "Out of memory\n");
-                        return 1;
-                    }
-                }
-                inputs[i].channelBuffer = (unsigned char*)malloc(inputs[i].frameSize);
-                if (inputs[i].channelBuffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
+                inputs[i].frameSize = 1920 * inputs[i].bytesPerSample;
             }
             else
             {
-                inputs[i].frameSize = 1601 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[0] = 1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[1] = 1601 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[2] = 1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[3] = 1601 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-                inputs[i].frameSizeSeq[4] = 1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
-
-                if (inputs[i].channelIndex == 0)
-                {
-                    inputs[i].buffer = (unsigned char*)malloc(inputs[i].wavInput.numAudioChannels * 
-                        1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8));
-                    if (inputs[i].buffer == NULL)
-                    {
-                        fprintf(stderr, "Out of memory\n");
-                        return 1;
-                    }
-                }
-                inputs[i].channelBuffer = (unsigned char*)malloc(
-                    1602 * ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8));
-                if (inputs[i].channelBuffer == NULL)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    return 1;
-                }
+                /* frame size is 1601.6 samples on average and a maximum of 1602 + MAX_AUDIO_VARIATION */
+                inputs[i].frameSize = (1602 + MAX_AUDIO_VARIATION) * inputs[i].bytesPerSample;
+                inputs[i].minFrameSize = (1602 - MAX_AUDIO_VARIATION) * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[0] = 1602 * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[1] = 1601 * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[2] = 1602 * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[3] = 1601 * inputs[i].bytesPerSample;
+                inputs[i].frameSizeSeq[4] = 1602 * inputs[i].bytesPerSample;
             }
+            if (inputs[i].channelIndex == 0)
+            {
+                /* allocate buffer for multi-channel audio data */
+                CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].wavInput.numAudioChannels * inputs[i].frameSize);
+            }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].channelBuffer, unsigned char, inputs[i].frameSize);
         }
         else
         {
+            /* unknown essence type - code fix needed */
             assert(0);
         }
     }    
 
-    
+
+
     /* create the package definitions */
     
-    /* TODO: need to check for failures */
+    CHK_OFAIL(create_package_definitions(&packageDefinitions));
+
+    /* project edit rate is the video sample rate */
+    projectEditRate.numerator = videoSampleRate.numerator;
+    projectEditRate.denominator = videoSampleRate.denominator;
+
+    /* set the tape length to 120 hours */
+    tapeLen = (int64_t)(120 * 60 * 60 * 
+        videoSampleRate.numerator / (double)videoSampleRate.denominator + 0.5);
     
-    mxf_get_timestamp_now(&now);
-    
-    create_package_definitions(&packageDefinitions);
-    
-    mxf_generate_old_aafsdk_umid(&materialPackageUID);
- //   mxf_generate_umid(&materialPackageUID);
-    create_material_package(packageDefinitions, &materialPackageUID, clipName, &now);
+    /* material package with user comments */    
+    CHK_OFAIL(create_material_package(packageDefinitions, &materialPackageUID, clipName, &materialPackageCreated));
     if (comment != NULL)
     {
-        set_user_comment(packageDefinitions, "Comments", comment);
+        CHK_OFAIL(set_user_comment(packageDefinitions, "Comments", comment));
     }
     if (desc != NULL)
     {
-        set_user_comment(packageDefinitions, "Descript", desc);
+        CHK_OFAIL(set_user_comment(packageDefinitions, "Descript", desc));
     }
 
-    mxf_generate_old_aafsdk_umid(&tapePackageUID);
-//    mxf_generate_umid(&tapePackageUID);
-    create_tape_source_package(packageDefinitions, &tapePackageUID, tapeName, &now);
+    /* tape source package */
+    CHK_OFAIL(create_tape_source_package(packageDefinitions, &tapePackageUID, tapeName, &tapePackageCreated));
 
+    /* create a file source package for each input and add a track to each package */
     for (i = 0; i < inputIndex; i++)
     {
         Package* filePackage;
@@ -1374,96 +1440,85 @@ int main(int argc, const char* argv[])
         Track* fileTrack;
         Track* materialTrack;
         mxfRational editRate;
-        mxfRational projectEditRate;
-        int64_t tapeLen;
         int64_t startPosition;
-        
-        projectEditRate.numerator = sampleRate.numerator;
-        projectEditRate.denominator = sampleRate.denominator;
-
-        if (isPAL)
-        {
-            tapeLen = 120 * 60 * 60 * 25;
-        }
-        else
-        {
-            tapeLen = 120 * 60 * 60 * 30;
-        }
         
         if (inputs[i].isVideo)
         {
             startPosition = videoStartPosition;
             
-            editRate.numerator = sampleRate.numerator;
-            editRate.denominator = sampleRate.denominator;
+            editRate.numerator = videoSampleRate.numerator;
+            editRate.denominator = videoSampleRate.denominator;
         }
         else
         {
-            editRate.numerator = 48000;
-            editRate.denominator = 1;
-            
-            if (isPAL)
-            {
-                startPosition = videoStartPosition * 48000 / 25;
-            }
-            else
-            {
-                startPosition = videoStartPosition * 48000 / 30;
-            }
+            startPosition = (int64_t)(videoStartPosition * 
+                (audioSampleRate.numerator * videoSampleRate.denominator) / 
+                    (double)(audioSampleRate.denominator * videoSampleRate.numerator) + 0.5);
+
+            editRate.numerator = audioSampleRate.numerator;
+            editRate.denominator = audioSampleRate.denominator;
         }
         
         get_filename(filenamePrefix, inputs[i].isVideo, inputs[i].trackNumber, filename);
         get_track_name(inputs[i].isVideo, inputs[i].trackNumber, trackName);
 
+        
         /* create file package */
         mxf_generate_old_aafsdk_umid(&filePackageUID);
-//        mxf_generate_umid(&filePackageUID);
-        create_file_source_package(packageDefinitions, &filePackageUID, NULL, &now,
-            filename, inputs[i].essenceType, &inputs[i].essenceInfo, &filePackage);
+        CHK_OFAIL(create_file_source_package(packageDefinitions, &filePackageUID, NULL, &filePackageCreated,
+            filename, inputs[i].essenceType, &inputs[i].essenceInfo, &filePackage));
+            
             
         /* track in tape source package */
-        create_track(packageDefinitions->tapeSourcePackage, i + 1, 0, trackName, inputs[i].isVideo,
-            &projectEditRate, &g_Null_UMID, 0, 0, tapeLen, &tapeTrack);
+        CHK_OFAIL(create_track(packageDefinitions->tapeSourcePackage, i + 1, 0, trackName, inputs[i].isVideo,
+            &projectEditRate, &g_Null_UMID, 0, 0, tapeLen, &tapeTrack));
             
         /* track in file source package */
-        create_track(filePackage, 1, 0, trackName, inputs[i].isVideo,
+        CHK_OFAIL(create_track(filePackage, 1, 0, trackName, inputs[i].isVideo,
             &editRate, &packageDefinitions->tapeSourcePackage->uid, tapeTrack->id, startPosition, 0, 
-            &fileTrack);
+            &fileTrack));
             
         /* track in material package */
-        create_track(packageDefinitions->materialPackage, i + 1, inputs[i].trackNumber, trackName, 
+        CHK_OFAIL(create_track(packageDefinitions->materialPackage, i + 1, inputs[i].trackNumber, trackName, 
             inputs[i].isVideo, &editRate, &filePackage->uid, fileTrack->id, 0, fileTrack->length, 
-            &materialTrack);
+            &materialTrack));
             
+            
+        /* the material track ID is the unique ID for the essence data from this input */
         inputs[i].materialTrackID = materialTrack->id;
     }
     
     
+    
     /* open the input files */
+    
     for (i = 0; i < inputIndex; i++)
     {
-        /* WAVE file already open */
-        if (!inputs[i].isWAVFile)
+        if (!inputs[i].isWAVFile) /* WAVE file already open */
         {
             if ((inputs[i].file = fopen(inputs[i].filename, "rb")) == NULL)
             {
                 fprintf(stderr, "Failed to open file '%s'\n", inputs[i].filename);
-                return 1;
+                goto fail;
             }
         }
     }   
 
     
+    
     /* create the clip writer */
+    
     if (!create_clip_writer(projectName, isPAL ? PAL_25i : NTSC_30i,
-        imageAspectRatio, sampleRate, 0, useLegacy, packageDefinitions, &clipWriter))
+        imageAspectRatio, videoSampleRate, 0, useLegacy, packageDefinitions, &clipWriter))
     {
         fprintf(stderr, "Failed to create Avid MXF clip writer\n");
-        return 1;
+        goto fail;
     }
     
     
-    /* write the data */
+    
+    /* write the essence data */
+    
     done = 0;
     while (!done)
     {
@@ -1474,7 +1529,7 @@ int main(int argc, const char* argv[])
                 if (!start_write_samples(clipWriter, inputs[i].materialTrackID))
                 {
                     fprintf(stderr, "Failed to start writing MJPEG frame\n");
-                    goto abort;
+                    goto fail;
                 }
                 haveImage = 0;
                 while (!haveImage)
@@ -1489,7 +1544,7 @@ int main(int argc, const char* argv[])
                         data, dataSize))
                     {
                         fprintf(stderr, "Failed to write MJPEG frame data\n");
-                        goto abort;
+                        goto fail;
                     }
                 }
                 if (done)
@@ -1499,7 +1554,7 @@ int main(int argc, const char* argv[])
                 if (!end_write_samples(clipWriter, inputs[i].materialTrackID, 1))
                 {
                     fprintf(stderr, "Failed to end writing MJPEG frame\n");
-                    goto abort;
+                    goto fail;
                 }
             }
             else if (inputs[i].essenceType == DVBased25)
@@ -1512,7 +1567,7 @@ int main(int argc, const char* argv[])
                 if (!write_samples(clipWriter, inputs[i].materialTrackID, 1, inputs[i].buffer, inputs[i].frameSize))
                 {
                     fprintf(stderr, "Failed to write DVBased25 frame\n");
-                    goto abort;
+                    goto fail;
                 }
             }
             else if (inputs[i].essenceType == DVBased50)
@@ -1525,7 +1580,7 @@ int main(int argc, const char* argv[])
                 if (!write_samples(clipWriter, inputs[i].materialTrackID, 1, inputs[i].buffer, inputs[i].frameSize))
                 {
                     fprintf(stderr, "Failed to write DVBased50 frame\n");
-                    goto abort;
+                    goto fail;
                 }
             }
             else if (inputs[i].essenceType == DV1080i50 || inputs[i].essenceType == DV720p50)
@@ -1538,7 +1593,7 @@ int main(int argc, const char* argv[])
                 if (!write_samples(clipWriter, inputs[i].materialTrackID, 1, inputs[i].buffer, inputs[i].frameSize))
                 {
                     fprintf(stderr, "Failed to write DV100 frame\n");
-                    goto abort;
+                    goto fail;
                 }
             }
             else if (inputs[i].essenceType == IMX30 ||
@@ -1553,7 +1608,7 @@ int main(int argc, const char* argv[])
                 if (!write_samples(clipWriter, inputs[i].materialTrackID, 1, inputs[i].buffer, inputs[i].frameSize))
                 {
                     fprintf(stderr, "Failed to write IMX frame\n");
-                    goto abort;
+                    goto fail;
                 }
             }
             else if (inputs[i].essenceType == DNxHD720p120 || inputs[i].essenceType == DNxHD720p185 ||
@@ -1569,7 +1624,7 @@ int main(int argc, const char* argv[])
                 if (!write_samples(clipWriter, inputs[i].materialTrackID, 1, inputs[i].buffer, inputs[i].frameSize))
                 {
                     fprintf(stderr, "Failed to write DNxHD frame\n");
-                    goto abort;
+                    goto fail;
                 }
             }
             else if (inputs[i].essenceType == UncUYVY || inputs[i].essenceType == Unc1080iUYVY)
@@ -1582,14 +1637,14 @@ int main(int argc, const char* argv[])
                 if (!write_samples(clipWriter, inputs[i].materialTrackID, 1, inputs[i].buffer, inputs[i].frameSize))
                 {
                     fprintf(stderr, "Failed to write Uncompressed frame\n");
-                    goto abort;
+                    goto fail;
                 }
             }
             else if (inputs[i].essenceType == PCM && !inputs[i].isWAVFile)
             {
                 if (isPAL)
                 {
-                    uint32_t numSamples = inputs[i].frameSize / ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8);
+                    uint32_t numSamples = inputs[i].frameSize / inputs[i].bytesPerSample;
                     if (fread(inputs[i].buffer, 1, inputs[i].frameSize, inputs[i].file) != inputs[i].frameSize)
                     {
                         done = 1;
@@ -1598,26 +1653,70 @@ int main(int argc, const char* argv[])
                     if (!write_samples(clipWriter, inputs[i].materialTrackID, numSamples, inputs[i].buffer, inputs[i].frameSize))
                     {
                         fprintf(stderr, "Failed to write PCM frame\n");
-                        goto abort;
+                        goto fail;
                     }
                 }
                 else
                 {
-                    assert(0); /* TODO */
+                    /* For NTSC we read frame sizes corresponding to the sequence set in
+                    inputs[i].frameSizeSeq. The last frame can be MAX_AUDIO_VARIATION samples
+                    more or less than the average. */ 
+                    
+                    unsigned long availFrameSize;
+                    uint32_t numSamples;
+                    
+                    /* read to get upto the maximum frame size in buffer */
+                    numRead = fread(inputs[i].buffer + inputs[i].bufferOffset, 1, inputs[i].frameSize - inputs[i].bufferOffset, inputs[i].file);
+                    if (inputs[i].bufferOffset + numRead < inputs[i].frameSize)
+                    {
+                        /* last or incomplete frame */
+                        done = 1;
+                        
+                        /* frame is incomplete if it is less than the minimum allowed */ 
+                        if (inputs[i].bufferOffset + numRead < inputs[i].minFrameSize)
+                        {
+                            break;
+                        }
+                        
+                        /* frame size is the remaining samples */
+                        availFrameSize = ((inputs[i].bufferOffset + numRead) / inputs[i].bytesPerSample) * inputs[i].bytesPerSample;
+                    }
+                    else
+                    {
+                        availFrameSize = inputs[i].frameSizeSeq[inputs[i].seqIndex];
+                    }
+
+                    numSamples = availFrameSize / inputs[i].bytesPerSample;
+                    if (!write_samples(clipWriter, inputs[i].materialTrackID, numSamples, inputs[i].buffer, availFrameSize))
+                    {
+                        fprintf(stderr, "Failed to write PCM frame\n");
+                        goto fail;
+                    }
+                    
+                    /* copy the remaining samples for the next frame */
+                    inputs[i].bufferOffset = inputs[i].frameSize - availFrameSize;
+                    memcpy(inputs[i].buffer, inputs[i].buffer + availFrameSize, inputs[i].bufferOffset);
+                    
+                    /* set the next frame size sequence index */
+                    inputs[i].seqIndex = (inputs[i].seqIndex + 1) % 5;
                 }
+                
             }
             else if (inputs[i].essenceType == PCM && inputs[i].isWAVFile)
             {
                 if (isPAL)
                 {
                     uint32_t numSamples;
+                    int channelZeroInput = i - inputs[i].channelIndex;
+                    
                     if (inputs[i].channelIndex == 0)
                     {
+                        /* read a frame of multi-channel audio data */
                         if (!get_wave_data(&inputs[i].wavInput, inputs[i].buffer, 
                             inputs[i].frameSize * inputs[i].wavInput.numAudioChannels, &numRead))
                         {
                             fprintf(stderr, "Failed to read PCM frame\n");
-                            goto abort;
+                            goto fail;
                         }
                         if (numRead != inputs[i].frameSize * inputs[i].wavInput.numAudioChannels)
                         {
@@ -1630,40 +1729,112 @@ int main(int argc, const char* argv[])
                         numRead = inputs[i].frameSize * inputs[i].wavInput.numAudioChannels;
                     }
 
-                    numSamples = (uint32_t)numRead / (inputs[i].wavInput.numAudioChannels  * 
-                        ((inputs[i].essenceInfo.pcmInfo.bitsPerSample + 7) / 8));
+                    numSamples = (uint32_t)numRead / (inputs[i].wavInput.numAudioChannels * inputs[i].bytesPerSample);
                         
-                    get_wave_channel(&inputs[i].wavInput, numRead, inputs[i - inputs[i].channelIndex].buffer, 
+                    /* extract a single channel audio data and write */
+                    get_wave_channel(&inputs[i].wavInput, numRead, inputs[channelZeroInput].buffer, 
                         inputs[i].channelIndex, inputs[i].channelBuffer);
                     if (!write_samples(clipWriter, inputs[i].materialTrackID, numSamples, 
                         inputs[i].channelBuffer, inputs[i].frameSize))
                     {
                         fprintf(stderr, "Failed to write PCM frame\n");
-                        goto abort;
+                        goto fail;
                     }
                 }
                 else
                 {
-                    assert(0); /* TODO */
+                    /* For NTSC we read frame sizes corresponding to the sequence set in
+                    inputs[i].frameSizeSeq. The last frame can be MAX_AUDIO_VARIATION samples
+                    more or less than the average. */ 
+                    
+                    uint32_t numSamples;
+                    int channelZeroInput = i - inputs[i].channelIndex;
+                    
+                    if (inputs[i].channelIndex == 0)
+                    {
+                        /* read a frame of multi-channel audio data */
+                        if (!get_wave_data(&inputs[i].wavInput, inputs[i].buffer + inputs[i].bufferOffset, 
+                            inputs[i].frameSize * inputs[i].wavInput.numAudioChannels - inputs[i].bufferOffset, &numRead))
+                        {
+                            fprintf(stderr, "Failed to read Wave PCM frame\n");
+                            goto fail;
+                        }
+                        
+                        if (inputs[i].bufferOffset + numRead < inputs[i].frameSize * inputs[i].wavInput.numAudioChannels)
+                        {
+                            /* last or incomplete frame */
+                            done = 1;
+                            
+                            /* frame is incomplete if it is less than the minimum allowed */ 
+                            if (inputs[i].bufferOffset + numRead < inputs[i].minFrameSize * inputs[i].wavInput.numAudioChannels)
+                            {
+                                break;
+                            }
+
+                            /* frame size is the remaining samples */
+                            inputs[i].availFrameSize = ((inputs[i].bufferOffset + numRead) / 
+                                (inputs[i].wavInput.numAudioChannels * inputs[i].bytesPerSample)) * 
+                                inputs[i].bytesPerSample;
+                        }
+                        else
+                        {
+                            inputs[i].availFrameSize = inputs[i].frameSizeSeq[inputs[i].seqIndex];
+                        }
+                    }
+                    else
+                    {
+                        inputs[i].availFrameSize = inputs[channelZeroInput].availFrameSize;
+                    }
+
+                    numSamples = inputs[i].availFrameSize / inputs[i].bytesPerSample;
+                        
+                    /* extract a single channel audio data and write */
+                    get_wave_channel(&inputs[i].wavInput, inputs[i].availFrameSize * inputs[i].wavInput.numAudioChannels, 
+                        inputs[channelZeroInput].buffer, inputs[i].channelIndex, inputs[i].channelBuffer);
+                    if (!write_samples(clipWriter, inputs[i].materialTrackID, numSamples, inputs[i].channelBuffer, 
+                        inputs[i].availFrameSize))
+                    {
+                        fprintf(stderr, "Failed to write Wave PCM frame\n");
+                        goto fail;
+                    }
+
+                    /* prepare for the next frame if this is the last channel */
+                    if (inputs[i].channelIndex + 1 >= inputs[i].wavInput.numAudioChannels)
+                    {
+                        /* copy the remaining samples for the next frame */
+                        inputs[channelZeroInput].bufferOffset = (inputs[channelZeroInput].frameSize - inputs[channelZeroInput].availFrameSize) * 
+                            inputs[channelZeroInput].wavInput.numAudioChannels;
+                        memcpy(inputs[channelZeroInput].buffer, inputs[channelZeroInput].buffer + inputs[channelZeroInput].availFrameSize * inputs[channelZeroInput].wavInput.numAudioChannels, 
+                            inputs[channelZeroInput].bufferOffset);
+                        
+                        /* set the next frame size sequence index */
+                        inputs[channelZeroInput].seqIndex = (inputs[channelZeroInput].seqIndex + 1) % 5;
+                    }
                 }
             }
             else
             {
+                /* unknown essence type - code fix needed */
                 assert(0);
             }
         }
     }
+
+
+    /* complete writing */
     
     if (!complete_writing(&clipWriter))
     {
         fprintf(stderr, "Failed to complete writing\n");
-        goto abort;
+        goto fail;
     }
+
     
-    /* free package definitions */
+    
+    /* free and close */
+    
     free_package_definitions(&packageDefinitions);
     
-    /* close the input files */
     for (i = 0; i < inputIndex; i++)
     {
         if (inputs[i].isWAVFile)
@@ -1692,17 +1863,23 @@ int main(int argc, const char* argv[])
         }
     }    
 
-    
+
     return 0;
 
     
-abort:
-    abort_writing(&clipWriter, 1);
-
-    /* free package definitions */
-    free_package_definitions(&packageDefinitions);
+fail:
+    /* abort, free and close and return 1 */
     
-    /* close the input files */
+    if (clipWriter != NULL)
+    {
+        abort_writing(&clipWriter, 1);
+    }
+
+    if (packageDefinitions != NULL)
+    {
+        free_package_definitions(&packageDefinitions);
+    }
+    
     for (i = 0; i < inputIndex; i++)
     {
         if (inputs[i].isWAVFile)
