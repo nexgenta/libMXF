@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.6 2008/09/16 17:20:13 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.7 2008/09/24 13:36:06 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -481,6 +481,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         
     
     mxf_generate_uuid(&thisGeneration);
+    mxf_get_timestamp_now(&clipWriter->now);
 
     roundedTimecodeBase = (uint16_t)((float)clipWriter->projectEditRate.numerator / 
         clipWriter->projectEditRate.denominator + 0.5);
