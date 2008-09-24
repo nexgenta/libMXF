@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.4 2008/07/08 15:17:18 philipn Exp $
+ * $Id: test_write_archive_mxf.c,v 1.5 2008/09/24 17:29:57 philipn Exp $
  *
  * 
  *
@@ -98,7 +98,7 @@ static void create_tone(unsigned char* pcmBuffer, int bufferSize)
     for (i = 0; i < bufferSize; i += 3)
     {
         (*pcmBufferPtr++) = 0; 
-        (*pcmBufferPtr++) = 64 + ((i / 3) % 10) / 10.0f * 128.0f; 
+        (*pcmBufferPtr++) = (unsigned char)(64 + ((i / 3) % 10) / 10.0f * 128.0f); 
         (*pcmBufferPtr++) = 0; 
     }
 }
@@ -267,7 +267,7 @@ int main(int argc, const char* argv[])
         {
             vtrErrors[numVTRErrors].vitcTimecode = vitc;
             vtrErrors[numVTRErrors].ltcTimecode = ltc;
-            vtrErrors[numVTRErrors].errorCode = 1 + numVTRErrors % 0xfe;
+            vtrErrors[numVTRErrors].errorCode = (uint8_t)(1 + numVTRErrors % 0xfe);
             if (i % 10 == 0)
             {
                 /* invalidate the VITC */

@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.4 2008/07/08 15:17:19 philipn Exp $
+ * $Id: write_archive_mxf.c,v 1.5 2008/09/24 17:29:57 philipn Exp $
  *
  * 
  *
@@ -353,12 +353,14 @@ static void convert_timecode_to_12m(ArchiveTimecode* t, uint8_t* t12m)
 
 static int64_t getPosition(int64_t videoPosition, const mxfRational* targetEditRate)
 {
+    double factor;
+
     if (memcmp(targetEditRate, &g_videoEditRate, sizeof(mxfRational)) == 0)
     {
         return videoPosition;
     }
 
-    double factor = targetEditRate->numerator * g_videoEditRate.denominator / 
+    factor = targetEditRate->numerator * g_videoEditRate.denominator / 
         (double)(targetEditRate->denominator * g_videoEditRate.numerator);
     return (int64_t)(videoPosition * factor + 0.5);        
 }
@@ -585,8 +587,8 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     int64_t filePos;
     mxfUUID uuid;
     int i;
-    uint32_t videoTrackNum = MXF_UNC_TRACK_NUM(0x00, 0x00, 0x00);
-    uint32_t audioTrackNum = MXF_AES3BWF_TRACK_NUM(0x00, 0x00, 0x00);
+    uint32_t videoTrackNum;
+    uint32_t audioTrackNum;
     uint32_t deltaOffset;
 #define NAME_BUFFER_SIZE 256
     char cNameBuffer[NAME_BUFFER_SIZE];
@@ -598,6 +600,8 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     CHK_ORET(numAudioTracks <= MAX_ARCHIVE_AUDIO_TRACKS);
     
     set_null_infax_data(&nullInfaxData);
+    videoTrackNum = MXF_UNC_TRACK_NUM(0x00, 0x00, 0x00);
+    audioTrackNum = MXF_AES3BWF_TRACK_NUM(0x00, 0x00, 0x00);
 
     CHK_MALLOC_ORET(newOutput, ArchiveMXFWriter);
     memset(newOutput, 0, sizeof(ArchiveMXFWriter));
@@ -1882,7 +1886,7 @@ int64_t get_archive_mxf_content_package_size(int numAudioTracks)
 
 #define PARSE_STRING(member, size, beStrict) \
 { \
-    int cpySize = endField - startField; \
+    int cpySize = (int)(endField - startField); \
     if (cpySize < 0) \
     { \
         mxf_log(MXF_ELOG, "invalid infax string field" LOG_LOC_FORMAT, LOG_LOC_PARAMS); \
@@ -1931,7 +1935,7 @@ int64_t get_archive_mxf_content_package_size(int numAudioTracks)
 { \
     if (endField - startField > 0) \
     { \
-        CHK_ORET(sscanf(startField, "%"PRIi64"", &member) == 1); \
+        CHK_ORET(sscanf(startField, "%"PFi64"", &member) == 1); \
     } \
     else \
     { \

@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info.c,v 1.3 2008/05/07 15:21:57 philipn Exp $
+ * $Id: d3_mxf_info.c,v 1.4 2008/09/24 17:29:57 philipn Exp $
  *
  * 
  *
@@ -28,7 +28,6 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #include <archive_types.h>
 #include <mxf/mxf.h>
@@ -56,10 +55,6 @@ typedef struct
     wchar_t* versionString;
     mxfTimestamp modificationDate;
 } WriterIdentification;
-
-typedef struct
-{
-} TimecodeReader;
 
 typedef struct
 {
@@ -252,7 +247,7 @@ static void report_actual_frame_count(Reader* reader)
         if (reader->headerPartition->footerPartition == 0 ||
             essenceStartPos + frameCount * reader->contentPackageLen < (int64_t)reader->headerPartition->footerPartition)
         {
-            mxf_log(MXF_WLOG, "%"PRId64" complete frames are present in the MXF file\n", frameCount);
+            mxf_log(MXF_WLOG, "%"PFi64" complete frames are present in the MXF file\n", frameCount);
         }
         else
         {

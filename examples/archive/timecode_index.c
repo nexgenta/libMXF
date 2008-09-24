@@ -1,5 +1,5 @@
 /*
- * $Id: timecode_index.c,v 1.1 2007/09/11 13:24:46 stuart_hc Exp $
+ * $Id: timecode_index.c,v 1.2 2008/09/24 17:29:57 philipn Exp $
  *
  * 
  *
@@ -67,10 +67,10 @@ static int64_t timecode_to_position(const ArchiveTimecode* timecode)
 
 static void position_to_timecode(int64_t position, ArchiveTimecode* timecode)
 {
-    timecode->hour = position / (60 * 60 * 25);
-    timecode->min = (position % (60 * 60 * 25)) / (60 * 25);
-    timecode->sec = ((position % (60 * 60 * 25)) % (60 * 25)) / 25;
-    timecode->frame = ((position % (60 * 60 * 25)) % (60 * 25)) % 25;
+    timecode->hour = (uint8_t)(position / (60 * 60 * 25));
+    timecode->min = (uint8_t)((position % (60 * 60 * 25)) / (60 * 25));
+    timecode->sec = (uint8_t)(((position % (60 * 60 * 25)) % (60 * 25)) / 25);
+    timecode->frame = (uint8_t)(((position % (60 * 60 * 25)) % (60 * 25)) % 25);
 }
 
 static int move_timecode_index_searcher(TimecodeIndexSearcher* searcher, int64_t position)

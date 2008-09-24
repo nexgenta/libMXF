@@ -1,5 +1,5 @@
 /*
- * $Id: update_archive_mxf.c,v 1.1 2008/07/08 15:17:16 philipn Exp $
+ * $Id: update_archive_mxf.c,v 1.2 2008/09/24 17:29:57 philipn Exp $
  *
  * Update an archive MXF file with new filename and LTO Infax data
  *
@@ -57,6 +57,7 @@ int main(int argc, const char* argv[])
     const char* ltoMXFFilename = NULL;
     const char* mxfFilename = NULL;
     int cmdlnIndex = 1;
+    InfaxData infaxData;
     
 
     while (cmdlnIndex + 1 < argc)
@@ -112,8 +113,6 @@ int main(int argc, const char* argv[])
     mxfFilename = argv[cmdlnIndex];
     cmdlnIndex++;
     
-    
-    InfaxData infaxData;
     
     if (!parse_infax_data(infaxString, &infaxData, 1))
     {
