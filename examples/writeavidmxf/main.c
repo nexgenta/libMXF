@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.5 2008/09/23 12:45:22 philipn Exp $
+ * $Id: main.c,v 1.6 2008/09/24 09:17:08 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -422,10 +422,10 @@ static int get_wave_data(WAVInput* input, unsigned char* buffer, size_t dataSize
 static void get_wave_channel(WAVInput* input, size_t dataSize, unsigned char* buffer, 
     int channelIndex, unsigned char* channelBuffer)
 {
-    int i;
+    size_t i;
     int j;
     int channelOffset = channelIndex * input->bytesPerSample;
-    int numSamples = dataSize / input->nBlockAlign;
+    size_t numSamples = dataSize / input->nBlockAlign;
     
     for (i = 0; i < numSamples; i++)
     {
@@ -1679,7 +1679,7 @@ int main(int argc, const char* argv[])
                         }
                         
                         /* frame size is the remaining samples */
-                        availFrameSize = ((inputs[i].bufferOffset + numRead) / inputs[i].bytesPerSample) * inputs[i].bytesPerSample;
+                        availFrameSize = ((inputs[i].bufferOffset + (uint32_t)numRead) / inputs[i].bytesPerSample) * inputs[i].bytesPerSample;
                     }
                     else
                     {
@@ -1772,7 +1772,7 @@ int main(int argc, const char* argv[])
                             }
 
                             /* frame size is the remaining samples */
-                            inputs[i].availFrameSize = ((inputs[i].bufferOffset + numRead) / 
+                            inputs[i].availFrameSize = ((inputs[i].bufferOffset + (uint32_t)numRead) / 
                                 (inputs[i].wavInput.numAudioChannels * inputs[i].bytesPerSample)) * 
                                 inputs[i].bytesPerSample;
                         }
