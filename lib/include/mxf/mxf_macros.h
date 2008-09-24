@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_macros.h,v 1.3 2008/05/07 15:22:22 philipn Exp $
+ * $Id: mxf_macros.h,v 1.4 2008/09/24 17:28:15 philipn Exp $
  *
  * General purpose macros
  *
@@ -87,8 +87,11 @@ extern "C"
 /*
 * 64-bit printf formatting
 */
-
-#if defined(__x86_64__)
+#if defined(_MSC_VER)
+#define PFi64 "I64d"
+#define PFu64 "I64u"
+#define PFoff "I64d"
+#elif defined(__x86_64__)
 #define PFi64 "ld"
 #define PFu64 "lu"
 #define PFoff "ld"
