@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.6 2008/09/24 09:17:08 philipn Exp $
+ * $Id: main.c,v 1.7 2008/09/25 14:11:38 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -545,6 +545,73 @@ static int parse_umid(const char* umidStr, mxfUMID* umid)
     return 1;
 }
 
+int parse_timecode(const char* timecodeStr, int isPAL, int64_t* frameCount)
+{
+    int result;
+    int hour, min, sec, frame;
+    int roundedTimecodeBase;
+    const char* checkPtr;
+    
+    roundedTimecodeBase = (isPAL) ? 25 : 30;
+    
+    /* drop frame timecode */
+    result = sscanf(timecodeStr, "d%d:%d:%d:%d", &hour, &min, &sec, &frame);
+    if (result == 4)
+    {
+        *frameCount = hour * 60 * 60 * roundedTimecodeBase + 
+            min * 60 * roundedTimecodeBase +
+            sec * roundedTimecodeBase +
+            frame;
+                
+        if (isPAL)
+        {
+            /* no drop frame */
+            return 1;
+        }
+        
+        /* first 2 frame numbers shall be omitted at the start of each minute,
+           except minutes 0, 10, 20, 30, 40 and 50 */
+
+        /* add frames omitted */
+        *frameCount += (60 - 6) * 2 * hour; /* every whole hour */
+        *frameCount += (min / 10) * 9 * 2; /* every whole 10 min */
+        *frameCount += (min % 10) * 2; /* every whole min, except min 0 */
+
+        return 1;
+    }
+    
+    /* non-drop frame timecode */
+    result = sscanf(timecodeStr, "%d:%d:%d:%d", &hour, &min, &sec, &frame);
+    if (result == 4)
+    {
+        *frameCount = hour * 60 * 60 * roundedTimecodeBase + 
+            min * 60 * roundedTimecodeBase +
+            sec * roundedTimecodeBase +
+            frame;
+        return 1;
+    }
+    
+    /* frame count */
+    result = sscanf(timecodeStr, "%"PFi64"", frameCount);
+    if (result == 1)
+    {
+        /* make sure it was a number */
+        checkPtr = timecodeStr;
+        while (*checkPtr != 0)
+        {
+            if (*checkPtr < '0' || *checkPtr > '9')
+            {
+                return 0;
+            }
+            checkPtr++;
+        }
+        
+        return 1;
+    }
+    
+    return 0;
+}
+
 static void usage(const char* cmd)
 {
     fprintf(stderr, "Usage: %s <<options>> <<inputs>>\n", cmd);
@@ -560,7 +627,7 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --aspect <ratio>           video aspect ratio x:y. Default is 4:3\n");
     fprintf(stderr, "  --comment <string>         add 'Comments' user comment to material package\n");
     fprintf(stderr, "  --desc <string>            add 'Descript' user comment to material package\n");
-    fprintf(stderr, "  --start-tc <count>         set the start timecode to given count of video frames\n");
+    fprintf(stderr, "  --start-tc <timecode>      set the start timecode. Default is 0 frames\n");
     fprintf(stderr, "  --mp-uid <umid>            set the Material Package UMID. Default is autogen\n");
     fprintf(stderr, "  --mp-created <timestamp>   set the Material Package creation date. Default is now\n");
     fprintf(stderr, "  --tp-uid <umid>            set the tape Source Package UMID. Default is autogen\n");
@@ -589,6 +656,7 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --wavpcm <filename>        raw 48kHz PCM audio contained in a WAV file\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "\n");
+    fprintf(stderr, "<timecode> format is a frame count or d?hh:mm:ss:ff (optional 'd' indicates drop frame)\n");
     fprintf(stderr, "<umid> format is [0-9a-fA-F]{64}, a sequence of 32 hexadecimal bytes\n");
     fprintf(stderr, "<timestamp> format is YYYY-MM-DDThh:mm:ss:qm where qm is in units of 1/250th second\n");
 }
@@ -633,6 +701,7 @@ int main(int argc, const char* argv[])
     int64_t videoStartPosition = 0; 
     mxfRational projectEditRate;
     int64_t tapeLen;
+    const char* startTimecodeStr = NULL;
     
     memset(inputs, 0, sizeof(Input) * MAX_INPUTS);
     mxf_get_timestamp_now(&materialPackageCreated);
@@ -748,20 +817,13 @@ int main(int argc, const char* argv[])
         }
         else if (strcmp(argv[cmdlnIndex], "--start-tc") == 0)
         {
-            int result;
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            if ((result = sscanf(argv[cmdlnIndex + 1], "%"PFi64"", &videoStartPosition)) != 1 ||
-                videoStartPosition < 0)
-            {
-                usage(argv[0]);
-                fprintf(stderr, "Failed to accept --start-tc integer value '%s'\n", argv[cmdlnIndex + 1]);
-                return 1;
-            }
+            startTimecodeStr = argv[cmdlnIndex + 1];
             cmdlnIndex += 2;
         }
         else if (strcmp(argv[cmdlnIndex], "--mp-uid") == 0)
@@ -1229,6 +1291,18 @@ int main(int argc, const char* argv[])
         fprintf(stderr, "No inputs\n");
         return 1;
     }
+    
+    /* parse the start timecode now that we know whether it is PAL or NTSC */
+    if (startTimecodeStr != NULL)
+    {
+        if (!parse_timecode(startTimecodeStr, isPAL, &videoStartPosition))
+        {
+            usage(argv[0]);
+            fprintf(stderr, "Failed to accept --start-tc timecode value '%s'\n", startTimecodeStr);
+            return 1;
+        }
+    }
+
 
     /* default the clip name to prefix if clip name not specified */
     if (clipName == NULL)
