@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.8 2008/09/25 14:53:35 philipn Exp $
+ * $Id: main.c,v 1.9 2008/09/26 09:01:21 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -845,7 +845,9 @@ int main(int argc, const char* argv[])
             else
             {
                 uctIndex = 0;
-                while (uctIndex < MAX_USER_COMMENT_TAGS && userCommentTags[uctIndex].name != NULL)
+                while (uctIndex < MAX_USER_COMMENT_TAGS && 
+                    userCommentTags[uctIndex].name != NULL &&
+                    strcmp(userCommentTags[uctIndex].name, argv[cmdlnIndex + 1]) != 0)
                 {
                     uctIndex++;
                 }
