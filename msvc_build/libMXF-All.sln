@@ -28,6 +28,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "updatearchivemxf", "example
 		{40B453EE-C662-42C8-8ACF-5D3EFC6A58F9} = {40B453EE-C662-42C8-8ACF-5D3EFC6A58F9}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "avidmxfinfo", "examples\avidmxfinfo\avidmxfinfo.vcproj", "{B366FAC9-B5EB-4660-B198-FB896BDF56C7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{580F8E65-F910-46A6-8A9C-6A8E58D95E53} = {580F8E65-F910-46A6-8A9C-6A8E58D95E53}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -58,6 +63,10 @@ Global
 		{B9A703EB-2547-412E-A0CF-61E3DF198BA1}.Debug.Build.0 = Debug|Win32
 		{B9A703EB-2547-412E-A0CF-61E3DF198BA1}.Release.ActiveCfg = Release|Win32
 		{B9A703EB-2547-412E-A0CF-61E3DF198BA1}.Release.Build.0 = Release|Win32
+		{B366FAC9-B5EB-4660-B198-FB896BDF56C7}.Debug.ActiveCfg = Debug|Win32
+		{B366FAC9-B5EB-4660-B198-FB896BDF56C7}.Debug.Build.0 = Debug|Win32
+		{B366FAC9-B5EB-4660-B198-FB896BDF56C7}.Release.ActiveCfg = Release|Win32
+		{B366FAC9-B5EB-4660-B198-FB896BDF56C7}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection
