@@ -634,7 +634,10 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
             /* some Avid files have a weak reference to a DataDefinition instead of a UL */ 
             if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef) && !mxf_is_timecode(&dataDef))
             {
-                mxf_avid_get_data_def(headerMetadata, (mxfUUID*)&dataDef, &dataDef);
+                if (!mxf_avid_get_data_def(headerMetadata, (mxfUUID*)&dataDef, &dataDef))
+                {
+                    continue;
+                }
             }
             
             /* skip non-video and audio tracks */
@@ -721,7 +724,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
         tracksStringPtr += strLen;
         remSize -= strLen;
     }
-    if (numVideoTrackNumberRanges > 0 && numAudioTrackNumberRanges)
+    if (numVideoTrackNumberRanges > 0 && numAudioTrackNumberRanges > 0)
     {
 #if defined(_MSC_VER)
         strLen = _snprintf(tracksStringPtr, remSize, " ");
@@ -757,7 +760,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     {
         set = (MXFMetadataSet*)mxf_get_iter_element(&listIter);
         
-        /* the physical source package is the source package that references a TapeDescriptor */
+        /* the physical source package is the source package that references a physical descriptor */
         if (mxf_have_item(set, &MXF_ITEM_K(SourcePackage, Descriptor)))
         {
             /* NOTE/TODO: some descriptors could be dark and so we don't assume we can dereference */
@@ -806,7 +809,18 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
         mxf_uu_next_track(headerMetadata, &arrayIter, &trackSet))
     {
         /* skip tracks that are not picture or sound */
-        DCHECK(mxf_uu_get_track_datadef(trackSet, &dataDef)); 
+        DCHECK(mxf_uu_get_track_datadef(trackSet, &dataDef));
+        
+        /* some Avid files have a weak reference to a DataDefinition instead of a UL */ 
+        if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef) && !mxf_is_timecode(&dataDef))
+        {
+            if (!mxf_avid_get_data_def(headerMetadata, (mxfUUID*)&dataDef, &dataDef))
+            {
+                continue;
+            }
+        }
+        
+        
         if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef))
         {
             continue;
@@ -835,10 +849,20 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
         
         /* find the timecode component in the physical source package and calculate the start timecode */
         DCHECK(mxf_uu_get_package_tracks(refSourcePackageSet, &iter3));
-        while (mxf_uu_next_track(refSourcePackageSet->headerMetadata, &iter3, &trackSet))
+        while (mxf_uu_next_track(headerMetadata, &iter3, &trackSet))
         {
             /* skip non-timecode tracks */
-            DCHECK(mxf_uu_get_track_datadef(trackSet, &dataDef)); 
+            DCHECK(mxf_uu_get_track_datadef(trackSet, &dataDef));
+            
+            /* some Avid files have a weak reference to a DataDefinition instead of a UL */ 
+            if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef) && !mxf_is_timecode(&dataDef))
+            {
+                if (!mxf_avid_get_data_def(headerMetadata, (mxfUUID*)&dataDef, &dataDef))
+                {
+                    continue;
+                }
+            }
+            
             if (!mxf_is_timecode(&dataDef))
             {
                 continue;
@@ -1133,7 +1157,7 @@ void ami_print_info(AvidMXFInfo* info)
     {
         printf("Audio sampling rate = %d/%d\n", info->audioSamplingRate.numerator, info->audioSamplingRate.denominator);
         printf("Channel count = %d\n", info->channelCount);
-        printf("quantization bits = %d\n", info->quantizationBits);
+        printf("Quantization bits = %d\n", info->quantizationBits);
     }
     if (info->userComments != NULL)
     {
