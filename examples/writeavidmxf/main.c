@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.9 2008/09/26 09:01:21 philipn Exp $
+ * $Id: main.c,v 1.10 2008/10/08 09:41:11 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -1458,8 +1458,7 @@ int main(int argc, const char* argv[])
             }
             else
             {
-                fprintf(stderr, "Uncompressed NTSC not yet implemented\n");
-                return 1;
+                inputs[i].frameSize = 720 * 486 * 2;
             }
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
