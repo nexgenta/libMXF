@@ -2,7 +2,6 @@ INCLUDES_DIR = ./include
 MXF_DIR = ./mxf
 PRODUCTS_DIR = ./products
 UTILS_DIR = ./utils
-METADATA_DIR = ./metadata
 MXF_INSTALL_PREFIX ?= /usr/local
 
 # we turn off checking for unused parameters (-Wno-unused-parameter) because we have
@@ -27,11 +26,7 @@ OBJS = $(MXF_DIR)/mxf_version.o \
 	$(PRODUCTS_DIR)/mxf_avid_metadict_blob.o \
 	$(PRODUCTS_DIR)/mxf_p2.o \
 	$(UTILS_DIR)/mxf_uu_metadata.o \
-	$(UTILS_DIR)/mxf_page_file.o \
-	$(METADATA_DIR)/mxf_descriptor.o \
-	$(METADATA_DIR)/mxf_package.o \
-	$(METADATA_DIR)/mxf_track.o \
-	$(METADATA_DIR)/mxf_structural_component.o
+	$(UTILS_DIR)/mxf_page_file.o
 
 INCLUDE_FILES = $(INCLUDES_DIR)/mxf/mxf_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_header_metadata.h \
@@ -54,8 +49,7 @@ INCLUDE_FILES = $(INCLUDES_DIR)/mxf/mxf_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_avid_labels_and_keys.h \
 	$(INCLUDES_DIR)/mxf/mxf_p2.h \
 	$(INCLUDES_DIR)/mxf/mxf_p2_extensions_data_model.h \
-	$(INCLUDES_DIR)/mxf/mxf_uu_metadata.h \
-	$(INCLUDES_DIR)/mxf/mxf_metadata.h
+	$(INCLUDES_DIR)/mxf/mxf_uu_metadata.h
 
 
 
@@ -121,18 +115,6 @@ $(UTILS_DIR)/mxf_page_file.o: $(UTILS_DIR)/mxf_page_file.c $(INCLUDE_FILES)
 	$(CC) -c -I$(INCLUDES_DIR) $(UTILS_DIR)/mxf_page_file.c -o $(UTILS_DIR)/mxf_page_file.o 
 
 
-$(METADATA_DIR)/mxf_descriptor.o: $(METADATA_DIR)/mxf_descriptor.c $(INCLUDE_FILES)
-	$(CC) -c -I$(METADATA_DIR) -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_descriptor.c -o $(METADATA_DIR)/mxf_descriptor.o 
-
-$(METADATA_DIR)/mxf_package.o: $(METADATA_DIR)/mxf_package.c $(INCLUDE_FILES)
-	$(CC) -c -I$(METADATA_DIR) -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_package.c -o $(METADATA_DIR)/mxf_package.o 
-
-$(METADATA_DIR)/mxf_track.o: $(METADATA_DIR)/mxf_track.c $(INCLUDE_FILES)
-	$(CC) -c -I$(METADATA_DIR) -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_track.c -o $(METADATA_DIR)/mxf_track.o 
-
-$(METADATA_DIR)/mxf_structural_component.o: $(METADATA_DIR)/mxf_structural_component.c $(INCLUDE_FILES)
-	$(CC) -c -I$(METADATA_DIR) -I$(INCLUDES_DIR) $(METADATA_DIR)/mxf_structural_component.c -o $(METADATA_DIR)/mxf_structural_component.o 
-
 
 
 .PHONY: install
@@ -153,4 +135,4 @@ clean:
 	@cd $(MXF_DIR) && rm -f *~ *.o 
 	@cd $(PRODUCTS_DIR) && rm -f *~ *.o 
 	@cd $(UTILS_DIR) && rm -f *~ *.o 
-	@cd $(METADATA_DIR) && rm -f *~ *.o 
+

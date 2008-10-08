@@ -203,9 +203,6 @@
 				RelativePath="..\..\lib\include\mxf\mxf_macros.h">
 			</File>
 			<File
-				RelativePath="..\..\lib\metadata\mxf_metadata_int.h">
-			</File>
-			<File
 				RelativePath="..\..\lib\include\mxf\mxf_p2.h">
 			</File>
 			<File
