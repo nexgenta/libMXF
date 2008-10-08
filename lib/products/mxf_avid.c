@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.3 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_avid.c,v 1.4 2008/10/08 09:34:21 philipn Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -732,5 +732,31 @@ int mxf_avid_read_string_user_comments(MXFMetadataSet* packageSet, MXFList** nam
     return mxf_avid_read_package_string_tagged_values(packageSet, &MXF_ITEM_K(GenericPackage, UserComments), names, values);
 }
 
+int mxf_avid_get_mob_attribute(const mxfUTF16Char* name, const MXFList* names, const MXFList* values, const mxfUTF16Char** value)
+{
+    MXFListIterator namesIter;
+    MXFListIterator valuesIter;
+    const mxfUTF16Char* listName;
+    
+    mxf_initialise_list_iter(&namesIter, names);
+    mxf_initialise_list_iter(&valuesIter, values);
+    while (mxf_next_list_iter_element(&namesIter) && mxf_next_list_iter_element(&valuesIter))
+    {
+        listName = (const mxfUTF16Char*)mxf_get_iter_element(&namesIter);
+
+        if (wcscmp(name, listName) == 0)
+        {
+            *value = (const mxfUTF16Char*)mxf_get_iter_element(&valuesIter);
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
+int mxf_avid_get_user_comment(const mxfUTF16Char* name, const MXFList* names, const MXFList* values, const mxfUTF16Char** value)
+{
+    return mxf_avid_get_mob_attribute(name, names, values, value);
+}
 
 
