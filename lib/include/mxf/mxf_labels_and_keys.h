@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.3 2008/02/07 16:40:24 john_f Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.4 2008/10/08 09:35:27 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -281,6 +281,12 @@ static const mxfUL MXF_EC_L(DVBased_100_720_50_P_ClipWrapped) =
 
 #define MXF_UNC_EC_L(regver, byte15, byte16) \
     MXF_GENERIC_CONTAINER_LABEL(regver, 0x02, 0x05, byte15, byte16)
+
+static const mxfUL MXF_EC_L(SD_Unc_525_60i_422_135_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x01, 0x01);
+
+static const mxfUL MXF_EC_L(SD_Unc_525_60i_422_135_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x01, 0x02);
 
 static const mxfUL MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped) = 
     MXF_UNC_EC_L(0x01, 0x01, 0x05);
