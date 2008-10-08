@@ -1,7 +1,5 @@
 #
-# $Id: Makefile,v 1.3 2008/10/08 09:38:51 philipn Exp $
-#
-# Makefile for building examples directory
+# $Id: Makefile,v 1.1 2008/10/08 09:38:51 philipn Exp $
 #
 # Copyright (C) 2006  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
 #
@@ -20,45 +18,39 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 #
+TOPLEVEL = ../..
+include $(TOPLEVEL)/vars.mk
+
 
 .PHONY: all
-all:
-	$(MAKE) -C writeavidmxf $@
-	$(MAKE) -C writeaviddv50 $@
-	$(MAKE) -C transfertop2 $@
-	$(MAKE) -C archive $@
-	$(MAKE) -C reader $@
-	$(MAKE) -C avidmxfinfo $@
+all: avidmxfinfo
+
+
+$(LIBMXF_DIR)/libMXF.a:
+	$(MAKE) -C $(LIBMXF_DIR)
+
+main.o: main.c avid_mxf_info.h
+	$(CC) $(CFLAGS) -c main.c
+
+avid_mxf_info.o: avid_mxf_info.c avid_mxf_info.h
+	$(CC) $(CFLAGS) -c avid_mxf_info.c
+
+avidmxfinfo: main.o $(LIBMXF_DIR)/libMXF.a avid_mxf_info.o
+	$(CC) main.o avid_mxf_info.o -L$(LIBMXF_DIR) -lMXF $(UUIDLIB) -o $@
+
 
 .PHONY: install
 install: all
-	$(MAKE) -C writeavidmxf $@
-	$(MAKE) -C archive $@
-	$(MAKE) -C reader $@
-	$(MAKE) -C avidmxfinfo $@
+	cp avidmxfinfo $(MXF_INSTALL_PREFIX)/bin/
 
 .PHONY: clean
 clean:
-	@rm -f *~
-	$(MAKE) -C writeavidmxf $@
-	$(MAKE) -C writeaviddv50 $@
-	$(MAKE) -C transfertop2 $@
-	$(MAKE) -C archive $@
-	$(MAKE) -C reader $@
-	$(MAKE) -C avidmxfinfo $@
+	@rm -f *~ *.o avidmxfinfo
 
 .PHONY: check
-check: all
-	$(MAKE) -C writeavidmxf $@
-	$(MAKE) -C writeaviddv50 $@
-	$(MAKE) -C archive $@
-	$(MAKE) -C reader $@
-	$(MAKE) -C avidmxfinfo $@
+check: avidmxfinfo
+	./test_avidmxfinfo.sh
 
 .PHONY: valgrind-check
-valgrind-check: all
-	$(MAKE) -C writeavidmxf $@
-	$(MAKE) -C writeaviddv50 $@
-	$(MAKE) -C archive $@
-	$(MAKE) -C reader $@
-	$(MAKE) -C avidmxfinfo $@
+valgrind-check: avidmxfinfo
+	./test_avidmxfinfo.sh --valgrind
