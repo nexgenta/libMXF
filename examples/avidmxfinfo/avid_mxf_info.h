@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.h,v 1.1 2008/10/08 09:38:51 philipn Exp $
+ * $Id: avid_mxf_info.h,v 1.2 2008/10/10 16:50:49 john_f Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -22,6 +22,12 @@
  
 #ifndef __AVID_MXF_INFO_H__
 #define __AVID_MXF_INFO_H__
+
+
+#ifdef __cplusplus
+extern "C" 
+{
+#endif
 
 
 #include <mxf/mxf_types.h>
@@ -134,6 +140,11 @@ void ami_free_info(AvidMXFInfo* info);
 void ami_print_info(AvidMXFInfo* info);
 /* TODO: add function to print machine readable info e.g. newline delimited fields */
 
+
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif

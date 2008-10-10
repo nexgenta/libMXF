@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 2008/10/08 09:38:51 philipn Exp $
+# $Id: Makefile,v 1.2 2008/10/10 16:50:49 john_f Exp $
 #
 # Copyright (C) 2006  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
 #
@@ -23,20 +23,24 @@ include $(TOPLEVEL)/vars.mk
 
 
 .PHONY: all
-all: avidmxfinfo
+all: libavidmxfinfo.a avidmxfinfo
 
 
 $(LIBMXF_DIR)/libMXF.a:
 	$(MAKE) -C $(LIBMXF_DIR)
 
+	
 main.o: main.c avid_mxf_info.h
 	$(CC) $(CFLAGS) -c main.c
 
 avid_mxf_info.o: avid_mxf_info.c avid_mxf_info.h
 	$(CC) $(CFLAGS) -c avid_mxf_info.c
 
-avidmxfinfo: main.o $(LIBMXF_DIR)/libMXF.a avid_mxf_info.o
-	$(CC) main.o avid_mxf_info.o -L$(LIBMXF_DIR) -lMXF $(UUIDLIB) -o $@
+libavidmxfinfo.a: avid_mxf_info.o
+	$(AR) libavidmxfinfo.a avid_mxf_info.o
+
+avidmxfinfo: main.o $(LIBMXF_DIR)/libMXF.a libavidmxfinfo.a
+	$(CC) main.o -L. -lavidmxfinfo -L$(LIBMXF_DIR) -lMXF $(UUIDLIB) -o $@
 
 
 .PHONY: install
@@ -45,7 +49,7 @@ install: all
 
 .PHONY: clean
 clean:
-	@rm -f *~ *.o avidmxfinfo
+	@rm -f *~ *.a *.o avidmxfinfo
 
 .PHONY: check
 check: avidmxfinfo
