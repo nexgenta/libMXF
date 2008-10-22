@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.3 2008/05/07 15:21:53 philipn Exp $
+# $Id: Makefile,v 1.4 2008/10/22 09:32:19 john_f Exp $
 #
 # Makefile for building archive examples
 #
@@ -25,7 +25,7 @@ include $(TOPLEVEL)/vars.mk
 
 
 .PHONY: all
-all: test_timecode_index test_mxf_page_file write info test
+all: test_timecode_index write info test
 
 .PHONY: write
 write:
@@ -52,12 +52,6 @@ test_timecode_index.o: test_timecode_index.c archive_types.h
 timecode_index.o: timecode_index.c timecode_index.h archive_types.h
 	$(CC) $(CFLAGS) -c timecode_index.c
 
-test_mxf_page_file: $(LIBMXF_DIR)/libMXF.a test_mxf_page_file.o
-	$(CC) test_mxf_page_file.o -L$(LIBMXF_DIR) -lMXF $(UUIDLIB) -o $@
-
-test_mxf_page_file.o: test_mxf_page_file.c
-	$(CC) $(CFLAGS) -c test_mxf_page_file.c
-
 
 .PHONY: install
 install:
@@ -67,7 +61,7 @@ install:
 
 .PHONY: clean
 clean:
-	@rm -f *.o *~ test_timecode_index test_mxf_page_file
+	@rm -f *.o *~ test_timecode_index
 	$(MAKE) -C write $@
 	$(MAKE) -C info $@
 	$(MAKE) -C test $@
@@ -76,10 +70,9 @@ clean:
 check: all
 	$(MAKE) -C write $@
 	./test_timecode_index
-	./test_mxf_page_file
 
 .PHONY: valgrind-check
 valgrind-check: all
 	$(MAKE) -C write $@
 	valgrind ./test_timecode_index
-	valgrind ./test_mxf_page_file
+

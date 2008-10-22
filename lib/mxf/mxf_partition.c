@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_partition.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_partition.c,v 1.3 2008/10/22 09:32:19 john_f Exp $
  *
  * MXF file partitions
  *
@@ -28,7 +28,13 @@
 #include <mxf/mxf.h>
 
 
+#define ZEROS_BUFFER_SIZE       1024
+
+
 static const mxfKey g_PartitionPackPrefix_key = MXF_PP_KEY(0x01, 0x00, 0x00);
+
+static const unsigned char zeros[ZEROS_BUFFER_SIZE] = {0};
+
 
 
 static void free_partition_in_list(void* data)
@@ -44,6 +50,24 @@ static void free_partition_in_list(void* data)
     mxf_free_partition(&tmpPartition);
 }
 
+static int write_zeros(MXFFile* mxfFile, int64_t fillSize)
+{
+    int64_t completeCount = fillSize / ZEROS_BUFFER_SIZE;
+    uint32_t partialCount = (uint32_t)(fillSize % ZEROS_BUFFER_SIZE);
+    int64_t i;
+    
+    for (i = 0; i < completeCount; i++)
+    {
+        CHK_ORET(mxf_file_write(mxfFile, zeros, ZEROS_BUFFER_SIZE) == ZEROS_BUFFER_SIZE);
+    }
+    
+    if (partialCount > 0)
+    {
+        CHK_ORET(mxf_file_write(mxfFile, zeros, partialCount) == partialCount);
+    }
+ 
+    return 1;
+}
 
 
 int mxf_is_header_partition_pack(const mxfKey* key)
@@ -445,7 +469,6 @@ int mxf_fill_to_kag(MXFFile* mxfFile,  MXFPartition* partition)
 {
     int64_t filePos;
     uint64_t relativeFilePos;
-    int64_t i;
     int64_t fillSize;
     uint8_t llen;
         
@@ -483,10 +506,7 @@ int mxf_fill_to_kag(MXFFile* mxfFile,  MXFPartition* partition)
         fillSize -= llen;
         
         CHK_ORET(mxf_write_l(mxfFile, fillSize));
-        for (i = 0; i < fillSize; i++)
-        {
-            CHK_ORET(mxf_file_putc(mxfFile, 0) == 0);
-        }
+        CHK_ORET(write_zeros(mxfFile, fillSize));
     }
     
     return 1;
@@ -496,7 +516,6 @@ int mxf_fill_to_position(MXFFile* mxfFile, uint64_t position)
 {
     int64_t filePos;
     int64_t fillSize;
-    int64_t i;
     uint8_t llen;
     
     CHK_ORET((filePos = mxf_file_tell(mxfFile)) >= 0);
@@ -516,10 +535,7 @@ int mxf_fill_to_position(MXFFile* mxfFile, uint64_t position)
     fillSize -= llen;
 
     CHK_ORET(mxf_write_l(mxfFile, fillSize));
-    for (i = 0; i < fillSize; i++)
-    {
-        CHK_ORET(mxf_file_putc(mxfFile, 0) == 0);
-    }
+    CHK_ORET(write_zeros(mxfFile, fillSize));
     
     return 1;
 }
@@ -527,7 +543,6 @@ int mxf_fill_to_position(MXFFile* mxfFile, uint64_t position)
 int mxf_allocate_space(MXFFile* mxfFile, uint32_t size)
 {
     int64_t fillSize;
-    int64_t i;
     uint8_t llen;
     
     CHK_ORET(size >= (uint32_t)(mxf_get_min_llen(mxfFile) + mxfKey_extlen));
@@ -540,10 +555,7 @@ int mxf_allocate_space(MXFFile* mxfFile, uint32_t size)
     fillSize -= llen;
 
     CHK_ORET(mxf_write_l(mxfFile, fillSize));
-    for (i = 0; i < fillSize; i++)
-    {
-        CHK_ORET(mxf_file_putc(mxfFile, 0) == 0);
-    }
+    CHK_ORET(write_zeros(mxfFile, fillSize));
     
     return 1;
 }

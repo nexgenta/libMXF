@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_page_file.c,v 1.3 2008/09/15 13:45:17 philipn Exp $
+ * $Id: mxf_page_file.c,v 1.4 2008/10/22 09:32:19 john_f Exp $
  *
  * 
  *
@@ -38,6 +38,22 @@
 #include <mxf/mxf.h>
 #include <mxf/mxf_page_file.h>
 
+#if defined(_WIN32)
+#if !defined(_MSC_VER) || (_MSC_VER < 1400)
+/* use low-level file I/O */
+#define USE_LOW_LEVEL_IO 1
+#else
+/* 64-bit ftell and fseek were introduced in Visual C++ 2005 */
+#define fseeko _fseeki64
+#define ftello _ftelli64
+#define fstat64 _fstati64
+#define USE_STATI64 1
+#endif
+#else
+#define fstat64 fstat
+#endif
+
+
 
 #define MAX_FILE_DESCRIPTORS        32
 
@@ -58,7 +74,7 @@ typedef struct FileDescriptor
     
     struct Page* page;
     
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     int fileId;
 #else
     FILE* file;
@@ -104,7 +120,7 @@ struct MXFFileSysData
 
 static void disk_file_close(FileDescriptor* fileDesc)
 {
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     if (fileDesc->fileId >= 0)
     {
         close(fileDesc->fileId);
@@ -121,25 +137,25 @@ static void disk_file_close(FileDescriptor* fileDesc)
 
 static uint32_t disk_file_read(FileDescriptor* fileDesc, uint8_t* data, uint32_t count)
 {
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     return read(fileDesc->fileId, data, count);
 #else
-    return fread(data, 1, count, fileDesc->file);
+    return (uint32_t)fread(data, 1, count, fileDesc->file);
 #endif
 }
 
 static uint32_t disk_file_write(FileDescriptor* fileDesc, const uint8_t* data, uint32_t count)
 {
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     return write(fileDesc->fileId, data, count);
 #else
-    return fwrite(data, 1, count, fileDesc->file);
+    return (uint32_t)fwrite(data, 1, count, fileDesc->file);
 #endif
 }
 
 static int disk_file_seek(FileDescriptor* fileDesc, int64_t offset, int whence)
 {
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     return _lseeki64(fileDesc->fileId, offset, whence) != -1;
 #else
     return fseeko(fileDesc->file, offset, whence) == 0;
@@ -173,7 +189,7 @@ static int64_t disk_file_size(const char* filename)
 
 static int open_file(MXFFileSysData* sysData, Page* page)
 {
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     int newFile = -1;
 #else
     FILE* newFile = NULL;
@@ -258,7 +274,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
     switch (sysData->mode)
     {
         case READ_MODE:
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
             newFile = open(filename, _O_BINARY | _O_RDONLY);
 #else
             newFile = fopen(filename, "rb");
@@ -267,7 +283,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
         case WRITE_MODE:
             if (!page->wasOpenedBefore)
             {
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
                 newFile = open(filename, _O_BINARY | _O_RDWR | _O_CREAT | _O_TRUNC, _S_IREAD | _S_IWRITE);
 #else
                 newFile = fopen(filename, "w+b");
@@ -275,7 +291,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
             }
             else
             {
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
                 newFile = open(filename, _O_BINARY | _O_RDWR);
 #else
                 newFile = fopen(filename, "r+b");
@@ -283,7 +299,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
             }
             break;
         case MODIFY_MODE:
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
             newFile = open(filename, _O_BINARY | _O_RDWR);
             if (newFile < 0)
             {
@@ -298,7 +314,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
 #endif
             break;
     }
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     if (newFile < 0)
 #else
     if (newFile == NULL)
@@ -311,7 +327,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
     /* create the new file descriptor */
     CHK_MALLOC_OFAIL(newFileDescriptor, FileDescriptor);
     memset(newFileDescriptor, 0, sizeof(*newFileDescriptor));
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     newFileDescriptor->fileId = newFile;
     newFile = -1;
 #else
@@ -340,7 +356,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
     return 1;
     
 fail:
-#if defined(_WIN32)
+#if defined(USE_LOW_LEVEL_IO)
     if (newFile >= 0)
     {
         close(newFile);
@@ -1013,7 +1029,11 @@ int mxf_page_file_forward_truncate(MXFPageFile* mxfPageFile)
         /* truncate the file to zero length */
         sprintf(filename, sysData->filenameTemplate, sysData->pages[i].index);
 
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(_MSC_VER)
+        /* WIN32 does not have truncate() so open the file with _O_TRUNC then close it */
+        if ((fileid = _open(filename, _O_CREAT | _O_TRUNC, _S_IWRITE)) == -1 ||
+            _close(fileid) == -1)
+#elif defined(_WIN32)
         /* WIN32 does not have truncate() so open the file with _O_TRUNC then close it */
         if ((fileid = open(filename, _O_CREAT | _O_TRUNC, _S_IWRITE)) == -1 ||
             close(fileid) == -1)

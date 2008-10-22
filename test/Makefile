@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.2 2008/05/07 15:22:28 philipn Exp $
+# $Id: Makefile,v 1.3 2008/10/22 09:32:19 john_f Exp $
 #
 # Makefile for building and running tests
 #
@@ -25,15 +25,18 @@
 all:
 	$(MAKE) -C MXFDump
 	$(MAKE) -C test_lib
+	$(MAKE) -C test_utils
 
 .PHONY: check
 check:
 	$(MAKE) -C MXFDump
 	$(MAKE) -C test_lib $@
+	$(MAKE) -C test_utils $@
 
 .PHONY: clean
 clean:
 	@rm -f *~
 	$(MAKE) -C MXFDump $@
 	$(MAKE) -C test_lib $@
+	$(MAKE) -C test_utils $@
 
