@@ -1,5 +1,5 @@
 /*
- * $Id: writeaviddv50.c,v 1.2 2008/05/07 15:22:13 philipn Exp $
+ * $Id: writeaviddv50.c,v 1.3 2008/10/24 19:14:07 john_f Exp $
  *
  * Example showing how to create Avid supported MXF OP-Atom files containing DV-50 
  *
@@ -33,10 +33,6 @@ static const mxfUUID g_WrapDV50ProductUID_uuid =
     {0x86, 0x78, 0xf7, 0x50, 0x59, 0x4d, 0x42, 0x2a, 0x98, 0x49, 0x66, 0x7a, 0xc0, 0xee, 0xfa, 0xe0};
 
     
-static const mxfUL MXF_EE_K(DVClipWrapped) = 
-    MXF_DV_EE_K(0x01, 0x02, 0x01);
-
-
     
 /*
  * Write DV-50 essence data to an MXF Op Atom file

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.2 2008/02/06 16:58:54 john_f Exp $
+ * $Id: mxf_opatom_reader.c,v 1.3 2008/10/24 19:14:07 john_f Exp $
  *
  * MXF OP-Atom reader
  *
@@ -33,15 +33,6 @@
 #include <mxf/mxf_uu_metadata.h>
 
 
-static const mxfUL MXF_EC_L(AvidMJPEGClipWrapped) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x01, 0x00, 0x00};
-
-static const mxfKey MXF_EE_K(AvidMJPEGEssenceElement) =
-    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x01, 0x01};
-
-static const mxfKey MXF_EE_K(DNxHD) =
-    MXF_DNXHD_PICT_EE_K(0x00, 0x06, 0x00)
-    
 
 /* TODO: handle frame size sequences for audio */
 
@@ -62,7 +53,7 @@ struct _EssenceReaderData
 
 static int is_avid_mjpeg_essence_element(const mxfKey* key)
 {
-    return mxf_equals_key_prefix(key, &MXF_EE_K(AvidMJPEGEssenceElement), 13) && key->octet14 == 0x01;
+    return mxf_equals_key_prefix(key, &MXF_EE_K(AvidMJPEGClipWrapped), 13) && key->octet14 == 0x01;
 }
 
 static int is_avid_dnxhd_essence_element(const mxfKey* key)

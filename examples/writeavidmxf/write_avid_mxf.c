@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.8 2008/10/08 09:41:11 philipn Exp $
+ * $Id: write_avid_mxf.c,v 1.9 2008/10/24 19:14:07 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -193,84 +193,13 @@ static const mxfUTF16Char* g_mxfIdentCompanyName = L"BBC Research";
 static const mxfUTF16Char* g_mxfIdentProductName = L"Avid MXF Writer";
 static const mxfUTF16Char* g_mxfIdentVersionString = L"Beta version";
 
-static const mxfKey MXF_EE_K(DVClipWrapped) = 
-    MXF_DV_EE_K(0x01, MXF_DV_CLIP_WRAPPED_EE_TYPE, 0x01);
     
-static const mxfKey MXF_EE_K(BWFClipWrapped) = 
-    MXF_AES3BWF_EE_K(0x01, MXF_BWF_CLIP_WRAPPED_EE_TYPE, 0x01);
-
-/* Avid MJPEG labels observed in files created by Media Composer 2.1.x */
-    /* CompressionId's */
-static const mxfUL MXF_CMDEF_L(AvidMJPEG21) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x08};
-static const mxfUL MXF_CMDEF_L(AvidMJPEG31) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x06};
-static const mxfUL MXF_CMDEF_L(AvidMJPEG101) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x04};
-static const mxfUL MXF_CMDEF_L(AvidMJPEG101m) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x04, 0x02};
-static const mxfUL MXF_CMDEF_L(AvidMJPEG151s) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x02, 0x02};
-static const mxfUL MXF_CMDEF_L(AvidMJPEG201) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x02, 0x01, 0x02, 0x01, 0x01, 0x02};
-
-    /* EssenceContainer label */
-static const mxfUL MXF_EC_L(AvidMJPEGClipWrapped) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x01, 0x00, 0x00};
-
-static const mxfUL g_AvidAAFKLVEssenceContainer_ul = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x01, 0x01, 0xff, 0x4b, 0x46, 0x41, 0x41, 0x00, 0x0d, 0x4d, 0x4f};
-    
-static const uint32_t g_AvidMJPEG21_ResolutionID = 0x4c;    /* 76 */
-static const uint32_t g_AvidMJPEG31_ResolutionID = 0x4d;    /* 77 */
-static const uint32_t g_AvidMJPEG101_ResolutionID = 0x4b;   /* 75 */
-static const uint32_t g_AvidMJPEG101m_ResolutionID = 0x6e;  /* 110 */
-static const uint32_t g_AvidMJPEG151s_ResolutionID = 0x4e;  /* 78 */
-static const uint32_t g_AvidMJPEG201_ResolutionID = 0x52;   /* 82 */
-
-static const mxfKey MXF_EE_K(AvidMJPEGClipWrapped) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x01, 0x01};
-
-/* IMX (D10) labels observed in files by Media Composer 2.6 */
-static const mxfKey MXF_EE_K(IMX) = MXF_D10_PICTURE_EE_K(0x01);
-
-  /* To be identical to the Avid don't use MXF_EC_L(D10_50_625_50_picture_only)
-     etc since they use regver=2 while Avid uses regver=1 */
-static const mxfUL MXF_EC_L(IMX30) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x05, 0x7f};
-static const mxfUL MXF_EC_L(IMX40) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x03, 0x7f};
-static const mxfUL MXF_EC_L(IMX50) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x01, 0x7f};
-
-/* DV100 labels observed in files by Media Composer 2.6 */
-static const mxfUL MXF_EC_L(DV1080i50ClipWrapped) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x02, 0x61, 0x02};
-static const mxfUL MXF_CMDEF_L(DV1080i50) =
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x04, 0x01, 0x02, 0x02, 0x02, 0x02, 0x06, 0x00};
-static const mxfKey MXF_EE_K(DV1080i50) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x18, 0x01, 0x02, 0x01};
-
-/* DV100 720p50 is not supported by Media Composer 2.6, labels found in P2 created media */
-static const mxfUL MXF_EC_L(DV720p50ClipWrapped) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x02, 0x63, 0x02};
-static const mxfUL MXF_CMDEF_L(DV720p50) =
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x04, 0x01, 0x02, 0x02, 0x02, 0x02, 0x08, 0x00};
-static const mxfKey MXF_EE_K(DV720p50) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x18, 0x01, 0x02, 0x01};
-
-static const mxfKey MXF_EE_K(DNxHD) =
-    MXF_DNXHD_PICT_EE_K(0x01, 0x06, 0x01)
-
 /* 15 = GC Picture, 01 = element count=1, 01 = Avid JFIF, 01 = element number=1 */
 static const uint32_t g_AvidMJPEGTrackNumber = 0x15010101;
 
 /* 15 = GC Picture, 01 = element count=1, 06 = DNxHD, 01 = element number=1 */
 static const uint32_t g_DNxHDTrackNumber = 0x15010601;
 
-
-static const mxfKey MXF_EE_K(UncClipWrapped) = 
-    MXF_UNC_EE_K(0x01, MXF_UNC_CLIP_WRAPPED_EE_TYPE, 0x01);
 
 static const uint32_t g_uncImageAlignmentOffset = 8192;
 
@@ -1144,7 +1073,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     switch (filePackage->essenceType)
     {
         case AvidMJPEG:
-            newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
+            newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
             if (clipWriter->projectFormat == PAL_25i)
             {
                 newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidMJPEGClipWrapped);
@@ -1385,7 +1314,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             break;
         case DV1080i50:
         case DV720p50:
-            newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
+            newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
             newTrackWriter->videoLineMap[0] = 21;
             newTrackWriter->videoLineMap[1] = 584;
             newTrackWriter->videoLineMapLen = 2;
@@ -1488,7 +1417,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
         case DNxHD1080p185:
         case DNxHD720p120:
         case DNxHD720p185:
-            newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
+            newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
             newTrackWriter->videoLineMap[0] = 21;
             newTrackWriter->videoLineMap[1] = 584;
             newTrackWriter->videoLineMapLen = 2;
@@ -1597,7 +1526,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
         case UncUYVY:
             /* TODO: check whether the same thing must be done as MJPEG regarding the ess container label 
             in the descriptor */
-            newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
+            newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
             if (clipWriter->projectFormat == PAL_25i)
             {
                 newTrackWriter->essenceContainerLabel = MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped);
@@ -1669,7 +1598,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
         case Unc1080iUYVY:
-            newTrackWriter->cdciEssenceContainerLabel = g_AvidAAFKLVEssenceContainer_ul;
+            newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
             if (clipWriter->projectFormat == PAL_25i)
             {
                 newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped);

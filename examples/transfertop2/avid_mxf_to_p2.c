@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_to_p2.c,v 1.2 2007/09/11 13:24:48 stuart_hc Exp $
+ * $Id: avid_mxf_to_p2.c,v 1.3 2008/10/24 19:14:07 john_f Exp $
  *
  * Transfers Avid MXF files to P2
  *
@@ -69,12 +69,6 @@ static const uint64_t g_p2_fixedStartByteOffset = 32768;
 /* 32768 = 32620 + size(BodyPP) + size(essence element KL) = 32620 + 124 + 24 */
 static const uint64_t g_p2_fixedBodyPPOffset = 32620; 
 
-
-static const mxfUL MXF_EE_K(DVClipWrapped) = 
-    MXF_DV_EE_K(0x01, 0x02, 0x01);
-
-static const mxfUL MXF_EE_K(AES3ClipWrapped) = 
-    MXF_AES3BWF_EE_K(0x01, 0x04, 0x01);
 
 
 /* buffer size must be >= max frame size */

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.2 2008/02/06 16:58:54 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.3 2008/10/24 19:14:07 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -38,9 +38,6 @@
 /* System item used in the BBC D3 preservation project. The system item contains a 
    local set item which has an array of 2 timecodes, VITC followed by LTC */
 static const mxfKey g_SysItemElementKey1 = MXF_SS1_ELEMENT_KEY(0x01, 0x00);
-
-static const mxfUL MXF_EC_L(AvidMJPEGClipWrapped) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x01, 0x00, 0x00};
 
 
 static void convert_12m_to_timecode(uint8_t* t12m, int* isDropFrame, 
