@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.3 2008/10/24 19:14:07 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.4 2008/10/29 17:54:26 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -194,7 +194,8 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_625_50_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_625_50_extended_template)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_625_50_picture_only)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_625_50_picture_only)) ||
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX50)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 304 * 2;
@@ -220,7 +221,8 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_625_50_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_625_50_extended_template)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_625_50_picture_only)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_625_50_picture_only)) ||
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX40)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 304 * 2;
@@ -246,7 +248,8 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_625_50_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_625_50_extended_template)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_625_50_picture_only)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_625_50_picture_only)) ||
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX30)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 304 * 2;

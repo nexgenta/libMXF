@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.3 2008/10/24 19:14:07 john_f Exp $
+ * $Id: mxf_opatom_reader.c,v 1.4 2008/10/29 17:54:26 john_f Exp $
  *
  * MXF OP-Atom reader
  *
@@ -253,6 +253,33 @@ static int get_avid_mjpeg_frame_info(MXFReader* reader, int64_t frameNumber, int
     *frameSize = reader->essenceReader->data->avidFrameOffsets[frameNumber + 1] - *offset;
     
     return 1;
+}
+
+static int read_avid_imx_frame_size(MXFReader* reader, int64_t* frameSize)
+{
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    MXFIndexTableSegment* segment = NULL;
+
+    while (1)
+    {
+        CHK_ORET(mxf_read_next_nonfiller_kl(reader->mxfFile, &key, &llen, &len));
+        if (mxf_is_index_table_segment(&key))
+        {
+            CHK_ORET(mxf_read_index_table_segment(reader->mxfFile, len, &segment));
+            *frameSize = segment->editUnitByteCount;
+            
+            mxf_free_index_table_segment(&segment);
+            return 1;
+        }
+        else
+        {
+            CHK_ORET(mxf_skip(reader->mxfFile, len));
+        }
+    }
+    
+    return 0;
 }
 
 static int process_metadata(MXFReader* reader, MXFPartition* partition)
@@ -738,6 +765,12 @@ int opa_is_supported(MXFPartition* headerPartition)
     {
         return 1;
     }
+    else if (mxf_equals_ul(label, &MXF_EC_L(AvidIMX30)) ||
+        mxf_equals_ul(label, &MXF_EC_L(AvidIMX40)) ||
+        mxf_equals_ul(label, &MXF_EC_L(AvidIMX50)))
+    {
+        return 1;
+    }
 
         
     
@@ -789,6 +822,17 @@ int opa_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
         CHK_OFAIL((filePos = mxf_file_tell(mxfFile)) >= 0);
         CHK_OFAIL(read_avid_mjpeg_index_segment(reader));
         CHK_OFAIL(mxf_file_seek(mxfFile, filePos, SEEK_SET));    
+    }
+    
+    /* read the Avid IMX's index table edit unit byte count to set the frame size */
+    
+    if (mxf_equals_ul(&MXF_EC_L(AvidIMX30), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
+        mxf_equals_ul(&MXF_EC_L(AvidIMX40), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
+        mxf_equals_ul(&MXF_EC_L(AvidIMX50), &get_mxf_track(reader, 0)->essenceContainerLabel))
+    {
+        CHK_OFAIL((filePos = mxf_file_tell(mxfFile)) >= 0);
+        CHK_OFAIL(read_avid_imx_frame_size(reader, &essenceTrack->frameSize));
+        CHK_OFAIL(mxf_file_seek(mxfFile, filePos, SEEK_SET));
     }
     
     

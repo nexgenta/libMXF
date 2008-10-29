@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.4 2008/05/07 15:21:46 philipn Exp $
+ * $Id: package_definitions.h,v 1.5 2008/10/29 17:54:26 john_f Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -39,12 +39,13 @@ extern "C"
 typedef enum
 {
     AvidMJPEG,
+    IECDV25,
     DVBased25,
     DVBased50,
     DV1080i50,
-    DV1080i60,
+    /* DV1080i60, not yet supported */
     DV720p50,
-    DV720p60,
+    /* DV720p60, not yet supported */
     IMX30,
     IMX40,
     IMX50,
@@ -126,7 +127,7 @@ typedef struct _PackageDefinitions
     Package* materialPackage;
     MXFList fileSourcePackages;
     Package* tapeSourcePackage; 
-    // user comments are attached to the material package
+    /* user comments are attached to the material package */
     MXFList userComments;
 } PackageDefinitions;
 

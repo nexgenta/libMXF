@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.2 2008/05/07 15:22:10 philipn Exp $
+# $Id: Makefile,v 1.3 2008/10/29 17:54:26 john_f Exp $
 #
 # Makefile for building MXF reader library
 #
@@ -70,8 +70,8 @@ clean:
 
 .PHONY: check
 check: all
-	./test_mxf_reader ../writeavidmxf/test_dv25_v1.mxf /dev/null
+	./test_mxf_reader ../writeavidmxf/test_unc_v1.mxf /dev/null
 
 .PHONY: valgrind-check
 valgrind-check: all
-	valgrind ./test_mxf_reader ../writeavidmxf/test_dv25_v1.mxf /dev/null
+	valgrind ./test_mxf_reader ../writeavidmxf/test_unc_v1.mxf /dev/null

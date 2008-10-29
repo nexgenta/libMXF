@@ -1,5 +1,5 @@
 /*
- * $Id: test_avidp2transfer.cpp,v 1.2 2007/09/11 13:24:48 stuart_hc Exp $
+ * $Id: test_avidp2transfer.cpp,v 1.3 2008/10/29 17:54:26 john_f Exp $
  *
  * Tests transfer of MXF files referenced in an Avid AAF composition to P2
  *
@@ -128,7 +128,7 @@ int main(int argc, const char* argv[])
     {
         AvidP2Transfer transfer(filename, test_progress, NULL, prefix, omitDriveColon);
 
-        printf("Estimated total storage size = %llu bytes\n", transfer.totalStorageSizeEstimate);
+        printf("Estimated total storage size = %"PFu64" bytes\n", transfer.totalStorageSizeEstimate);
         
         vector<APTTrackInfo>::const_iterator iter;
         for (iter = transfer.trackInfo.begin(); iter != transfer.trackInfo.end(); iter++)
@@ -143,10 +143,10 @@ int main(int argc, const char* argv[])
                 printf("    Type = Sound\n");
             }
             printf("    Name = '%s'\n", (*iter).name.c_str());
-            printf("    CompositionMob track length = (%d/%d) %lld\n",
+            printf("    CompositionMob track length = (%d/%d) %"PFi64"\n",
                 (*iter).compositionEditRate.numerator, (*iter).compositionEditRate.denominator,
                 (*iter).compositionTrackLength);
-            printf("    SourceMob track length = (%d/%d) %lld\n", 
+            printf("    SourceMob track length = (%d/%d) %"PFi64"\n", 
                 (*iter).sourceEditRate.numerator, (*iter).sourceEditRate.denominator,
                 (*iter).sourceTrackLength);
         }

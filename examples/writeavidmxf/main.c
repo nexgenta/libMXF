@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.10 2008/10/08 09:41:11 philipn Exp $
+ * $Id: main.c,v 1.11 2008/10/29 17:54:26 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -37,6 +37,9 @@
 
 #define MAX_USER_COMMENT_TAGS   64
 
+
+#define DV_DIF_BLOCK_SIZE           80
+#define DV_DIF_SEQUENCE_SIZE        (150 * DV_DIF_BLOCK_SIZE)
 
 
 typedef struct
@@ -98,6 +101,7 @@ typedef struct
 typedef struct
 {
     EssenceType essenceType;
+    int isDV;
     int isVideo;
     int trackNumber;
     uint32_t materialTrackID;
@@ -112,6 +116,10 @@ typedef struct
     unsigned char* buffer;
     int bufferOffset;
 
+    /* DV input parameters */
+    int isPAL;
+    mxfRational imageAspectRatio;
+    
     /* used when writing MJPEG */    
     MJPEGState mjpegState;
 
@@ -130,6 +138,136 @@ static const unsigned char FMT_ID[4] = {'f', 'm', 't', ' '};
 static const unsigned char BEXT_ID[4] = {'b', 'e', 'x', 't'};
 static const unsigned char DATA_ID[4] = {'d', 'a', 't', 'a'};
 static const uint16_t WAVE_FORMAT_PCM = 0x0001;
+
+
+
+static int get_dv_stream_info(const char* filename, Input* input)
+{
+    FILE* inputFile;
+    unsigned char buffer[DV_DIF_SEQUENCE_SIZE];
+    size_t result;
+    unsigned char byte;
+    int isIEC;
+    
+    inputFile = fopen(filename, "rb");
+    if (inputFile == NULL)
+    {
+        fprintf(stderr, "%s: Failed to open DV file\n", filename);
+        return 0;
+    }
+    
+    result = fread(buffer, DV_DIF_SEQUENCE_SIZE, 1, inputFile);
+    fclose(inputFile);
+    if (result != 1)
+    {
+        fprintf(stderr, "%s: Failed to read first DV DIF sequence from DV file\n", filename);
+        return 0;
+    }
+    
+    
+    /* check section ids */
+    if ((buffer[0] & 0xe0) != 0x00 || /* header */
+        (buffer[DV_DIF_BLOCK_SIZE] & 0xe0) != 0x20 || /* subcode */
+        (buffer[3 * DV_DIF_BLOCK_SIZE] & 0xe0) != 0x40 || /* vaux */
+        (buffer[6 * DV_DIF_BLOCK_SIZE] & 0xe0) != 0x60 || /* audio */
+        (buffer[15 * DV_DIF_BLOCK_SIZE] & 0xe0) != 0x80) /* video */
+    {
+        fprintf(stderr, "%s: File is not a DV file\n", filename);
+        return 0;
+    }
+    
+    /* check video and vaux section are transmitted */
+    if (buffer[6] & 0x80)
+    {
+        fprintf(stderr, "%s: No video in DV file\n", filename);
+        return 0;
+    }
+    
+    
+    /* IEC/DV is extracted from the APT in byte 4 */
+    byte = buffer[4];
+    if (byte & 0x03) /* DV-based if APT all 001 or all 111 */
+    {
+        isIEC = 0;
+    }
+    else
+    {
+        isIEC = 1;
+    }
+
+
+    /* 525/625 is extracted from the DSF in byte 3 */
+    byte = buffer[3];
+    if (byte & 0x80)
+    {
+        input->isPAL = 1;
+    }
+    else
+    {
+        input->isPAL  = 0;
+    }
+    
+    /* aspect ratio is extracted from the VAUX section, VSC pack, DISP bits */
+    byte = buffer[3 * DV_DIF_BLOCK_SIZE + 2 * DV_DIF_BLOCK_SIZE + 3 + 10 * 5 + 2];
+    if ((byte & 0x07) == 0x02)
+    {
+        input->imageAspectRatio.numerator = 16;
+        input->imageAspectRatio.denominator = 9;
+    }
+    else
+    {
+        /* either byte & 0x07 == 0x00 or we default to 4:3 */
+        input->imageAspectRatio.numerator = 4;
+        input->imageAspectRatio.denominator = 3;
+    }
+    
+    
+    /* mbps is extracted from the VAUX section, VS pack, STYPE bits */
+    byte = buffer[3 * DV_DIF_BLOCK_SIZE + 2 * DV_DIF_BLOCK_SIZE + 3 + 9 * 5 + 3];
+    byte &= 0x1f;
+    if (byte == 0x00)
+    {
+        if (isIEC)
+        {
+            input->essenceType = IECDV25;
+        }
+        else
+        {
+            input->essenceType = DVBased25;
+        }
+    }
+    else if (byte == 0x04)
+    {
+        input->essenceType = DVBased50;
+    }
+    else if (byte == 0x14)
+    {
+        if (!input->isPAL)
+        {
+            fprintf(stderr, "%s: DV 100 1080i 60 not yet supported\n", filename);     
+            return 0;
+        }
+        input->essenceType = DV1080i50;
+    }
+    else if (byte == 0x15)
+    {
+        if (!input->isPAL)
+        {
+            fprintf(stderr, "%s: DV 100 720p 60 not yet supported\n", filename);     
+            return 0;
+        }
+        input->essenceType = DV720p50;
+    }
+    else
+    {
+        fprintf(stderr, "%s: Unknown DV bit rate\n", filename);     
+        return 0;
+    }
+    
+    
+    input->isDV = 1;
+    return 1;
+}
 
 
 /* TODO: have a problem if start-of-frame marker not found directly after end-of-frame */
@@ -629,9 +767,9 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --clip <name>              clip (MaterialPackage) name.\n");
     fprintf(stderr, "  --project <name>           Avid project name.\n");
     fprintf(stderr, "  --tape <name>              tape name.\n");
-    fprintf(stderr, "  --ntsc                     NTSC. Default is PAL\n");
+    fprintf(stderr, "  --ntsc                     NTSC. Default is DV file frame rate or PAL\n");
     fprintf(stderr, "  --nolegacy                 don't use the legacy definitions\n");
-    fprintf(stderr, "  --aspect <ratio>           video aspect ratio x:y. Default is 4:3\n");
+    fprintf(stderr, "  --aspect <ratio>           video aspect ratio x:y. Default is DV file aspect ratio or 4:3\n");
     fprintf(stderr, "  --comment <string>         add 'Comments' user comment to the MaterialPackage\n");
     fprintf(stderr, "  --desc <string>            add 'Descript' user comment to the MaterialPackage\n");
     fprintf(stderr, "  --tag <name> <string>      add <name> user comment to the MaterialPackage. Option can be used multiple times\n");
@@ -643,10 +781,7 @@ static void usage(const char* cmd)
     fprintf(stderr, "Inputs:\n");
     fprintf(stderr, "  --mjpeg <filename>         Avid MJPEG\n");
     fprintf(stderr, "       --res <resolution>    Resolution '2:1' (default), '3:1', '10:1', '10:1m', '15:1s' or '20:1'\n");
-    fprintf(stderr, "  --dv25 <filename>          DV-based 25 Mbps\n");
-    fprintf(stderr, "  --dv50 <filename>          DV-based 50 Mbps\n");
-    fprintf(stderr, "  --dv1080i50 <filename>     DV 100 Mbps 1080i50 (SMPTE 370M)\n");
-    fprintf(stderr, "  --dv720p50 <filename>      DV 100 Mbps 720p50 (not specified in SMPTE 370M)\n");
+    fprintf(stderr, "  --dv <filename>            IEC DV 25, DV-based 25 / 50, DV 100 1080i50 / 720p50 (SMPTE 370M)\n");
     fprintf(stderr, "  --IMX30 <filename>         IMX 30 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
     fprintf(stderr, "  --IMX40 <filename>         IMX 40 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
     fprintf(stderr, "  --IMX50 <filename>         IMX 50 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
@@ -677,12 +812,12 @@ int main(int argc, const char* argv[])
     const char* projectName = NULL;
     const char* clipName = NULL;
     const char* tapeName = NULL;
-    int isPAL = 1;
+    int isPAL = -1;
     Input inputs[MAX_INPUTS];
     int inputIndex = 0;
     int cmdlnIndex = 1;
-    mxfRational imageAspectRatio = {4, 3};
-    mxfRational videoSampleRate = {25, 1};
+    mxfRational imageAspectRatio = {0, 0};
+    mxfRational videoSampleRate = {0, 0};
     mxfRational audioSampleRate = {48000, 1};
     int numAudioTracks = 0;
     int i;
@@ -777,8 +912,6 @@ int main(int argc, const char* argv[])
         else if (strcmp(argv[cmdlnIndex], "--ntsc") == 0)
         {
             isPAL = 0;
-            videoSampleRate.numerator = 30000;
-            videoSampleRate.denominator = 1001;
             cmdlnIndex++;
         }
         else if (strcmp(argv[cmdlnIndex], "--nolegacy") == 0)
@@ -1000,7 +1133,7 @@ int main(int argc, const char* argv[])
             }
             cmdlnIndex += 2;
         }
-        else if (strcmp(argv[cmdlnIndex], "--dv25") == 0)
+        else if (strcmp(argv[cmdlnIndex], "--dv") == 0)
         {
             if (cmdlnIndex + 1 >= argc)
             {
@@ -1008,53 +1141,12 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
+            
             inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = DVBased25;
-            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
-            inputs[inputIndex].trackNumber = ++videoTrackNumber;
-            inputIndex++;
-            cmdlnIndex += 2;
-        }
-        else if (strcmp(argv[cmdlnIndex], "--dv50") == 0)
-        {
-            if (cmdlnIndex + 1 >= argc)
+            if (!get_dv_stream_info(argv[cmdlnIndex + 1], &inputs[inputIndex]))
             {
-                usage(argv[0]);
-                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = DVBased50;
-            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
-            inputs[inputIndex].trackNumber = ++videoTrackNumber;
-            inputIndex++;
-            cmdlnIndex += 2;
-        }
-        else if (strcmp(argv[cmdlnIndex], "--dv1080i50") == 0)
-        {
-            if (cmdlnIndex + 1 >= argc)
-            {
-                usage(argv[0]);
-                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
-                return 1;
-            }
-            inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = DV1080i50;
-            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
-            inputs[inputIndex].trackNumber = ++videoTrackNumber;
-            inputIndex++;
-            cmdlnIndex += 2;
-        }
-        else if (strcmp(argv[cmdlnIndex], "--dv720p50") == 0)
-        {
-            if (cmdlnIndex + 1 >= argc)
-            {
-                usage(argv[0]);
-                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
-                return 1;
-            }
-            inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = DV720p50;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
             inputIndex++;
@@ -1340,6 +1432,62 @@ int main(int argc, const char* argv[])
         return 1;
     }
     
+    /* set isPAL and check it doesn't clash with the DV frame rate */
+    if (isPAL < 0)
+    {
+        for (i = 0; i < inputIndex; i++)
+        {
+            if (inputs[i].isDV)
+            {
+                isPAL = inputs[i].isPAL;
+                break;
+            }
+        }
+        if (isPAL < 0)
+        {
+            isPAL = 1;
+        }
+    }
+    for (i = 0; i < inputIndex; i++)
+    {
+        if (inputs[i].isDV && inputs[i].isPAL != isPAL)
+        {
+            fprintf(stderr, "Frame rate of '%s' (%s) does not correspond to project format (%s)\n", 
+                inputs[i].filename, inputs[i].isPAL ? "PAL" : "NTSC", isPAL ? "PAL" : "NTSC");
+            return 1;
+        }
+    }
+
+    /* set the video sample rate */
+    if (isPAL)
+    {
+        videoSampleRate.numerator = 25;
+        videoSampleRate.denominator = 1;
+    }
+    else /* NTSC */
+    {
+        videoSampleRate.numerator = 30000;
+        videoSampleRate.denominator = 1001;
+    }
+
+    /* set the imageAspectRatio */
+    if (imageAspectRatio.numerator == 0 || imageAspectRatio.denominator == 0)
+    {
+        for (i = 0; i < inputIndex; i++)
+        {
+            if (inputs[i].isDV)
+            {
+                imageAspectRatio = inputs[i].imageAspectRatio;
+                break;
+            }
+        }
+        if (imageAspectRatio.numerator == 0 || imageAspectRatio.denominator == 0)
+        {
+            imageAspectRatio.numerator = 4;
+            imageAspectRatio.denominator = 3;
+        }
+    }
+
     /* parse the start timecode now that we know whether it is PAL or NTSC */
     if (startTimecodeStr != NULL)
     {
@@ -1372,7 +1520,7 @@ int main(int argc, const char* argv[])
             inputs[i].mjpegState.prevPosition = inputs[i].mjpegState.bufferSize;
             inputs[i].mjpegState.resolution = inputs[i].essenceInfo.avidMJPEGInfo.resolution;
         }
-        else if (inputs[i].essenceType == DVBased25)
+        else if (inputs[i].essenceType == DVBased25 || inputs[i].essenceType == IECDV25)
         {
             if (isPAL)
             {
@@ -1684,7 +1832,7 @@ int main(int argc, const char* argv[])
                     goto fail;
                 }
             }
-            else if (inputs[i].essenceType == DVBased25)
+            else if (inputs[i].essenceType == IECDV25 || inputs[i].essenceType == DVBased25)
             {
                 if (fread(inputs[i].buffer, 1, inputs[i].frameSize, inputs[i].file) != inputs[i].frameSize)
                 {
@@ -1693,7 +1841,7 @@ int main(int argc, const char* argv[])
                 }
                 if (!write_samples(clipWriter, inputs[i].materialTrackID, 1, inputs[i].buffer, inputs[i].frameSize))
                 {
-                    fprintf(stderr, "Failed to write DVBased25 frame\n");
+                    fprintf(stderr, "Failed to write DVBased/IECDV 25 frame\n");
                     goto fail;
                 }
             }

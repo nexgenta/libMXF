@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_labels_and_keys.h,v 1.3 2008/10/24 19:14:08 john_f Exp $
+ * $Id: mxf_avid_labels_and_keys.h,v 1.4 2008/10/29 17:54:26 john_f Exp $
  *
  * Avid labels, keys, etc.
  *
@@ -79,11 +79,11 @@ static const mxfUL MXF_EC_L(AvidAAFKLVEssenceContainer) =
 
 /* To be identical to the Avid don't use MXF_EC_L(D10_50_625_50_picture_only)
  etc since they use regver=2 while Avid uses regver=1 */
-static const mxfUL MXF_EC_L(IMX30) = 
+static const mxfUL MXF_EC_L(AvidIMX30) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x05, 0x7f};
-static const mxfUL MXF_EC_L(IMX40) = 
+static const mxfUL MXF_EC_L(AvidIMX40) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x03, 0x7f};
-static const mxfUL MXF_EC_L(IMX50) = 
+static const mxfUL MXF_EC_L(AvidIMX50) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x01, 0x01, 0x7f};
 
 /* DV100 labels observed in files by Media Composer 2.6 */

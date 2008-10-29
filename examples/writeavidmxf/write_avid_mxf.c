@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.9 2008/10/24 19:14:07 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.10 2008/10/29 17:54:26 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -1201,16 +1201,16 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
-        case DVBased25:
+            
+        case IECDV25:
             newTrackWriter->cdciEssenceContainerLabel = g_Null_UL;
             if (clipWriter->projectFormat == PAL_25i)
             {
                 /* TODO: this Avid label fails in Xpress HD 5.2.1, but what about earlier versions?
                   newTrackWriter->essenceContainerLabel = g_avid_DV25ClipWrappedEssenceContainer_label; */
-                newTrackWriter->essenceContainerLabel = MXF_EC_L(DVBased_25_625_50_ClipWrapped);
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(IECDV_25_625_50_ClipWrapped);
                 newTrackWriter->frameSize = 144000;
-                newTrackWriter->resolutionID = 0x8d;
-                newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DVBased_25_625_50);
+                newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(IECDV_25_625_50);
                 newTrackWriter->storedHeight = 288;
                 newTrackWriter->storedWidth = 720;
                 newTrackWriter->videoLineMap[0] = 23;
@@ -1219,23 +1219,24 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 newTrackWriter->colorSiting = 4; /* Rec601 */
                 if (clipWriter->useLegacy)
                 {
+                    newTrackWriter->resolutionID = 0x8d;
                     newTrackWriter->horizSubsampling = 2;
                     newTrackWriter->vertSubsampling = 2;
-                    newTrackWriter->frameLayout = 3; /* legacy MixedFields */
+                    newTrackWriter->frameLayout = 3; /* MixedFields */
                 }
                 else
                 {
-                    newTrackWriter->horizSubsampling = 4;
-                    newTrackWriter->vertSubsampling = 1;
+                    newTrackWriter->resolutionID = 0x8d;
+                    newTrackWriter->horizSubsampling = 2;
+                    newTrackWriter->vertSubsampling = 2;
                     newTrackWriter->frameLayout = 1; /* SeparateFields */
                 }
             }
             else
             {
-                newTrackWriter->essenceContainerLabel = MXF_EC_L(DVBased_25_525_60_ClipWrapped);
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(IECDV_25_525_60_ClipWrapped);
                 newTrackWriter->frameSize = 120000;
-                newTrackWriter->resolutionID = 0x8c;
-                newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DVBased_25_525_60);
+                newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(IECDV_25_525_60);
                 newTrackWriter->storedHeight = 240;
                 newTrackWriter->storedWidth = 720;
                 newTrackWriter->videoLineMap[0] = 23;
@@ -1244,15 +1245,18 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 newTrackWriter->colorSiting = 4; /* Rec601 */
                 if (clipWriter->useLegacy)
                 {
+                    newTrackWriter->resolutionID = 0x8c;
                     newTrackWriter->horizSubsampling = 1;
                     newTrackWriter->vertSubsampling = 1;
+                    newTrackWriter->frameLayout = 3; /* MixedFields */
                 }
                 else
                 {
+                    newTrackWriter->resolutionID = 0x8c;
                     newTrackWriter->horizSubsampling = 4;
                     newTrackWriter->vertSubsampling = 1;
+                    newTrackWriter->frameLayout = 1; /* SeparateFields */
                 }
-                newTrackWriter->frameLayout = 1;
             }
             newTrackWriter->displayHeight = 0;
             newTrackWriter->displayWidth = 0;
@@ -1263,6 +1267,73 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
+            
+        case DVBased25:
+            newTrackWriter->cdciEssenceContainerLabel = g_Null_UL;
+            if (clipWriter->projectFormat == PAL_25i)
+            {
+                /* TODO: this Avid label fails in Xpress HD 5.2.1, but what about earlier versions?
+                  newTrackWriter->essenceContainerLabel = g_avid_DV25ClipWrappedEssenceContainer_label; */
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(DVBased_25_625_50_ClipWrapped);
+                newTrackWriter->frameSize = 144000;
+                newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DVBased_25_625_50);
+                newTrackWriter->storedHeight = 288;
+                newTrackWriter->storedWidth = 720;
+                newTrackWriter->videoLineMap[0] = 23;
+                newTrackWriter->videoLineMap[1] = 335;
+                newTrackWriter->videoLineMapLen = 2;
+                newTrackWriter->colorSiting = 4; /* Rec601 */
+                if (clipWriter->useLegacy)
+                {
+                    newTrackWriter->resolutionID = 0x8c;
+                    newTrackWriter->horizSubsampling = 2;
+                    newTrackWriter->vertSubsampling = 2;
+                    newTrackWriter->frameLayout = 3; /* MixedFields */
+                }
+                else
+                {
+                    newTrackWriter->resolutionID = 0x8c;
+                    newTrackWriter->horizSubsampling = 4;
+                    newTrackWriter->vertSubsampling = 1;
+                    newTrackWriter->frameLayout = 1; /* SeparateFields */
+                }
+            }
+            else
+            {
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(DVBased_25_525_60_ClipWrapped);
+                newTrackWriter->frameSize = 120000;
+                newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DVBased_25_525_60);
+                newTrackWriter->storedHeight = 240;
+                newTrackWriter->storedWidth = 720;
+                newTrackWriter->videoLineMap[0] = 23;
+                newTrackWriter->videoLineMap[1] = 285;
+                newTrackWriter->videoLineMapLen = 2;
+                newTrackWriter->colorSiting = 4; /* Rec601 */
+                if (clipWriter->useLegacy)
+                {
+                    newTrackWriter->resolutionID = 0x8c;
+                    newTrackWriter->horizSubsampling = 1;
+                    newTrackWriter->vertSubsampling = 1;
+                    newTrackWriter->frameLayout = 3; /* MixedFields */
+                }
+                else
+                {
+                    newTrackWriter->resolutionID = 0x8c;
+                    newTrackWriter->horizSubsampling = 4;
+                    newTrackWriter->vertSubsampling = 1;
+                    newTrackWriter->frameLayout = 1; /* SeparateFields */
+                }
+            }
+            newTrackWriter->displayHeight = 0;
+            newTrackWriter->displayWidth = 0;
+            newTrackWriter->essenceElementKey = MXF_EE_K(DVClipWrapped);
+            newTrackWriter->sourceTrackNumber = MXF_DV_TRACK_NUM(0x01, MXF_DV_CLIP_WRAPPED_EE_TYPE, 0x01);
+            newTrackWriter->essenceElementLLen = 8;
+            CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
+            newTrackWriter->sampleRate = track->editRate;
+            newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
+            break;
+            
         case DVBased50:
             newTrackWriter->cdciEssenceContainerLabel = g_Null_UL;
             if (clipWriter->projectFormat == PAL_25i)
@@ -1280,7 +1351,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 newTrackWriter->colorSiting = 4; /* Rec601 */
                 if (clipWriter->useLegacy)
                 {
-                    newTrackWriter->frameLayout = 3; /* legacy MixedFields */
+                    newTrackWriter->frameLayout = 3; /* MixedFields */
                 }
                 else
                 {
@@ -1312,6 +1383,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->resolutionID = 0x8e;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
+            
         case DV1080i50:
         case DV720p50:
             newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
@@ -1354,6 +1426,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
+            
         case IMX30:
         case IMX40:
         case IMX50:
@@ -1364,19 +1437,19 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 {
                     case IMX30:
                         newTrackWriter->frameSize = 150000;
-                        newTrackWriter->essenceContainerLabel = MXF_EC_L(IMX30);
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX30);
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_30);
                         newTrackWriter->resolutionID = 162;
                         break;
                     case IMX40:
                         newTrackWriter->frameSize = 200000;
-                        newTrackWriter->essenceContainerLabel = MXF_EC_L(IMX40);
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX40);
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_40);
                         newTrackWriter->resolutionID = 161;
                         break;
                     case IMX50:
                         newTrackWriter->frameSize = 250000;
-                        newTrackWriter->essenceContainerLabel = MXF_EC_L(IMX50);
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX50);
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_50);
                         newTrackWriter->resolutionID = 160;
                         break;
@@ -1410,6 +1483,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
+            
         case DNxHD1080i120:
         case DNxHD1080i185:
         case DNxHD1080p36:
@@ -1523,6 +1597,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
+            
         case UncUYVY:
             /* TODO: check whether the same thing must be done as MJPEG regarding the ess container label 
             in the descriptor */
@@ -1597,6 +1672,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->resolutionID = 0xaa;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
+            
         case Unc1080iUYVY:
             newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
             if (clipWriter->projectFormat == PAL_25i)
@@ -1636,6 +1712,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
+            
         case PCM:
             newTrackWriter->samplingRate.numerator = 48000;
             newTrackWriter->samplingRate.denominator = 1;
@@ -1857,6 +1934,7 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
             writer->duration += numSamples;
             break;
+        case IECDV25:
         case DVBased25:
         case DVBased50:
         case DV1080i50:
@@ -1969,6 +2047,7 @@ int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
             writer->prevFrameOffset += writer->sampleDataSize;
             writer->duration += numSamples;
             break;
+        case IECDV25:
         case DVBased25:
         case DVBased50:
         case DV1080i50:
