@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.4 2008/10/08 09:34:21 philipn Exp $
+ * $Id: mxf_avid.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -44,10 +44,114 @@
 
 #include <mxf/mxf.h>
 #include <mxf/mxf_avid.h>
-#include <mxf/mxf_avid_metadict_blob.h>
 
 
-static int mxf_avid_create_object_directory(MXFAvidObjectDirectory** directory)
+typedef struct _MXFAvidObjectReference
+{
+    struct _MXFAvidObjectReference* next;
+    
+    mxfUUID instanceUID;
+    uint64_t offset;
+    uint8_t flags;
+} MXFAvidObjectReference;
+
+typedef struct
+{
+    MXFAvidObjectReference* references;
+} MXFAvidObjectDirectory;
+
+
+typedef struct
+{
+    mxfUUID id;
+    int64_t directoryOffset;
+    uint32_t formatVersion;
+    mxfUUID metaDictionaryInstanceUID;
+    mxfUUID prefaceInstanceUID;
+} MXFAvidMetadataRoot;
+
+typedef struct
+{
+    MXFReadFilter metaDictFilter;
+    MXFReadFilter dictFilter;
+    
+    MXFReadFilter filter;
+} MXFAvidReadFilter;
+    
+
+
+
+static int avid_before_set_read(void* privateData, MXFHeaderMetadata* headerMetadata, 
+        const mxfKey* key, uint8_t llen, uint64_t len, int* skip)
+{
+    MXFAvidReadFilter* filter = (MXFAvidReadFilter*)privateData;
+    int newSkip = 0;
+    
+    if (filter->metaDictFilter.before_set_read != NULL)
+    {
+        CHK_ORET(filter->metaDictFilter.before_set_read(filter->metaDictFilter.privateData,
+            headerMetadata, key, llen, len, &newSkip));
+    }
+    if (!newSkip)
+    {
+        if (filter->dictFilter.before_set_read != NULL)
+        {
+            CHK_ORET(filter->dictFilter.before_set_read(filter->dictFilter.privateData,
+                headerMetadata, key, llen, len, &newSkip));
+        }
+    }
+    
+    *skip = newSkip;
+    return 1;
+}
+
+static int avid_after_set_read(void* privateData, MXFHeaderMetadata* headerMetadata, MXFMetadataSet* set, 
+    int* skip)
+{
+    MXFAvidReadFilter* filter = (MXFAvidReadFilter*)privateData;
+    int newSkip = 0;
+    
+    if (filter->metaDictFilter.after_set_read != NULL)
+    {
+        CHK_ORET(filter->metaDictFilter.after_set_read(filter->metaDictFilter.privateData, headerMetadata, set, &newSkip));
+    }
+    if (!newSkip)
+    {
+        if (filter->dictFilter.after_set_read != NULL)
+        {
+            CHK_ORET(filter->dictFilter.after_set_read(filter->dictFilter.privateData, headerMetadata, set, &newSkip));
+        }
+    }
+    
+    *skip = newSkip;
+    return 1;
+}
+
+static int initialise_read_filter(MXFAvidReadFilter* readFilter, int skipDataDefs)
+{
+    CHK_ORET(mxf_initialise_metadict_read_filter(&readFilter->metaDictFilter));
+    CHK_ORET(mxf_initialise_dict_read_filter(&readFilter->dictFilter, skipDataDefs));
+
+    readFilter->filter.privateData = readFilter;
+    readFilter->filter.before_set_read = avid_before_set_read;
+    readFilter->filter.after_set_read = avid_after_set_read;
+
+    return 1;
+}
+
+static void clear_read_filter(MXFAvidReadFilter* readFilter)
+{
+    if (readFilter == NULL)
+    {
+        return;
+    }
+    
+    mxf_clear_metadict_read_filter(&readFilter->metaDictFilter);
+    mxf_clear_dict_read_filter(&readFilter->dictFilter);
+}
+
+
+static int create_object_directory(MXFAvidObjectDirectory** directory)
 {
     MXFAvidObjectDirectory* newDirectory;
     
@@ -58,7 +162,7 @@ static int mxf_avid_create_object_directory(MXFAvidObjectDirectory** directory)
     return 1;   
 }
 
-static void mxf_avid_free_object_directory(MXFAvidObjectDirectory** directory)
+static void free_object_directory(MXFAvidObjectDirectory** directory)
 {
     if (*directory == NULL)
     {
@@ -79,7 +183,7 @@ static void mxf_avid_free_object_directory(MXFAvidObjectDirectory** directory)
     SAFE_FREE(directory);
 }
 
-static int mxf_avid_add_object_directory_entry(MXFAvidObjectDirectory* directory,
+static int add_object_directory_entry(MXFAvidObjectDirectory* directory,
     const mxfUUID* instanceUID, uint64_t offset, uint8_t flags)
 {
     MXFAvidObjectReference* newEntry = NULL;
@@ -107,30 +211,7 @@ static int mxf_avid_add_object_directory_entry(MXFAvidObjectDirectory* directory
     return 1;
 }
 
-/* Note: must call this function just prior to writing the header metadata so 
-   that the initial offset is correct */
-static int mxf_avid_add_header_dir_entries(MXFFile* mxfFile, MXFAvidObjectDirectory* directory, 
-    MXFHeaderMetadata* headerMetadata)
-{
-    MXFListIterator iter;
-    int64_t offset;
-    MXFMetadataSet* set;
-    
-    CHK_ORET((offset = mxf_file_tell(mxfFile)) >= 0);
-    
-    mxf_initialise_list_iter(&iter, &headerMetadata->sets);
-    while (mxf_next_list_iter_element(&iter))
-    {
-        set = (MXFMetadataSet*)mxf_get_iter_element(&iter);
-        mxf_avid_add_object_directory_entry(directory, &set->instanceUID, offset, 0x00);
-
-        offset += mxf_get_set_size(mxfFile, set);
-    }
-    
-    return 1;
-}        
-
-static int mxf_avid_write_object_directory(MXFFile* mxfFile, const MXFAvidObjectDirectory* directory)
+static int write_object_directory(MXFFile* mxfFile, const MXFAvidObjectDirectory* directory)
 {
     const MXFAvidObjectReference* entry = NULL;
     uint64_t numEntries = 0;
@@ -142,8 +223,7 @@ static int mxf_avid_write_object_directory(MXFFile* mxfFile, const MXFAvidObject
         entry = entry->next;
     }
     
-    CHK_ORET(mxf_write_k(mxfFile, &g_AvidObjectDirectory_key));
-    CHK_ORET(mxf_write_l(mxfFile, 9 + 25*numEntries));
+    CHK_ORET(mxf_write_kl(mxfFile, &g_AvidObjectDirectory_key, 9 + 25 * numEntries));
 
     CHK_ORET(mxf_write_uint64(mxfFile, numEntries));
     CHK_ORET(mxf_write_uint8(mxfFile, 25));
@@ -160,142 +240,104 @@ static int mxf_avid_write_object_directory(MXFFile* mxfFile, const MXFAvidObject
     return 1;
 }
 
-/* Note: the set is not appended to the header metadata set list. This ensures that
-   the items in the root are not registered in the Primer. 
-   However, applications must update the Avid ObjectDirectory with the position of the root set 
-   because this would only happen automatically if the set were part of the header metadata */
-static int mxf_avid_create_metadata_root(MXFHeaderMetadata* headerMetadata, MXFAvidMetadataRootSet** set)
+static void initialise_root_set(MXFAvidMetadataRoot* root)
 {
-    MXFMetadataSet* newSet;
-    CHK_ORET(mxf_create_set(headerMetadata, &g_AvidMetadataRoot_key, &newSet));
-    CHK_ORET(mxf_remove_set(headerMetadata, newSet));
+    memset(root, 0, sizeof(*root));
+    
+    mxf_generate_uuid(&root->id);
+    root->formatVersion = 0x0008;
+}
+
+static int write_root_set(MXFFile* mxfFile, const MXFAvidMetadataRoot* root)
+{
+    CHK_ORET(mxf_write_kl(mxfFile, &g_AvidMetadataRoot_key, 96));
+    
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3c0a, mxfUUID_extlen));
+    CHK_ORET(mxf_write_uuid(mxfFile, &root->id));
+    
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x0003, mxfUUID_extlen + 8));
+    CHK_ORET(mxf_write_uuid(mxfFile, &g_Null_UUID));
+    CHK_ORET(mxf_write_int64(mxfFile, root->directoryOffset));
+    
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x0004, 4));
+    CHK_ORET(mxf_write_uint32(mxfFile, root->formatVersion));
+    
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x0001, mxfUUID_extlen));
+    CHK_ORET(mxf_write_uuid(mxfFile, &root->metaDictionaryInstanceUID));
+    
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x0002, mxfUUID_extlen));
+    CHK_ORET(mxf_write_uuid(mxfFile, &root->prefaceInstanceUID));
+
+    return 1;
+}
+
+static int write_set(MXFFile* mxfFile, MXFMetadataSet* set, int64_t* offset, 
+    MXFAvidObjectDirectory* objectDirectory)
+{
+    CHK_ORET(add_object_directory_entry(objectDirectory, &set->instanceUID, *offset, 0x00));
+    CHK_ORET(mxf_write_set(mxfFile, set));
+    *offset += mxf_get_set_size(mxfFile, set);
+    
+    return 1;
+}
+
+static int write_metadict_sets(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata, 
+    MXFAvidObjectDirectory* objectDirectory)
+{
+    MXFListIterator iter;
+    MXFMetadataSet* metaDictSet;
+    int64_t offset;
+    
+    CHK_ORET((offset = mxf_file_tell(mxfFile)) >= 0);
+    
+    /* must write the MetaDictionary set first */
+    CHK_ORET(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(MetaDictionary), &metaDictSet));
+    CHK_ORET(write_set(mxfFile, metaDictSet, &offset, objectDirectory));
+    
+    mxf_initialise_list_iter(&iter, &headerMetadata->sets);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        MXFMetadataSet* set = (MXFMetadataSet*)mxf_get_iter_element(&iter);
         
-    *set = newSet;
+        if (mxf_is_subclass_of(headerMetadata->dataModel, &set->key, &MXF_SET_K(MetaDefinition)))
+        {
+            CHK_ORET(write_set(mxfFile, set, &offset, objectDirectory));
+        }
+    }
+    
     return 1;
 }
 
-/* Note: the assumption is that metadata items are only added to the root set using this function 
-   This allows us to re-write items in the same order */
-static int mxf_avid_set_metadata_root(MXFAvidMetadataRootSet* set, const MXFAvidMetadataRoot* root)
+static int write_preface_sets(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata,
+    MXFAvidObjectDirectory* objectDirectory)
 {
-    MXFMetadataItem* newItem;
-    uint8_t value[24];
-    uint16_t len;
-    mxfUUID instanceUID;
+    MXFListIterator iter;
+    MXFMetadataSet* prefaceSet;
+    int64_t offset;
     
-
-    /* keep the instanceUID and remove all other items */
-    CHK_ORET(mxf_get_uuid_item(set, &MXF_ITEM_K(InterchangeObject, InstanceUID), &instanceUID));
-    mxf_clear_list(&set->items);
-    CHK_ORET(mxf_create_item(set, &MXF_ITEM_K(InterchangeObject, InstanceUID), 0x3c0a, &newItem));
-    mxf_set_uuid(&instanceUID, value);
-    CHK_ORET(mxf_set_item_value(newItem, value, mxfUUID_extlen));
-
+    CHK_ORET((offset = mxf_file_tell(mxfFile)) >= 0);
     
-    /* (re-)write the items */
+    /* must write the Preface set first */
+    CHK_ORET(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(Preface), &prefaceSet));
+    CHK_ORET(write_set(mxfFile, prefaceSet, &offset, objectDirectory));
     
-    mxf_set_uuid(&root->id, value);
-    mxf_set_uint64(root->directoryOffset, &value[mxfUUID_extlen]);
-    len = mxfUUID_extlen + 8;
-    CHK_ORET(mxf_create_item(set, &g_Null_Key, 0x0003, &newItem));
-    CHK_ORET(mxf_set_item_value(newItem, value, len));
-
-    mxf_set_uint32(root->formatVersion, value);
-    len = 4;
-    CHK_ORET(mxf_create_item(set, &g_Null_Key, 0x0004, &newItem));
-    CHK_ORET(mxf_set_item_value(newItem, value, len));
+    mxf_initialise_list_iter(&iter, &headerMetadata->sets);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        MXFMetadataSet* set = (MXFMetadataSet*)mxf_get_iter_element(&iter);
         
-    mxf_set_uuid(&root->metaDictionaryInstanceUID, value);
-    len = mxfUUID_extlen;
-    CHK_ORET(mxf_create_item(set, &g_Null_Key, 0x0001, &newItem));
-    CHK_ORET(mxf_set_item_value(newItem, value, len));
-
-    mxf_set_uuid(&root->prefaceInstanceUID, value);
-    len = mxfUUID_extlen;
-    CHK_ORET(mxf_create_item(set, &g_Null_Key, 0x0002, &newItem));
-    CHK_ORET(mxf_set_item_value(newItem, value, len));
-
-    return 1;
-}
-
-static int mxf_avid_register_metadict_tags(MXFPrimerPack* primerPack)
-{
-    uint32_t i;
-    mxfLocalTag assignedTag;  // ignored
-    for (i = 0; i < g_AvidMetaDictTags_len; i++)
-    {
-        CHK_ORET(mxf_register_primer_entry(primerPack, &g_AvidMetaDictTags[i].uid, 
-            g_AvidMetaDictTags[i].localTag, &assignedTag));
-    }
-    
-    return 1;
-}
-
-static int mxf_avid_write_metadict_blob(MXFFile* mxfFile, uint8_t* avidMetaDictBlob, uint32_t avidMetaDictBlobLen)
-{
-    const uint32_t maxWriteBytes = 4096;
-    const uint8_t* dataPtr = avidMetaDictBlob;
-    uint32_t numBytes;
-    uint32_t totalBytes = 0;
-    int done = 0;
-    while (!done)
-    {
-        if (avidMetaDictBlobLen - totalBytes < maxWriteBytes)
+        if (!mxf_is_subclass_of(headerMetadata->dataModel, &set->key, &MXF_SET_K(MetaDictionary)) &&
+            !mxf_is_subclass_of(headerMetadata->dataModel, &set->key, &MXF_SET_K(MetaDefinition)) &&
+            !mxf_equals_key(&set->key, &MXF_SET_K(Preface)))
         {
-            done = 1;
-            numBytes = avidMetaDictBlobLen - totalBytes;
-        }
-        else
-        {
-            numBytes = maxWriteBytes;
-        }
-        if (numBytes > 0)
-        {
-            CHK_ORET(mxf_file_write(mxfFile, dataPtr, numBytes) == numBytes);
-            dataPtr += numBytes;
-            totalBytes += numBytes;
+            CHK_ORET(write_set(mxfFile, set, &offset, objectDirectory));
         }
     }
     
     return 1;
 }
 
-static int mxf_avid_register_metadict_object_offsets(uint64_t startOffset,
-    MXFAvidObjectDirectory* directory)
-{
-    uint32_t i;
-    for (i = 0; i < g_AvidMetaDictObjectOffsets_len; i++)
-    {
-        CHK_ORET(mxf_avid_add_object_directory_entry(directory, &g_AvidMetaDictObjectOffsets[i].instanceUID,
-            g_AvidMetaDictObjectOffsets[i].offset + startOffset, g_AvidMetaDictObjectOffsets[i].flags));
-    }
-    
-    return 1;
-}
-    
-static int mxf_avid_fixup_dynamic_tags_in_blob(MXFPrimerPack* primerPack, uint8_t* avidMetaDictBlob)
-{
-    mxfLocalTag tag;
-    uint32_t i;
-    for (i = 0; i < g_AvidMetaDictDynTagOffsets_len; i++)
-    {
-        /* check if the Avid item extension has been used and therefore that a tag 
-           has been registered in the primer pack */
-        if (!mxf_get_item_tag(primerPack, &g_AvidMetaDictDynTagOffsets[i].itemKey,
-            &tag))
-        {
-            /* item extension has not been used so create a new unique tag in the meta-definition */
-            CHK_ORET(mxf_create_item_tag(primerPack, &tag));
-        }
-        
-        /* fixup the tag in the meta-definition */
-        mxf_set_uint16(tag, &avidMetaDictBlob[g_AvidMetaDictDynTagOffsets[i].tagOffset]);
-    }
-    
-    return 1;
-}
-
-static int mxf_avid_get_indirect_string(MXFMetadataSet* set, const mxfKey* itemKey, mxfUTF16Char** value)
+static int get_indirect_string(MXFMetadataSet* set, const mxfKey* itemKey, mxfUTF16Char** value)
 {
     /* prefix is 0x42 ('B') for big endian or 0x4c ('L') for little endian, followed by half-swapped key for String type */
     const uint8_t prefix_BE[17] =
@@ -357,7 +399,7 @@ fail:
     return 0;    
 }
 
-static int mxf_avid_read_package_string_tagged_values(MXFMetadataSet* packageSet, const mxfKey* itemKey, MXFList** names, MXFList** values)
+static int read_package_string_tagged_values(MXFMetadataSet* packageSet, const mxfKey* itemKey, MXFList** names, MXFList** values)
 {
     MXFMetadataSet* taggedValueSet;
     uint32_t count;
@@ -383,7 +425,7 @@ static int mxf_avid_read_package_string_tagged_values(MXFMetadataSet* packageSet
         CHK_OFAIL(mxf_get_array_item_element(packageSet, itemKey, i, &element));
         CHK_OFAIL(mxf_get_strongref(packageSet->headerMetadata, element, &taggedValueSet));
 
-        if (mxf_avid_get_indirect_string(taggedValueSet, &MXF_ITEM_K(TaggedValue, Value), &taggedValueValue))
+        if (get_indirect_string(taggedValueSet, &MXF_ITEM_K(TaggedValue, Value), &taggedValueValue))
         {
             CHK_OFAIL(mxf_append_list_element(newValues, taggedValueValue));
             taggedValueValue = NULL;
@@ -425,87 +467,82 @@ int mxf_avid_load_extensions(MXFDataModel* dataModel)
 }
 
 
+int mxf_avid_read_filtered_header_metadata(MXFFile* mxfFile, int skipDataDefs, MXFHeaderMetadata* headerMetadata, 
+    uint64_t headerByteCount, const mxfKey* key, uint8_t llen, uint64_t len)
+{
+    MXFAvidReadFilter readFilter;
+    memset(&readFilter, 0, sizeof(readFilter));
+    
+    CHK_OFAIL(initialise_read_filter(&readFilter, skipDataDefs));
+    
+    CHK_OFAIL(mxf_read_filtered_header_metadata(mxfFile, &readFilter.filter, headerMetadata, headerByteCount, key, llen, len));
+    
+    clear_read_filter(&readFilter);
+    return 1;
+    
+fail:
+    clear_read_filter(&readFilter);
+    return 0;
+}
 
 
 int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata)
 {
-    int64_t rootMetadataSetPos;
-    int64_t headerMetadataSetsPos;
+    int64_t rootPos;
     int64_t endPos;
     MXFAvidObjectDirectory* objectDirectory = NULL;
-    MXFAvidMetadataRootSet* avidRootSet = NULL;
-    MXFAvidMetadataRoot avidRoot;
     MXFMetadataSet* prefaceSet;
-    uint8_t* avidMetaDictBlob = NULL;
-    
-    CHK_MALLOC_ARRAY_ORET(avidMetaDictBlob, uint8_t, g_AvidMetaDictBlob_len);
-    memcpy(avidMetaDictBlob, g_AvidMetaDictBlob, g_AvidMetaDictBlob_len);
+    MXFMetadataSet* metaDictSet;
+    MXFAvidMetadataRoot root;
     
 
-    /* init the avid root */    
-    avidRoot.id = g_Null_UUID;
-    avidRoot.directoryOffset = 0;
-    avidRoot.formatVersion = 0x0008;
-    avidRoot.metaDictionaryInstanceUID = g_AvidMetaDictInstanceUID_uuid;
+    CHK_OFAIL(create_object_directory(&objectDirectory));
+
+    initialise_root_set(&root);
+    CHK_OFAIL(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(MetaDictionary), &metaDictSet));
+    root.metaDictionaryInstanceUID = metaDictSet->instanceUID;
     CHK_OFAIL(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(Preface), &prefaceSet));
-    avidRoot.prefaceInstanceUID = prefaceSet->instanceUID;
-    
-    /* create object directory and root metadata set */
-    CHK_OFAIL(mxf_avid_create_object_directory(&objectDirectory));
-    CHK_OFAIL(mxf_avid_create_metadata_root(headerMetadata, &avidRootSet));
+    root.prefaceInstanceUID = prefaceSet->instanceUID;
 
     
-    /* update the primer with the tags in the blob and write */
-    CHK_OFAIL(mxf_avid_register_metadict_tags(headerMetadata->primerPack));
+    /* write the primer pack, root set, meta-dictionary sets, preface sets and object directory */
+    
     CHK_OFAIL(mxf_write_header_primer_pack(mxfFile, headerMetadata));
     
-    /* write the avid root metadata set (and update the object directory) */
-    CHK_OFAIL((rootMetadataSetPos = mxf_file_tell(mxfFile)) >= 0);
-    mxf_avid_add_object_directory_entry(objectDirectory,
-        &avidRootSet->instanceUID, rootMetadataSetPos, 0x00);
-    CHK_OFAIL(mxf_avid_set_metadata_root(avidRootSet, &avidRoot));
-    CHK_OFAIL(mxf_write_set(mxfFile, avidRootSet));
+    CHK_OFAIL((rootPos = mxf_file_tell(mxfFile)) >= 0);
+    CHK_OFAIL(add_object_directory_entry(objectDirectory, &root.id, rootPos, 0x00));
+    CHK_OFAIL(write_root_set(mxfFile, &root));
     
-    /* write the Avid meta-dictionary blob */
-    CHK_OFAIL((headerMetadataSetsPos = mxf_file_tell(mxfFile)) >= 0);
-    CHK_OFAIL(mxf_avid_fixup_dynamic_tags_in_blob(headerMetadata->primerPack, avidMetaDictBlob));
-    CHK_OFAIL(mxf_avid_write_metadict_blob(mxfFile, avidMetaDictBlob, g_AvidMetaDictBlob_len));
-    CHK_OFAIL(mxf_avid_register_metadict_object_offsets(headerMetadataSetsPos, objectDirectory));
-        
-    /* write the header metadata; record the object directory entries before writing */
-    CHK_OFAIL(mxf_avid_add_header_dir_entries(mxfFile, objectDirectory, headerMetadata));
-    CHK_OFAIL(mxf_write_header_sets(mxfFile, headerMetadata));
+    CHK_OFAIL(write_metadict_sets(mxfFile, headerMetadata, objectDirectory));
+
+    CHK_OFAIL(write_preface_sets(mxfFile, headerMetadata, objectDirectory));
     
-    /* write the avid object directory */
-    CHK_OFAIL((avidRoot.directoryOffset = mxf_file_tell(mxfFile)) >= 0);
-    CHK_OFAIL(mxf_avid_write_object_directory(mxfFile, objectDirectory));
+    CHK_OFAIL((root.directoryOffset = mxf_file_tell(mxfFile)) >= 0);
+    CHK_OFAIL(write_object_directory(mxfFile, objectDirectory));
     CHK_OFAIL((endPos = mxf_file_tell(mxfFile)) >= 0);
 
-    /* go back and re-write the Avid root set with an updated object directory offset */
-    CHK_OFAIL(mxf_avid_set_metadata_root(avidRootSet, &avidRoot));
-    CHK_OFAIL(mxf_file_seek(mxfFile, rootMetadataSetPos, SEEK_SET));
-    CHK_OFAIL(mxf_write_set(mxfFile, avidRootSet));
+    
+    /* go back and re-write the root set with an updated object directory offset */
+    CHK_OFAIL(mxf_file_seek(mxfFile, rootPos, SEEK_SET));
+    CHK_OFAIL(write_root_set(mxfFile, &root));
  
+    
     /* position file after object directory */
     CHK_OFAIL(mxf_file_seek(mxfFile, endPos, SEEK_SET));
     
-    SAFE_FREE(&avidMetaDictBlob);
-    mxf_free_set(&avidRootSet);
-    mxf_avid_free_object_directory(&objectDirectory);
+    
+    free_object_directory(&objectDirectory);
     return 1;
     
 fail:
-    SAFE_FREE(&avidMetaDictBlob);
-    mxf_free_set(&avidRootSet);
-    mxf_avid_free_object_directory(&objectDirectory);
+    free_object_directory(&objectDirectory);
     return 0;
 }
 
 
 
 /* MobID generation code following the same algorithm as implemented in the AAF SDK */
-/* NOTE: this function is not guaranteed (but is it highly unlikely?) to create a 
-   unique UMID in multi-threaded environment */
+/* NOTE: this function is not guaranteed to create a unique UMID in multi-threaded environment */
 void mxf_generate_aafsdk_umid(mxfUMID* umid)
 {
     uint32_t major, minor;
@@ -658,7 +695,8 @@ fail:
 
 /* in some Avid files, the StructuralComponent::DataDefinition is not a UL but is a 
    weak reference to a DataDefinition object in the Dictionary 
-   So we try dereferencing it, expecting to find a DataDefinition object with Identification item */
+   So we try dereferencing it, expecting to find a DataDefinition object with Identification item,
+   NOTE: skipDataDefs in mxf_avid_read_filtered_header_metadata must be set to 0 for this to work */
 int mxf_avid_get_data_def(MXFHeaderMetadata* headerMetadata, mxfUUID* uuid, mxfUL* dataDef)
 {
     MXFMetadataSet* dataDefSet;
@@ -724,12 +762,12 @@ int mxf_avid_attach_user_comment(MXFHeaderMetadata* headerMetadata, MXFMetadataS
 
 int mxf_avid_read_string_mob_attributes(MXFMetadataSet* packageSet, MXFList** names, MXFList** values)
 {
-    return mxf_avid_read_package_string_tagged_values(packageSet, &MXF_ITEM_K(GenericPackage, MobAttributeList), names, values);
+    return read_package_string_tagged_values(packageSet, &MXF_ITEM_K(GenericPackage, MobAttributeList), names, values);
 }
 
 int mxf_avid_read_string_user_comments(MXFMetadataSet* packageSet, MXFList** names, MXFList** values)
 {
-    return mxf_avid_read_package_string_tagged_values(packageSet, &MXF_ITEM_K(GenericPackage, UserComments), names, values);
+    return read_package_string_tagged_values(packageSet, &MXF_ITEM_K(GenericPackage, UserComments), names, values);
 }
 
 int mxf_avid_get_mob_attribute(const mxfUTF16Char* name, const MXFList* names, const MXFList* values, const mxfUTF16Char** value)
@@ -758,5 +796,7 @@ int mxf_avid_get_user_comment(const mxfUTF16Char* name, const MXFList* names, co
 {
     return mxf_avid_get_mob_attribute(name, names, values, value);
 }
+
+
 
 

@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_to_p2.c,v 1.3 2008/10/24 19:14:07 john_f Exp $
+ * $Id: avid_mxf_to_p2.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
  *
  * Transfers Avid MXF files to P2
  *
@@ -134,7 +134,7 @@ static int open_input_file(const char* filename, AvidMXFFile* input)
     
     if (!mxf_disk_file_open_read(input->filename, &input->mxfFile))
     {
-        mxf_log(MXF_ELOG, "Failed to open '%s'" LOG_LOC_FORMAT, input->filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to open '%s'" LOG_LOC_FORMAT, input->filename, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -187,7 +187,7 @@ static int open_output_file(const char* filename, P2MXFFile* output)
     
     if (!mxf_disk_file_open_new(output->filename, &output->mxfFile))
     {
-        mxf_log(MXF_ELOG, "Failed to create '%s'" LOG_LOC_FORMAT, output->filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to create '%s'" LOG_LOC_FORMAT, output->filename, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -289,7 +289,7 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
     
     if (!mxf_read_header_pp_kl(input->mxfFile, &key, &llen, &len))
     {
-        mxf_log(MXF_ELOG, "Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     CHK_ORET(mxf_read_partition(input->mxfFile, &key, &input->headerPartition));
@@ -300,7 +300,7 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
     if (!is_op_atom(&input->headerPartition->operationalPattern) &&
         !is_invalid_aafsdk_op_atom_label(&input->headerPartition->operationalPattern))
     {
-        mxf_log(MXF_ELOG, "Input file is not OP Atom" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Input file is not OP Atom" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -310,7 +310,7 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
     essenceContainerLen = mxf_get_list_length(&input->headerPartition->essenceContainers);
     if (essenceContainerLen != 1)
     {
-        mxf_log(MXF_ELOG, "Unexpected essence container labels - expecting 1 only" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Unexpected essence container labels - expecting 1 only" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     essenceContainerLabel = (mxfUL*)mxf_get_first_list_element(&input->headerPartition->essenceContainers);
@@ -482,26 +482,26 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
     }
     else if (is_invalid_aafsdk_esscont_label(essenceContainerLabel))
     {
-        mxf_log(MXF_ELOG, "Invalid AAF SDK essence container label in input file" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Invalid AAF SDK essence container label in input file" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     else
     {
         char labelStr[KEY_STR_SIZE];
         mxf_sprint_label(labelStr, essenceContainerLabel);
-        mxf_log(MXF_ELOG, "Unknown or unsupported essence container label '%s' in input file" LOG_LOC_FORMAT, 
+        mxf_log_error("Unknown or unsupported essence container label '%s' in input file" LOG_LOC_FORMAT, 
             labelStr, LOG_LOC_PARAMS);
         return 0;
     }
     
     
-    /* create and read the header metadata */
+    /* create and read the header metadata (filter out meta-dictionary and dictionary except data defs) */
     
     CHK_ORET(mxf_create_header_metadata(&input->headerMetadata, input->dataModel));
     
     CHK_ORET(mxf_read_next_nonfiller_kl(input->mxfFile, &key, &llen, &len));
     CHK_ORET(mxf_is_header_metadata(&key));
-    CHK_ORET(mxf_read_header_metadata(input->mxfFile, input->headerMetadata, 
+    CHK_ORET(mxf_avid_read_filtered_header_metadata(input->mxfFile, 0, input->headerMetadata, 
         input->headerPartition->headerByteCount, &key, llen, len));
     
     
@@ -539,7 +539,7 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
         mxf_free_list(&input->aList);
         if (!foundIt)
         {
-            mxf_log(MXF_ELOG, "Could not find the top level file source package" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Could not find the top level file source package" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
     }
@@ -575,13 +575,13 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
         
         if (output->samplingRate.numerator != 48000 || output->samplingRate.denominator != 1)
         {
-            mxf_log(MXF_ELOG, "Unsupported input audio sampling rate %d/%d" LOG_LOC_FORMAT, 
+            mxf_log_error("Unsupported input audio sampling rate %d/%d" LOG_LOC_FORMAT, 
                 output->samplingRate.numerator, output->samplingRate.denominator, LOG_LOC_PARAMS);
             return 0;
         }
         if (output->bitsPerSample != 16 && output->bitsPerSample != 24)
         {
-            mxf_log(MXF_ELOG, "Unsupported audio bits per sample %u" LOG_LOC_FORMAT, 
+            mxf_log_error("Unsupported audio bits per sample %u" LOG_LOC_FORMAT, 
                 output->bitsPerSample, LOG_LOC_PARAMS);
             return 0;
         }
@@ -589,13 +589,13 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
         {
             if (output->blockAlign != 2)
             {
-                mxf_log(MXF_ELOG, "Unsupported audio block alignment %u for %u bit quantization" LOG_LOC_FORMAT, 
+                mxf_log_error("Unsupported audio block alignment %u for %u bit quantization" LOG_LOC_FORMAT, 
                     output->blockAlign, output->bitsPerSample, LOG_LOC_PARAMS);
                 return 0;
             }
             if (output->avgBps != 96000)
             {
-                mxf_log(MXF_ELOG, "Unsupported audio avg. bps %u for %u bit quantization" LOG_LOC_FORMAT, 
+                mxf_log_error("Unsupported audio avg. bps %u for %u bit quantization" LOG_LOC_FORMAT, 
                     output->avgBps, output->bitsPerSample, LOG_LOC_PARAMS);
                 return 0;
             }
@@ -604,13 +604,13 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
         {
             if (output->blockAlign != 3)
             {
-                mxf_log(MXF_ELOG, "Unsupported audio block alignment %u for %u bit quantization" LOG_LOC_FORMAT, 
+                mxf_log_error("Unsupported audio block alignment %u for %u bit quantization" LOG_LOC_FORMAT, 
                     output->blockAlign, output->bitsPerSample, LOG_LOC_PARAMS);
                 return 0;
             }
             if (output->avgBps != 144000)
             {
-                mxf_log(MXF_ELOG, "Unsupported audio avg. bps %u for %u bit quantization" LOG_LOC_FORMAT, 
+                mxf_log_error("Unsupported audio avg. bps %u for %u bit quantization" LOG_LOC_FORMAT, 
                     output->avgBps, output->bitsPerSample, LOG_LOC_PARAMS);
                 return 0;
             }
@@ -624,7 +624,7 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
     CHK_ORET(mxf_read_next_nonfiller_kl(input->mxfFile, &key, &llen, &len));
     if (!mxf_is_body_partition_pack(&key))
     {
-        mxf_log(MXF_ELOG, "Expecting the body partition pack" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Expecting the body partition pack" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     CHK_ORET(mxf_skip(input->mxfFile, len));
@@ -632,7 +632,7 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
     CHK_ORET(mxf_read_next_nonfiller_kl(input->mxfFile, &key, &llen, &len));
     if (!mxf_is_gc_essence_element(&key))
     {
-        mxf_log(MXF_ELOG, "Expecting an essence element" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Expecting an essence element" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
 
@@ -652,7 +652,7 @@ static int preprocess_avid_input(AvidMXFToP2Transfer* transfer, int inputFileInd
     }
     if (output->containerDuration != output->duration)
     {
-        mxf_log(MXF_WLOG, "File container duration %"PFi64" does not equal track duration %"PFi64"\n", 
+        mxf_log_warn("File container duration %"PFi64" does not equal track duration %"PFi64"\n", 
             output->containerDuration, output->duration);
     }
     
@@ -701,7 +701,7 @@ static int transfer_to_p2(AvidMXFToP2Transfer* transfer, int inputFileIndex, int
     CHK_ORET(mxf_read_next_nonfiller_kl(input->mxfFile, &key, &llen, &len));
     if (!mxf_is_gc_essence_element(&key))
     {
-        mxf_log(MXF_ELOG, "Expecting an essence element" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Expecting an essence element" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -996,7 +996,7 @@ static int transfer_to_p2(AvidMXFToP2Transfer* transfer, int inputFileIndex, int
 
         if (output->isPicture && numRead > 0 && numRead != essenceReadSize)
         {
-            mxf_log(MXF_WLOG, "Last essence data frame is wrong size %u\n", numRead); 
+            mxf_log_warn("Last essence data frame is wrong size %u\n", numRead); 
         }
         
         if (numRead > 0)
@@ -1076,13 +1076,13 @@ static int write_icon_bmp(AvidMXFToP2Transfer* transfer)
 	/* TODO: use ffmpeg to extract a frame, decode it, and scale down to 80x60 */
     if ((iconFile = fopen(filename, "wb")) == NULL)
     {
-        mxf_log(MXF_ELOG, "Failed to open BMP file for write '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to open BMP file for write '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
         return 0;
     }
 	/* write the hard-coded "Avid->P2" icon */
     if ((fwrite(icon_avid_to_p2, 1, sizeof(icon_avid_to_p2), iconFile)) != sizeof(icon_avid_to_p2)) 
     {
-        mxf_log(MXF_ELOG, "Failed to write BMP data for '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to write BMP data for '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
         return 0;
     }
     fclose(iconFile);
@@ -1119,7 +1119,7 @@ static int write_clip_document(AvidMXFToP2Transfer* transfer)
     /* Note: the XML writer must use DOS line endings */
     if (!xml_writer_open(filename, &writer))
     {
-        mxf_log(MXF_ELOG, "Failed to open clip xml document '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to open clip xml document '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -1324,20 +1324,20 @@ static int create_p2_clipname(AvidMXFToP2Transfer* transfer)
     
     if ((lastClipFile = fopen(filename, "r+b")) == NULL)
     {
-        mxf_log(MXF_WLOG, "Creating new last clip file '%s'\n", filename);
+        mxf_log_warn("Creating new last clip file '%s'\n", filename);
         if ((lastClipFile = fopen(filename, "w+b")) == NULL)
         {
-            mxf_log(MXF_ELOG, "Failed to open last clip file '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+            mxf_log_error("Failed to open last clip file '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
             goto fail;
         }
         if (fprintf(lastClipFile, "000000\n1.0\n2\n") < 0)
         {
-            mxf_log(MXF_ELOG, "Failed to initialise last clip file '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+            mxf_log_error("Failed to initialise last clip file '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
             goto fail;
         }
         if (fseek(lastClipFile, 0, SEEK_SET) != 0)
         {
-            mxf_log(MXF_ELOG, "Failed to seek to start of last clip file '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+            mxf_log_error("Failed to seek to start of last clip file '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
             goto fail;
         }
     }
@@ -1346,7 +1346,7 @@ static int create_p2_clipname(AvidMXFToP2Transfer* transfer)
     if (fscanf(lastClipFile, "%s", lastClipName) != 1 || 
         strlen(lastClipName) != 6)
     {
-        mxf_log(MXF_ELOG, "Failed to read last clip name" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to read last clip name" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         goto fail;
     }
 
@@ -1355,7 +1355,7 @@ static int create_p2_clipname(AvidMXFToP2Transfer* transfer)
         
     if (xxxx < 0 || xxxx > 9999)
     {
-        mxf_log(MXF_ELOG, "Invalid last clip name '%s'" LOG_LOC_FORMAT, lastClipName, LOG_LOC_PARAMS);
+        mxf_log_error("Invalid last clip name '%s'" LOG_LOC_FORMAT, lastClipName, LOG_LOC_PARAMS);
         goto fail;
     }
     
@@ -1424,7 +1424,7 @@ static int create_p2_clipname(AvidMXFToP2Transfer* transfer)
         {
             if (pastLimitAlready)
             {
-                mxf_log(MXF_ELOG, "No unique clip name could be created" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_error("No unique clip name could be created" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                 goto fail;
             }
             xxxx = 0;
@@ -1435,12 +1435,12 @@ static int create_p2_clipname(AvidMXFToP2Transfer* transfer)
     /* update last clip */
     if (fseek(lastClipFile, 0, SEEK_SET) != 0)
     {
-        mxf_log(MXF_ELOG, "Failed to seek to start of last clip file" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to seek to start of last clip file" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         goto fail;
     }
     if (fprintf(lastClipFile, "%s", transfer->clipName) < 0)
     {
-        mxf_log(MXF_ELOG, "Failed to write last clip name" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to write last clip name" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         goto fail;
     }
     

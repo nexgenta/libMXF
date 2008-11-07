@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 2008/05/07 15:21:34 philipn Exp $
+# $Id: Makefile,v 1.2 2008/11/07 14:12:59 philipn Exp $
 #
 # Makefile for building libMXf library, tools and examples
 #
@@ -25,8 +25,8 @@
 all:
 	$(MAKE) -C lib
 	$(MAKE) -C test
-	$(MAKE) -C tools
 	$(MAKE) -C examples
+	$(MAKE) -C tools
 
 # The only installable files are in lib/ and examples/
 .PHONY: install
@@ -38,8 +38,8 @@ install: all
 clean:
 	$(MAKE) -C lib $@
 	$(MAKE) -C test $@
-	$(MAKE) -C tools $@
 	$(MAKE) -C examples $@
+	$(MAKE) -C tools $@
 
 .PHONY: check
 check: all
@@ -48,5 +48,5 @@ check: all
 
 .PHONY: valgrind-check
 valgrind-check: all
-	$(MAKE) -C test $@
 	$(MAKE) -C examples $@
+

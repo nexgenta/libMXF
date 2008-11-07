@@ -1,5 +1,5 @@
 /*
- * $Id: avidp2transfer.cpp,v 1.2 2007/09/11 13:24:48 stuart_hc Exp $
+ * $Id: avidp2transfer.cpp,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * Reads an Avid AAF composition file and transfers referenced MXF files to P2
  *
@@ -46,11 +46,11 @@ using namespace std;
 
 
 #define APT_ERROR(message) \
-    mxf_log(MXF_ELOG, message LOG_LOC_FORMAT, LOG_LOC_PARAMS); \
+    mxf_log_error(message LOG_LOC_FORMAT, LOG_LOC_PARAMS); \
     throw APTException(message "\n");
 
 #define APT_ERROR_1(message, arg1) \
-    mxf_log(MXF_ELOG, message LOG_LOC_FORMAT, arg1, LOG_LOC_PARAMS); \
+    mxf_log_error(message LOG_LOC_FORMAT, arg1, LOG_LOC_PARAMS); \
     throw APTException(message "\n", arg1);
 
 #define AAF_CHECK(cmd, message) \
@@ -66,7 +66,7 @@ using namespace std;
     }
     
 #define APT_WARNING(message) \
-    mxf_log(MXF_WLOG, message LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+    mxf_log_warn(message LOG_LOC_FORMAT, LOG_LOC_PARAMS);
 
 
 
@@ -269,7 +269,7 @@ _omitDriveColon(omitDriveColon)
     }
     
     processAvidComposition(aafFilename);
-    mxf_log(MXF_DLOG, "Number of tracks extracted from '%s' = %d\n", aafFilename, trackInfo.size());
+    mxf_log_debug("Number of tracks extracted from '%s' = %d\n", aafFilename, trackInfo.size());
     
     vector<APTTrackInfo>::const_iterator iter;
     for (i = 0, iter = trackInfo.begin(); iter != trackInfo.end(); iter++, i++)
@@ -687,11 +687,11 @@ void AvidP2Transfer::processAvidComposition(const char* filename)
                 singleTrackInfo.mxfFilename = rewriteFilepath(buffer3);
                 
                 trackInfo.push_back(singleTrackInfo);
-                mxf_log(MXF_DLOG, "MXF source file located at '%s'\n", singleTrackInfo.mxfFilename.c_str());
-                mxf_log(MXF_DLOG, "MXF composition track length (%d/%d) %lld\n",
+                mxf_log_debug("MXF source file located at '%s'\n", singleTrackInfo.mxfFilename.c_str());
+                mxf_log_debug("MXF composition track length (%d/%d) %lld\n",
                     singleTrackInfo.compositionEditRate.numerator, singleTrackInfo.compositionEditRate.denominator, 
                     singleTrackInfo.compositionTrackLength);
-                mxf_log(MXF_DLOG, "MXF source track length (%d/%d) %lld\n",
+                mxf_log_debug("MXF source track length (%d/%d) %lld\n",
                     singleTrackInfo.sourceEditRate.numerator, singleTrackInfo.sourceEditRate.denominator, 
                     singleTrackInfo.sourceTrackLength);
                 

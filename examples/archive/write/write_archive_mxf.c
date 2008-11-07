@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.5 2008/09/24 17:29:57 philipn Exp $
+ * $Id: write_archive_mxf.c,v 1.6 2008/11/07 14:12:59 philipn Exp $
  *
  * 
  *
@@ -278,7 +278,7 @@ static int verify_essence_write_state(ArchiveMXFWriter* output, int writeTimecod
     {
         if (output->essWriteState.haveTimecode)
         {
-            mxf_log(MXF_ELOG, "Timecode already written" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Timecode already written" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
     }
@@ -286,12 +286,12 @@ static int verify_essence_write_state(ArchiveMXFWriter* output, int writeTimecod
     {
         if (!output->essWriteState.haveTimecode)
         {
-            mxf_log(MXF_ELOG, "Must first write timecode before video frame" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Must first write timecode before video frame" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
         if (output->essWriteState.haveVideo)
         {
-            mxf_log(MXF_ELOG, "Video frame already written" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Video frame already written" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
     }
@@ -299,7 +299,7 @@ static int verify_essence_write_state(ArchiveMXFWriter* output, int writeTimecod
     {
         if (!output->essWriteState.haveVideo)
         {
-            mxf_log(MXF_ELOG, "Must write video frame before audio frames" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Must write video frame before audio frames" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
     }
@@ -1240,7 +1240,7 @@ int write_video_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size)
 
     if (size != g_videoFrameSize)
     {
-        mxf_log(MXF_ELOG, "Invalid video frame size %ld; expecting %ld" LOG_LOC_FORMAT, size, g_videoFrameSize, LOG_LOC_PARAMS);
+        mxf_log_error("Invalid video frame size %ld; expecting %ld" LOG_LOC_FORMAT, size, g_videoFrameSize, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -1263,7 +1263,7 @@ int write_audio_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size)
 
     if (size != g_audioFrameSize)
     {
-        mxf_log(MXF_ELOG, "Invalid audio frame size %ld; expecting %ld" LOG_LOC_FORMAT, size, g_audioFrameSize, LOG_LOC_PARAMS);
+        mxf_log_error("Invalid audio frame size %ld; expecting %ld" LOG_LOC_FORMAT, size, g_audioFrameSize, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -1434,7 +1434,7 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* d3InfaxDa
         
         if (!locatedAtLeastOneVTRError)
         {
-            mxf_log(MXF_WLOG, "Failed to find the position of at least one D3 VTR error in first %d "
+            mxf_log_warn("Failed to find the position of at least one D3 VTR error in first %d "
                 "- not recording any errors" LOG_LOC_FORMAT, MAXIMUM_ERROR_CHECK, LOG_LOC_PARAMS);
         }
         else
@@ -1565,7 +1565,7 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* d3InfaxDa
                 if (!find_position_at_dual_timecode(&vitcIndexSearcher, &vtrError->vitcTimecode, 
                     &ltcIndexSearcher, &vtrError->ltcTimecode, &errorPosition))
                 {
-                    mxf_log(MXF_WLOG, "Failed to find the position of the D3 VTR error %ld" LOG_LOC_FORMAT, errorIndex, LOG_LOC_PARAMS);
+                    mxf_log_warn("Failed to find the position of the D3 VTR error %ld" LOG_LOC_FORMAT, errorIndex, LOG_LOC_PARAMS);
                     continue;
                 }
                 
@@ -1696,7 +1696,7 @@ static int update_header_metadata(MXFFile* mxfFile, uint64_t headerByteCount, In
             if (mxf_equals_key(&key, &MXF_SET_K(D3P_InfaxFramework)))
             {
                 ltoInfaxSetFound = 0;
-                CHK_OFAIL(mxf_read_and_return_set(mxfFile, &key, len, headerMetadata, 1, &frameworkSet));
+                CHK_OFAIL(mxf_read_and_return_set(mxfFile, &key, len, headerMetadata, 1, &frameworkSet) == 1);
                 if (mxf_have_item(frameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_Format)))
                 {
                     CHK_OFAIL(mxf_get_utf16string_item(frameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_Format), formatString));
@@ -1730,7 +1730,7 @@ static int update_header_metadata(MXFFile* mxfFile, uint64_t headerByteCount, In
                 CHK_OFAIL(!networkLocatorSetFoundAndUpdated);
                 
                 /* update set (and debug check the length hasn't changed) */
-                CHK_OFAIL(mxf_read_and_return_set(mxfFile, &key, len, headerMetadata, 1, &networkLocatorSet));
+                CHK_OFAIL(mxf_read_and_return_set(mxfFile, &key, len, headerMetadata, 1, &networkLocatorSet) == 1);
                 CHK_OFAIL(convert_string(newFilename, &tempString));
                 CHK_OFAIL(mxf_set_fixed_size_utf16string_item(networkLocatorSet, &MXF_ITEM_K(NetworkLocator, URLString), 
                     tempString, NETWORK_LOCATOR_URL_SIZE));
@@ -1811,7 +1811,7 @@ int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, Infa
     /* read the header partition pack */
     if (!mxf_read_header_pp_kl(mxfFile, &key, &llen, &len))
     {
-        mxf_log(MXF_ELOG, "Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     CHK_OFAIL(mxf_read_partition(mxfFile, &key, &headerPartition));
@@ -1828,7 +1828,7 @@ int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, Infa
     /* read the footer partition pack */
     if (!mxf_read_kl(mxfFile, &key, &llen, &len))
     {
-        mxf_log(MXF_ELOG, "Could not find footer partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Could not find footer partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     CHK_OFAIL(mxf_read_partition(mxfFile, &key, &footerPartition));
@@ -1889,20 +1889,20 @@ int64_t get_archive_mxf_content_package_size(int numAudioTracks)
     int cpySize = (int)(endField - startField); \
     if (cpySize < 0) \
     { \
-        mxf_log(MXF_ELOG, "invalid infax string field" LOG_LOC_FORMAT, LOG_LOC_PARAMS); \
+        mxf_log_error("invalid infax string field" LOG_LOC_FORMAT, LOG_LOC_PARAMS); \
         return 0; \
     } \
     else if (cpySize >= size) \
     { \
         if (beStrict) \
         { \
-            mxf_log(MXF_ELOG, "Infax string size (%d) exceeds limit (%d)" \
+            mxf_log_error("Infax string size (%d) exceeds limit (%d)" \
                 LOG_LOC_FORMAT, endField - startField, size, LOG_LOC_PARAMS); \
             return 0; \
         } \
         else \
         { \
-            mxf_log(MXF_WLOG, "Infax string size (%d) exceeds limit (%d) - string will be truncated" \
+            mxf_log_warn("Infax string size (%d) exceeds limit (%d) - string will be truncated" \
                 LOG_LOC_FORMAT, endField - startField, size, LOG_LOC_PARAMS); \
             cpySize = size - 1; \
         } \
@@ -2019,7 +2019,7 @@ int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, int beSt
                 PARSE_UINT32(infaxData->itemNo, beStrict);
                 break;
             default:
-                mxf_log(MXF_ELOG, "Invalid Infax data string ('%s')" LOG_LOC_FORMAT, infaxDataString, LOG_LOC_PARAMS);
+                mxf_log_error("Invalid Infax data string ('%s')" LOG_LOC_FORMAT, infaxDataString, LOG_LOC_PARAMS);
                 return 0;            
         }
         

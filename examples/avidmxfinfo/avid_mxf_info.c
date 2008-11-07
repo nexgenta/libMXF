@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.4 2008/10/24 19:14:07 john_f Exp $
+ * $Id: avid_mxf_info.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -412,7 +412,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     
     memset(info, 0, sizeof(AvidMXFInfo));
     info->frameLayout = 0xff; /* unknown (0 is known) */
-    
+
 
     /* open file */
     
@@ -430,7 +430,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     CHECK(is_op_atom(&headerPartition->operationalPattern), -4);
     
     
-    /* read the header metadata */
+    /* read the header metadata (filter out meta-dictionary and dictionary except data defs) */
     
     DCHECK(mxf_load_data_model(&dataModel));
     DCHECK(mxf_avid_load_extensions(dataModel));
@@ -439,7 +439,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     DCHECK(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
     DCHECK(mxf_is_header_metadata(&key));
     DCHECK(mxf_create_header_metadata(&headerMetadata, dataModel));
-    DCHECK(mxf_read_header_metadata(mxfFile, headerMetadata, headerPartition->headerByteCount, &key, llen, len));
+    DCHECK(mxf_avid_read_filtered_header_metadata(mxfFile, 0, headerMetadata, headerPartition->headerByteCount, &key, llen, len));
     
     
     /* get the preface and info */

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.h,v 1.4 2008/10/08 09:34:21 philipn Exp $
+ * $Id: mxf_avid.h,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -31,33 +31,8 @@ extern "C"
 
 
 #include <mxf/mxf_avid_labels_and_keys.h>
-#include <mxf/mxf_avid_metadict_blob.h>
-
-
-typedef struct _MXFAvidObjectReference
-{
-    struct _MXFAvidObjectReference* next;
-    
-    mxfUUID instanceUID;
-    uint64_t offset;
-    uint8_t flags;
-} MXFAvidObjectReference;
-
-typedef struct
-{
-    MXFAvidObjectReference* references;
-} MXFAvidObjectDirectory;
-
-typedef struct
-{
-    mxfUUID id;
-    int64_t directoryOffset;
-    uint32_t formatVersion;
-    mxfUUID metaDictionaryInstanceUID;
-    mxfUUID prefaceInstanceUID;
-} MXFAvidMetadataRoot;
-
-typedef MXFMetadataSet MXFAvidMetadataRootSet;
+#include <mxf/mxf_avid_metadictionary.h>
+#include <mxf/mxf_avid_dictionary.h>
 
 
 #define MXF_LABEL(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15) \
@@ -75,7 +50,11 @@ typedef MXFMetadataSet MXFAvidMetadataRootSet;
 int mxf_avid_load_extensions(MXFDataModel* dataModel);
 
 
+int mxf_avid_read_filtered_header_metadata(MXFFile* mxfFile, int skipDataDefs, MXFHeaderMetadata* headerMetadata, 
+    uint64_t headerByteCount, const mxfKey* key, uint8_t llen, uint64_t len);
+
 int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata);
+
 
 void mxf_generate_aafsdk_umid(mxfUMID* umid);
 void mxf_generate_old_aafsdk_umid(mxfUMID* umid);
@@ -97,6 +76,7 @@ int mxf_avid_read_string_user_comments(MXFMetadataSet* packageSet, MXFList** nam
 
 int mxf_avid_get_mob_attribute(const mxfUTF16Char* name, const MXFList* names, const MXFList* values, const mxfUTF16Char** value);
 int mxf_avid_get_user_comment(const mxfUTF16Char* name, const MXFList* names, const MXFList* values, const mxfUTF16Char** value);
+
 
 
 #ifdef __cplusplus

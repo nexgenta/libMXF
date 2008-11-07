@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_index_helper.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: mxf_index_helper.c,v 1.2 2008/11/07 14:12:59 philipn Exp $
  *
  * Utility functions for navigating through the essence data
  *
@@ -669,7 +669,7 @@ int set_position(MXFFile* mxfFile, FileIndex* index, mxfPosition position)
                     }
                     else
                     {
-                        mxf_log(MXF_ELOG, "Unexpected key found in essence data" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                        mxf_log_error("Unexpected key found in essence data" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                         goto fail;
                     }
                 }

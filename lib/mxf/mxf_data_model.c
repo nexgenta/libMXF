@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.c,v 1.3 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_data_model.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -408,7 +408,7 @@ int mxf_register_compound_type_member(MXFItemType* type, const char* memberName,
     }
     if (memberIndex == maxMembers)
     {
-        mxf_log(MXF_ELOG, "Number of compound item type members exceeds hardcoded maximum %d" 
+        mxf_log_error("Number of compound item type members exceeds hardcoded maximum %d" 
             LOG_LOC_FORMAT, maxMembers, LOG_LOC_PARAMS);
         return 0;
     }
@@ -519,7 +519,7 @@ int mxf_check_data_model(MXFDataModel* dataModel)
             {
                 char keyStr[KEY_STR_SIZE];
                 mxf_sprint_key(keyStr, &setDef1->key);
-                mxf_log(MXF_WLOG, "Duplicate set def found. Key = %s" 
+                mxf_log_warn("Duplicate set def found. Key = %s" 
                     LOG_LOC_FORMAT, keyStr, LOG_LOC_PARAMS); 
                 return 0;
             }
@@ -541,7 +541,7 @@ int mxf_check_data_model(MXFDataModel* dataModel)
         {
             char keyStr[KEY_STR_SIZE];
             mxf_sprint_key(keyStr, &itemDef1->key);
-            mxf_log(MXF_WLOG, "Found item def not contained in any set def. Key = %s" 
+            mxf_log_warn("Found item def not contained in any set def. Key = %s" 
                 LOG_LOC_FORMAT, keyStr, LOG_LOC_PARAMS); 
             return 0;
         }
@@ -555,7 +555,7 @@ int mxf_check_data_model(MXFDataModel* dataModel)
             {
                 char keyStr[KEY_STR_SIZE];
                 mxf_sprint_key(keyStr, &itemDef1->key);
-                mxf_log(MXF_WLOG, "Duplicate item def found. Key = %s" 
+                mxf_log_warn("Duplicate item def found. Key = %s" 
                     LOG_LOC_FORMAT, keyStr, LOG_LOC_PARAMS); 
                 return 0;
             }
@@ -563,7 +563,7 @@ int mxf_check_data_model(MXFDataModel* dataModel)
             {
                 char keyStr[KEY_STR_SIZE];
                 mxf_sprint_key(keyStr, &itemDef1->key);
-                mxf_log(MXF_WLOG, "Duplicate item def local tag found. LocalTag = 0x%04x, Key = %s" 
+                mxf_log_warn("Duplicate item def local tag found. LocalTag = 0x%04x, Key = %s" 
                     LOG_LOC_FORMAT, itemDef1->localTag, keyStr, LOG_LOC_PARAMS); 
                 return 0;
             }
@@ -574,7 +574,7 @@ int mxf_check_data_model(MXFDataModel* dataModel)
         {
             char keyStr[KEY_STR_SIZE];
             mxf_sprint_key(keyStr, &itemDef1->key);
-            mxf_log(MXF_WLOG, "Item def has unknown type (%d). LocalTag = 0x%04x, Key = %s" 
+            mxf_log_warn("Item def has unknown type (%d). LocalTag = 0x%04x, Key = %s" 
                 LOG_LOC_FORMAT, itemDef1->typeId, itemDef1->localTag, keyStr, LOG_LOC_PARAMS); 
             return 0;
         }
@@ -648,21 +648,35 @@ MXFItemType* mxf_get_item_def_type(MXFDataModel* dataModel, unsigned int typeId)
 
 int mxf_is_subclass_of(MXFDataModel* dataModel, const mxfKey* setKey, const mxfKey* parentSetKey)
 {
-    MXFSetDef* set;
+    MXFSetDef* setDef;
 
     if (mxf_equals_key(setKey, parentSetKey))
     {
         return 1;
     }
     
-    if (!mxf_find_set_def(dataModel, setKey, &set))
+    if (!mxf_find_set_def(dataModel, setKey, &setDef))
     {
         return 0;
     }
-    if (mxf_equals_key(setKey, &set->parentSetDefKey))
-    {
-        return 0;
-    }
-    return mxf_is_subclass_of(dataModel, &set->parentSetDefKey, parentSetKey);
+
+    return mxf_is_subclass_of_2(dataModel, setDef, parentSetKey);
 }
+
+int mxf_is_subclass_of_2(MXFDataModel* dataModel, MXFSetDef* setDef, const mxfKey* parentSetKey)
+{
+    if (mxf_equals_key(&setDef->key, parentSetKey))
+    {
+        return 1;
+    }
+
+    if (setDef->parentSetDef == NULL ||
+        mxf_equals_key(&setDef->key, &setDef->parentSetDefKey))
+    {
+        return 0;
+    }
+
+    return mxf_is_subclass_of_2(dataModel, setDef->parentSetDef, parentSetKey);
+}
+
 

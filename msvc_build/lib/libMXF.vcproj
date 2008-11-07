@@ -105,7 +105,10 @@
 				RelativePath="..\..\lib\products\mxf_avid.c">
 			</File>
 			<File
-				RelativePath="..\..\lib\products\mxf_avid_metadict_blob.c">
+				RelativePath="..\..\lib\products\mxf_avid_dictionary.c">
+			</File>
+			<File
+				RelativePath="..\..\lib\products\mxf_avid_metadictionary.c">
 			</File>
 			<File
 				RelativePath="..\..\lib\mxf\mxf_data_model.c">
@@ -164,13 +167,22 @@
 				RelativePath="..\..\lib\include\mxf\mxf_avid.h">
 			</File>
 			<File
+				RelativePath="..\..\lib\include\mxf\mxf_avid_dictionary.h">
+			</File>
+			<File
+				RelativePath="..\..\lib\products\mxf_avid_dictionary_data.h">
+			</File>
+			<File
 				RelativePath="..\..\lib\include\mxf\mxf_avid_extensions_data_model.h">
 			</File>
 			<File
 				RelativePath="..\..\lib\include\mxf\mxf_avid_labels_and_keys.h">
 			</File>
 			<File
-				RelativePath="..\..\lib\include\mxf\mxf_avid_metadict_blob.h">
+				RelativePath="..\..\lib\include\mxf\mxf_avid_metadictionary.h">
+			</File>
+			<File
+				RelativePath="..\..\lib\products\mxf_avid_metadictionary_data.h">
 			</File>
 			<File
 				RelativePath="..\..\lib\include\mxf\mxf_baseline_data_model.h">

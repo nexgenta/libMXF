@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 2008/05/07 15:21:48 philipn Exp $
+# $Id: Makefile,v 1.2 2008/11/07 14:12:59 philipn Exp $
 #
 # Makefile for building tools directory
 #
@@ -23,16 +23,10 @@
 
 .PHONY: all
 all:
-	$(MAKE) -C avid_metadict_blob
+	$(MAKE) -C extract_avid_extensions
 
 .PHONY: clean
 clean:
-	$(MAKE) -C avid_metadict_blob $@
+	$(MAKE) -C extract_avid_extensions $@
 
-.PHONY: check
-check: all
-	$(MAKE) -C avid_metadict_blob $@
 
-.PHONY: valgrind-check
-valgrind-check: all
-	$(MAKE) -C avid_metadict_blob $@

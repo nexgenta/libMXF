@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_page_file.c,v 1.4 2008/10/22 09:32:19 john_f Exp $
+ * $Id: mxf_page_file.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * 
  *
@@ -199,7 +199,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
 
     if (page->wasRemoved)
     {
-        mxf_log(MXF_WLOG, "Failed to open mxf page file which was removed after truncation\n");
+        mxf_log_warn("Failed to open mxf page file which was removed after truncation\n");
         return 0;
     }
 
@@ -320,7 +320,7 @@ static int open_file(MXFFileSysData* sysData, Page* page)
     if (newFile == NULL)
 #endif
     {
-        mxf_log(MXF_ELOG, "Failed to open paged mxf file '%s': %s\n", filename, strerror(errno));
+        mxf_log_error("Failed to open paged mxf file '%s': %s\n", filename, strerror(errno));
         return 0;
     }
     
@@ -704,7 +704,7 @@ int mxf_page_file_open_new(const char* filenameTemplate, int64_t pageSize, MXFPa
     
     if (strstr(filenameTemplate, "%d") == NULL)
     {
-        mxf_log(MXF_ELOG, "Filename template '%s' doesn't contain %%d\n", filenameTemplate);
+        mxf_log_error("Filename template '%s' doesn't contain %%d\n", filenameTemplate);
         return 0;
     }
     
@@ -757,7 +757,7 @@ int mxf_page_file_open_read(const char* filenameTemplate, MXFPageFile** mxfPageF
     
     if (strstr(filenameTemplate, "%d") == NULL)
     {
-        mxf_log(MXF_ELOG, "Filename template '%s' doesn't contain %%d\n", filenameTemplate);
+        mxf_log_error("Filename template '%s' doesn't contain %%d\n", filenameTemplate);
         return 0;
     }
     
@@ -811,7 +811,7 @@ int mxf_page_file_open_read(const char* filenameTemplate, MXFPageFile** mxfPageF
     sprintf(filename, filenameTemplate, 0);
     if (stat(filename, &st) != 0)
     {
-        mxf_log(MXF_ELOG, "Failed to stat file '%s': %s\n", filename, strerror(errno));
+        mxf_log_error("Failed to stat file '%s': %s\n", filename, strerror(errno));
         goto fail;
     }
     newMXFFile->sysData->pageSize = st.st_size;
@@ -832,7 +832,7 @@ int mxf_page_file_open_read(const char* filenameTemplate, MXFPageFile** mxfPageF
     sprintf(filename, filenameTemplate, newMXFFile->sysData->numPages - 1);
     if (stat(filename, &st) != 0)
     {
-        mxf_log(MXF_ELOG, "Failed to stat file '%s': %s\n", filename, strerror(errno));
+        mxf_log_error("Failed to stat file '%s': %s\n", filename, strerror(errno));
         goto fail;
     }
     newMXFFile->sysData->pages[newMXFFile->sysData->numPages - 1].size = st.st_size;
@@ -861,7 +861,7 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
     
     if (strstr(filenameTemplate, "%d") == NULL)
     {
-        mxf_log(MXF_ELOG, "Filename template '%s' doesn't contain %%d\n", filenameTemplate);
+        mxf_log_error("Filename template '%s' doesn't contain %%d\n", filenameTemplate);
         return 0;
     }
 
@@ -891,12 +891,12 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
         fileSize = disk_file_size(filename);
         if (fileSize < 0)
         {
-            mxf_log(MXF_ELOG, "Failed to stat file '%s': %s\n", filename, strerror(errno));
+            mxf_log_error("Failed to stat file '%s': %s\n", filename, strerror(errno));
             return 0;
         }
         if (pageSize != fileSize)
         {
-            mxf_log(MXF_ELOG, "Size of first file '%s' (%"PFi64" does not equal page size %"PFi64"\n", filename, fileSize, pageSize);
+            mxf_log_error("Size of first file '%s' (%"PFi64" does not equal page size %"PFi64"\n", filename, fileSize, pageSize);
             return 0;
         }
     }
@@ -945,7 +945,7 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
     fileSize = disk_file_size(filename);
     if (fileSize < 0)
     {
-        mxf_log(MXF_ELOG, "Failed to stat file '%s': %s\n", filename, strerror(errno));
+        mxf_log_error("Failed to stat file '%s': %s\n", filename, strerror(errno));
         goto fail;
     }
     newMXFFile->sysData->pages[newMXFFile->sysData->numPages - 1].size = fileSize;
@@ -989,7 +989,7 @@ int mxf_page_file_forward_truncate(MXFPageFile* mxfPageFile)
     
     if (sysData->mode == READ_MODE)
     {
-        mxf_log(MXF_ELOG, "Cannot forward truncate read-only mxf page file\n");
+        mxf_log_error("Cannot forward truncate read-only mxf page file\n");
         return 0;
     }
     
@@ -1041,7 +1041,7 @@ int mxf_page_file_forward_truncate(MXFPageFile* mxfPageFile)
         if (truncate(filename, 0) != 0)
 #endif
         {
-            mxf_log(MXF_WLOG, "Failed to truncate '%s' to zero length: %s\n", filename, strerror(errno));
+            mxf_log_warn("Failed to truncate '%s' to zero length: %s\n", filename, strerror(errno));
         }
         sysData->pages[i].wasRemoved = 1;
     }

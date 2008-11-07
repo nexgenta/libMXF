@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_op1a_reader.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: mxf_op1a_reader.c,v 1.2 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF OP-1A reader
  *
@@ -505,7 +505,7 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
         }
         else
         {
-            mxf_log(MXF_ELOG, "Unsupported file descriptor" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Unsupported file descriptor" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
     }
@@ -629,7 +629,7 @@ fail:
     if (!mxf_append_list_element(partitions, partition))
     {
         mxf_free_partition(&partition);
-        mxf_log(MXF_ELOG, "Failed to append header partition to list" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to append header partition to list" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -1058,11 +1058,11 @@ int op1a_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
             {
                 if (!mxf_partition_is_closed(&partition->key))
                 {
-                    mxf_log(MXF_WLOG, "No closed partition with header metadata found" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                    mxf_log_warn("No closed partition with header metadata found" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                 }
                 if (!mxf_partition_is_complete(&partition->key))
                 {
-                    mxf_log(MXF_WLOG, "No complete partition with header metadata found" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                    mxf_log_warn("No complete partition with header metadata found" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                 }
                 
                 /* seek to start of partition and skip the partition pack */
@@ -1080,7 +1080,7 @@ int op1a_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
         }
         if (i < 0)
         {
-            mxf_log(MXF_ELOG, "No partition with header metadata found" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("No partition with header metadata found" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             goto fail;
         }
 
@@ -1099,11 +1099,11 @@ int op1a_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
         /* process the header metadata */
         if (!mxf_partition_is_closed(&data->headerPartition->key))
         {
-            mxf_log(MXF_WLOG, "Header partition is not closed" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_warn("Header partition is not closed" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         }
         if (!mxf_partition_is_complete(&data->headerPartition->key))
         {
-            mxf_log(MXF_WLOG, "Header partition is incomplete" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_warn("Header partition is incomplete" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         }
         CHK_OFAIL(process_metadata(reader, data->headerPartition));
         

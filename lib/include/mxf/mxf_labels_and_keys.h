@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.4 2008/10/08 09:35:27 philipn Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -685,8 +685,10 @@ int is_op_1a(const mxfUL* label);
 #define MXF_DM_L(name) \
     g_##name##_dmscheme_label
 
+static const mxfUL MXF_DM_L(DMS1) = 
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x04, 0x01, 0x01, 0x01, 0x01, 0x00};
 
-    
+
 
 #ifdef __cplusplus
 }

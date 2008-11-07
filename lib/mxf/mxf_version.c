@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_version.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_version.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * libMXF version information
  *
@@ -23,7 +23,7 @@
 #include <mxf/mxf.h>
 
 
-static mxfProductVersion g_libmxfVersion = {0, 1, 0, 0, 0};
+static mxfProductVersion g_libmxfVersion = {1, 0, 0, 0, 0};
 
 
 #if defined (__linux__)

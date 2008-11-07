@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_header_metadata.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_header_metadata.h,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF header metadata
  *
@@ -109,6 +109,7 @@ int mxf_read_filtered_header_metadata(MXFFile* mxfFile, MXFReadFilter* filter,
     MXFHeaderMetadata* headerMetadata, uint64_t headerByteCount, const mxfKey* key, uint8_t llen, uint64_t len);
 int mxf_read_set(MXFFile* mxfFile, const mxfKey* key, uint64_t len,
     MXFHeaderMetadata* headerMetadata, int addToHeaderMetadata);
+/* returns 1 on success, 0 for failure, 2 if it is an unknown set and "set" parameter is set to NULL */
 int mxf_read_and_return_set(MXFFile* mxfFile, const mxfKey* key, uint64_t len,
     MXFHeaderMetadata* headerMetadata, int addToHeaderMetadata, MXFMetadataSet** set);
 int mxf_read_item_tl(MXFFile* mxfFile, mxfLocalTag* itemTag, uint16_t* itemLen);

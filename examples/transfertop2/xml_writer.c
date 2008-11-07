@@ -1,5 +1,5 @@
 /*
- * $Id: xml_writer.c,v 1.2 2007/09/11 13:24:48 stuart_hc Exp $
+ * $Id: xml_writer.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * Simple XML writer
  *
@@ -70,7 +70,7 @@ int xml_writer_open(const char* filename, XMLWriter** writer)
 
     if ((newWriter->file = fopen(filename, "wb")) == NULL)
     {
-        mxf_log(MXF_ELOG, "Failed to open xml file '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to open xml file '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
         goto fail;
     }
     

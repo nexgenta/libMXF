@@ -1,9 +1,9 @@
 #
-# $Id: Makefile,v 1.2 2008/05/07 15:22:43 philipn Exp $
+# $Id: Makefile,v 1.1 2008/11/07 14:12:59 philipn Exp $
 #
-# Makefile for building blob tools
 #
-# Copyright (C) 2006  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
+#
+# Copyright (C) 2008  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -25,21 +25,15 @@ include $(TOPLEVEL)/vars.mk
 
 
 .PHONY: all
-all: extract_blob gen_blob_source
+all: extract_avid_extensions
 
-gen_blob_source: gen_blob_source.o
-	$(CC) gen_blob_source.o -o gen_blob_source
+extract_avid_extensions: extract_avid_extensions.o
+	$(CC) extract_avid_extensions.o -L$(LIBMXF_DIR) -lMXF $(UUIDLIB) -o extract_avid_extensions
 
-gen_blob_source.o: gen_blob_source.c
-	$(CC) $(CFLAGS) -c gen_blob_source.c
-
-extract_blob: extract_blob.o
-	$(CC) extract_blob.o -o extract_blob
-
-extract_blob.o: extract_blob.c
-	$(CC) $(CFLAGS) -c extract_blob.c
+extract_avid_extensions.o: extract_avid_extensions.c
+	$(CC) $(CFLAGS) -c extract_avid_extensions.c
 
 
 .PHONY: clean
 clean:
-	@rm -f *~ *.o gen_blob_source extract_blob
+	@rm -f *~ *.o extract_avid_extensions

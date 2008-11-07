@@ -1,5 +1,5 @@
 /*
- * $Id: writeaviddv50.c,v 1.3 2008/10/24 19:14:07 john_f Exp $
+ * $Id: writeaviddv50.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
  *
  * Example showing how to create Avid supported MXF OP-Atom files containing DV-50 
  *
@@ -56,6 +56,7 @@ int write_dv50(FILE* dv50File, MXFFile* mxfFile, int test)
     MXFPartition* bodyPartition;
     MXFPartition* footerPartition;
     MXFHeaderMetadata* headerMetadata = NULL;
+    MXFMetadataSet* metaDictSet = NULL;
     MXFMetadataSet* prefaceSet = NULL;
     MXFMetadataSet* identSet = NULL;
     MXFMetadataSet* contentStorageSet = NULL;
@@ -143,6 +144,11 @@ int write_dv50(FILE* dv50File, MXFFile* mxfFile, int test)
     /* create the header metadata */
     
     CHK_ORET(mxf_create_header_metadata(&headerMetadata, dataModel));
+    
+    
+    /* create the Avid meta-dictionary */
+    
+    CHK_ORET(mxf_avid_create_default_metadictionary(headerMetadata, &metaDictSet));
     
     
     /* Preface */

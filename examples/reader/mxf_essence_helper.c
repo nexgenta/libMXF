@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.4 2008/10/29 17:54:26 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -512,13 +512,13 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
                 essenceTrack->frameSize = -1; /* variable */
                 break;
             default:
-                mxf_log(MXF_ELOG, "Unsupported Avid MJPEG resolution %d" LOG_LOC_FORMAT, avidResolutionID, LOG_LOC_PARAMS);
+                mxf_log_error("Unsupported Avid MJPEG resolution %d" LOG_LOC_FORMAT, avidResolutionID, LOG_LOC_PARAMS);
                 return 0;
         }
     }
     else
     {
-        mxf_log(MXF_ELOG, "Unsupported essence type" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Unsupported essence type" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -596,8 +596,9 @@ int convert_aes_to_pcm(uint32_t channelCount, uint32_t bitsPerSample,
     uint16_t sampleNum;
     uint8_t channel;
     uint8_t channelNumber;
+    uint8_t validChannelCount;
 
-    CHK_ORET(channelCount == aes3ChannelCount); 
+    CHK_ORET(channelCount <= aes3ChannelCount);
     CHK_ORET(blockAlign >= 1 && blockAlign <= 3); /* only 8-bit to 24-bit sample size possible */
     CHK_ORET(audioSampleCount == (aesDataLen - 4) / (8 * 4)); /* 4 bytes per sample, 8 channels */
     CHK_ORET((buffer[4 + 4 * 8 + 3] & 0x40) == 0x00); /* channel status bit 1 is 0 to indicated normal audio present */
@@ -606,7 +607,8 @@ int convert_aes_to_pcm(uint32_t channelCount, uint32_t bitsPerSample,
     pcmDataPtr = &buffer[0];
     for (sampleNum = 0; sampleNum < audioSampleCount; sampleNum++)
     {
-        for (channel = 0; channel < 8; channel++)
+        validChannelCount = 0;
+        for (channel = 0; channel < 8 && validChannelCount < channelCount; channel++)
         {
             /* write audio channel if contains valid audio data */
             channelNumber = aesDataPtr[0] & 0x07;
@@ -638,6 +640,8 @@ int convert_aes_to_pcm(uint32_t channelCount, uint32_t bitsPerSample,
                         return 0;
                 }
                 pcmDataPtr += blockAlign;
+                
+                validChannelCount++;
             }
             aesDataPtr += 4 ; /* 4 bytes per sample */
         }

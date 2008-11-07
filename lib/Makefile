@@ -23,7 +23,8 @@ OBJS = $(MXF_DIR)/mxf_version.o \
 	$(MXF_DIR)/mxf_data_model.o \
 	$(MXF_DIR)/mxf_header_metadata.o \
 	$(PRODUCTS_DIR)/mxf_avid.o \
-	$(PRODUCTS_DIR)/mxf_avid_metadict_blob.o \
+	$(PRODUCTS_DIR)/mxf_avid_metadictionary.o \
+	$(PRODUCTS_DIR)/mxf_avid_dictionary.o \
 	$(PRODUCTS_DIR)/mxf_p2.o \
 	$(UTILS_DIR)/mxf_uu_metadata.o \
 	$(UTILS_DIR)/mxf_page_file.o
@@ -44,12 +45,14 @@ INCLUDE_FILES = $(INCLUDES_DIR)/mxf/mxf_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_version.h \
 	$(INCLUDES_DIR)/mxf/mxf_types.h \
 	$(INCLUDES_DIR)/mxf/mxf_avid.h \
-	$(INCLUDES_DIR)/mxf/mxf_avid_metadict_blob.h \
+	$(INCLUDES_DIR)/mxf/mxf_avid_metadictionary.h \
+	$(INCLUDES_DIR)/mxf/mxf_avid_dictionary.h \
 	$(INCLUDES_DIR)/mxf/mxf_avid_extensions_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_avid_labels_and_keys.h \
 	$(INCLUDES_DIR)/mxf/mxf_p2.h \
 	$(INCLUDES_DIR)/mxf/mxf_p2_extensions_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_uu_metadata.h
+
 
 
 
@@ -98,10 +101,13 @@ $(MXF_DIR)/mxf_version.o: $(MXF_DIR)/mxf_version.c $(INCLUDE_FILES)
 	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_version.c -o $(MXF_DIR)/mxf_version.o
 
 
-$(PRODUCTS_DIR)/mxf_avid_metadict_blob.o: $(PRODUCTS_DIR)/mxf_avid_metadict_blob.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(PRODUCTS_DIR)/mxf_avid_metadict_blob.c -o $(PRODUCTS_DIR)/mxf_avid_metadict_blob.o
+$(PRODUCTS_DIR)/mxf_avid_dictionary.o: $(PRODUCTS_DIR)/mxf_avid_dictionary.c $(INCLUDE_FILES) $(PRODUCTS_DIR)/mxf_avid_dictionary_data.h
+	$(CC) -c -I$(INCLUDES_DIR) $(PRODUCTS_DIR)/mxf_avid_dictionary.c -o $(PRODUCTS_DIR)/mxf_avid_dictionary.o
 
-$(PRODUCTS_DIR)/mxf_avid.o: $(PRODUCTS_DIR)/mxf_avid.c $(INCLUDE_FILES)
+$(PRODUCTS_DIR)/mxf_avid_metadictionary.o: $(PRODUCTS_DIR)/mxf_avid_metadictionary.c $(INCLUDE_FILES) $(PRODUCTS_DIR)/mxf_avid_metadictionary_data.h
+	$(CC) -c -I$(INCLUDES_DIR) $(PRODUCTS_DIR)/mxf_avid_metadictionary.c -o $(PRODUCTS_DIR)/mxf_avid_metadictionary.o
+
+$(PRODUCTS_DIR)/mxf_avid.o: $(PRODUCTS_DIR)/mxf_avid.c $(INCLUDE_FILES) $(AVID_INTERNAL_INCLUDE_FILES)
 	$(CC) -c -I$(INCLUDES_DIR) $(PRODUCTS_DIR)/mxf_avid.c -o $(PRODUCTS_DIR)/mxf_avid.o 
 
 $(PRODUCTS_DIR)/mxf_p2.o: $(PRODUCTS_DIR)/mxf_p2.c $(INCLUDE_FILES)

@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.10 2008/10/29 17:54:26 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.11 2008/11/07 14:12:59 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -135,6 +135,7 @@ typedef struct
     MXFPartition* bodyPartition;
     MXFPartition* footerPartition;
     MXFMetadataSet* prefaceSet;
+    MXFMetadataSet* dictionarySet;
     MXFMetadataSet* identSet;
     MXFMetadataSet* contentStorageSet;
     MXFMetadataSet* materialPackageSet;
@@ -414,6 +415,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     uint32_t maxTrackID;
     int64_t tapeLen;
     UserComment* userComment;
+    MXFMetadataSet* metaDictSet = NULL;
         
     
     mxf_generate_uuid(&thisGeneration);
@@ -446,10 +448,17 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     CHK_ORET(mxf_create_header_metadata(&writer->headerMetadata, writer->dataModel));
 
     
+    /* create the Avid meta-dictionary */
+    
+    CHK_ORET(mxf_avid_create_default_metadictionary(writer->headerMetadata, &metaDictSet));
+    
+    
     /* Preface */
     CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(Preface), &writer->prefaceSet));
+    CHK_ORET(mxf_set_int16_item(writer->prefaceSet, &MXF_ITEM_K(Preface, ByteOrder), 0x4949)); /* little-endian */
+    CHK_ORET(mxf_set_uint32_item(writer->prefaceSet, &MXF_ITEM_K(Preface, ObjectModelVersion), 0x00000001));
+    CHK_ORET(mxf_set_version_type_item(writer->prefaceSet, &MXF_ITEM_K(Preface, Version), 0x0101)); /* AAF SDK version */
     CHK_ORET(mxf_set_timestamp_item(writer->prefaceSet, &MXF_ITEM_K(Preface, LastModifiedDate), &clipWriter->now));
-    CHK_ORET(mxf_set_version_type_item(writer->prefaceSet, &MXF_ITEM_K(Preface, Version), 0x0102));
     CHK_ORET(mxf_set_ul_item(writer->prefaceSet, &MXF_ITEM_K(Preface, OperationalPattern), &MXF_OP_L(atom, complexity02)));
     CHK_ORET(mxf_alloc_array_item_elements(writer->prefaceSet, &MXF_ITEM_K(Preface, EssenceContainers), mxfUL_extlen, 1, &arrayElement));
     mxf_set_ul(&writer->essenceContainerLabel, arrayElement);
@@ -458,8 +467,17 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         CHK_ORET(mxf_set_utf16string_item(writer->prefaceSet, &MXF_ITEM_K(Preface, ProjectName), clipWriter->wProjectName));
     }
     CHK_ORET(mxf_set_rational_item(writer->prefaceSet, &MXF_ITEM_K(Preface, ProjectEditRate), &clipWriter->projectEditRate));
-
+    CHK_ORET(mxf_set_umid_item(writer->prefaceSet, &MXF_ITEM_K(Preface, MasterMobID), &materialPackage->uid));
+    CHK_ORET(mxf_set_umid_item(writer->prefaceSet, &MXF_ITEM_K(Preface, EssenceFileMobID), &filePackage->uid));
+    CHK_ORET(mxf_alloc_array_item_elements(writer->prefaceSet, &MXF_ITEM_K(Preface, DMSchemes), mxfUL_extlen, 1, &arrayElement));
+    mxf_set_ul(&MXF_DM_L(DMS1), arrayElement);
     
+
+    /* Preface - Dictionary */
+    CHK_ORET(mxf_avid_create_default_dictionary(writer->headerMetadata, &writer->dictionarySet));
+    CHK_ORET(mxf_set_strongref_item(writer->prefaceSet, &MXF_ITEM_K(Preface, Dictionary), writer->dictionarySet));
+
+
     /* Preface - ContentStorage */
     CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(ContentStorage), &writer->contentStorageSet));
     CHK_ORET(mxf_set_strongref_item(writer->prefaceSet, &MXF_ITEM_K(Preface, ContentStorage), writer->contentStorageSet));
@@ -476,6 +494,9 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         CHK_ORET(convert_string(clipWriter, materialPackage->name));
         CHK_ORET(mxf_set_utf16string_item(writer->materialPackageSet, &MXF_ITEM_K(GenericPackage, Name), clipWriter->wTmpString));
     }
+    /* TODO: what are ConvertFrameRate and AppCode for? */
+    CHK_ORET(mxf_set_boolean_item(writer->materialPackageSet, &MXF_ITEM_K(GenericPackage, ConvertFrameRate), 0));
+    CHK_ORET(mxf_set_int32_item(writer->materialPackageSet, &MXF_ITEM_K(GenericPackage, AppCode), 0x00000007));
 
     mxf_initialise_list_iter(&iter, &materialPackage->tracks);
     while (mxf_next_list_iter_element(&iter))
@@ -1190,7 +1211,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             else
             {
                 /* TODO */
-                mxf_log(MXF_ELOG, "Avid MJPEG NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_error("Avid MJPEG NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                 assert(0);
                 return 0;
             }
@@ -1473,7 +1494,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             }
             else
             {
-                mxf_log(MXF_ELOG, "IMX NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_error("IMX NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                 assert(0);
             }
             newTrackWriter->essenceElementKey = MXF_EE_K(IMX);
@@ -1701,7 +1722,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             else
             {
                 /* TODO */
-                mxf_log(MXF_ELOG, "Uncompressed 1080i NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_error("Uncompressed 1080i NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                 assert(0);
                 return 0;
             }
@@ -2103,7 +2124,7 @@ void abort_writing(AvidClipWriter** clipWriter, int deleteFile)
         {
             if (remove(trackWriter->filename) != 0)
             {
-                mxf_log(MXF_WLOG, "Failed to delete MXF file '%s'" LOG_LOC_FORMAT, trackWriter->filename, LOG_LOC_PARAMS);
+                mxf_log_warn("Failed to delete MXF file '%s'" LOG_LOC_FORMAT, trackWriter->filename, LOG_LOC_PARAMS);
             }
         }
     }

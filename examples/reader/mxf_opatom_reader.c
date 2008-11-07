@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.4 2008/10/29 17:54:26 john_f Exp $
+ * $Id: mxf_opatom_reader.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF OP-Atom reader
  *
@@ -217,7 +217,7 @@ static int read_avid_mjpeg_index_segment(MXFReader* reader)
                         }
                         break;
                     default:
-                        mxf_log(MXF_WLOG, "Unknown local item (%u) in index table segment", localTag);
+                        mxf_log_warn("Unknown local item (%u) in index table segment", localTag);
                         CHK_OFAIL(mxf_skip(reader->mxfFile, localLen));
                         totalLen += localLen;
                 }
@@ -324,12 +324,12 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
     CHK_ORET(mxf_finalise_data_model(reader->dataModel));
     
     
-    /* create and read the header metadata */
+    /* create and read the header metadata (filter out meta-dictionary and dictionary except data defs) */
     
     CHK_ORET(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
     CHK_ORET(mxf_is_header_metadata(&key));
     CHK_ORET(mxf_create_header_metadata(&data->headerMetadata, reader->dataModel));
-    CHK_ORET(mxf_read_header_metadata(mxfFile, data->headerMetadata, 
+    CHK_ORET(mxf_avid_read_filtered_header_metadata(mxfFile, 0, data->headerMetadata, 
         partition->headerByteCount, &key, llen, len));
     
     
@@ -446,7 +446,7 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
     }
     else
     {
-        mxf_log(MXF_ELOG, "Unsupported file descriptor" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Unsupported file descriptor" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
 

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_primer.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_primer.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF header metadata primer pack
  *
@@ -145,7 +145,7 @@ int mxf_register_primer_entry(MXFPrimerPack* primerPack, const mxfUID* itemUID, 
     {
         if (mxf_find_list_element(&primerPack->entries, (void*)&newTag, entry_eq_tag) != NULL)
         {
-            mxf_log(MXF_ELOG, "Local tag %x already in use" LOG_LOC_FORMAT, newTag, LOG_LOC_PARAMS);
+            mxf_log_error("Local tag %x already in use" LOG_LOC_FORMAT, newTag, LOG_LOC_PARAMS);
             return 0;
         }
 
@@ -203,7 +203,7 @@ int mxf_create_item_tag(MXFPrimerPack* primerPack, mxfLocalTag* localTag)
         tag = primerPack->nextTag--;
         if (tag < 0x8000)
         {
-            mxf_log(MXF_ELOG, "Could not create a unique tag - reached the end of the allowed dynamic tag values" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Could not create a unique tag - reached the end of the allowed dynamic tag values" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
         if (mxf_find_list_element(&primerPack->entries, (void*)&tag, entry_eq_tag) == NULL)

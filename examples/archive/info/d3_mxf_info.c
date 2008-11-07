@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info.c,v 1.4 2008/09/24 17:29:57 philipn Exp $
+ * $Id: d3_mxf_info.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * 
  *
@@ -163,7 +163,7 @@ static void get_content_package_len(Reader* reader)
         }
         else if (mxf_is_footer_partition_pack(&key))
         {
-            mxf_log(MXF_ILOG, "MXF file contains no essence data\n");
+            mxf_log_info("MXF file contains no essence data\n");
             
             /* restore file to the original position */
             mxf_file_seek(reader->mxfFile, filePos, SEEK_SET);
@@ -198,7 +198,7 @@ static void get_content_package_len(Reader* reader)
 
     
 fail:
-    mxf_log(MXF_WLOG, "Failed to determine the content package length in the MXF file\n");
+    mxf_log_warn("Failed to determine the content package length in the MXF file\n");
     reader->contentPackageLen = 0;
 
     /* restore file to the original position */
@@ -247,16 +247,16 @@ static void report_actual_frame_count(Reader* reader)
         if (reader->headerPartition->footerPartition == 0 ||
             essenceStartPos + frameCount * reader->contentPackageLen < (int64_t)reader->headerPartition->footerPartition)
         {
-            mxf_log(MXF_WLOG, "%"PFi64" complete frames are present in the MXF file\n", frameCount);
+            mxf_log_warn("%"PFi64" complete frames are present in the MXF file\n", frameCount);
         }
         else
         {
-            mxf_log(MXF_WLOG, "All frames are present in the MXF file\n");
+            mxf_log_warn("All frames are present in the MXF file\n");
         }
     }
     else
     {
-        mxf_log(MXF_WLOG, "0 complete frames are present in the MXF file\n");
+        mxf_log_warn("0 complete frames are present in the MXF file\n");
     }
 
     
@@ -267,7 +267,7 @@ static void report_actual_frame_count(Reader* reader)
 
     
 fail:
-    mxf_log(MXF_WLOG, "Failed to determine the number of frame actually present in the MXF file\n");
+    mxf_log_warn("Failed to determine the number of frame actually present in the MXF file\n");
 
     /* restore file to the original position */
     mxf_file_seek(reader->mxfFile, filePos, SEEK_SET);
@@ -593,12 +593,12 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     /* read the header partition pack */
     if (!mxf_read_header_pp_kl(reader->mxfFile, &key, &llen, &len))
     {
-        mxf_log(MXF_ELOG, "Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     if (!mxf_partition_is_complete(&key))
     {
-        mxf_log(MXF_WLOG, "Header partition is incomplete" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_warn("Header partition is incomplete" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
     }
     CHK_ORET(mxf_read_partition(reader->mxfFile, &key, &reader->headerPartition));
     
@@ -606,7 +606,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     /* check the operational pattern is OP 1A */
     if (!is_op_1a(&reader->headerPartition->operationalPattern))
     {
-        mxf_log(MXF_ELOG, "Input file is not OP 1A" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Input file is not OP 1A" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -620,7 +620,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
             !mxf_equals_ul(label, &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)) &&
             !mxf_equals_ul(label, &MXF_EC_L(BWFFrameWrapped)))
         {
-            mxf_log(MXF_ELOG, "Unexpected essence container label" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Unexpected essence container label" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
     }
@@ -630,7 +630,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     fileIsComplete = check_can_read_rip(reader);
     if (!fileIsComplete)
     {
-        mxf_log(MXF_WLOG, "Failed to read the MXF Random Index Pack - file is incomplete\n");
+        mxf_log_warn("Failed to read the MXF Random Index Pack - file is incomplete\n");
     }
     
     
@@ -644,8 +644,8 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
         /* don't bother if were unable to read the content package length */
         if (reader->contentPackageLen <= 0)
         {
-            mxf_log(MXF_WLOG, "Cannot check the actual frame count because failed to read the first content package\n");
-            mxf_log(MXF_WLOG, "Assuming 0 complete frames are present in the MXF file\n");
+            mxf_log_warn("Cannot check the actual frame count because failed to read the first content package\n");
+            mxf_log_warn("Assuming 0 complete frames are present in the MXF file\n");
         }
         else
         {    
@@ -667,16 +667,16 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
             
             if (!mxf_partition_is_closed(&key))
             {
-                mxf_log(MXF_WLOG, "Footer partition is open" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_warn("Footer partition is open" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             }
             if (!mxf_partition_is_complete(&key))
             {
-                mxf_log(MXF_WLOG, "Footer partition is incomplete" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_warn("Footer partition is incomplete" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             }
         }
         else
         {
-            mxf_log(MXF_WLOG, "Cannot show PSE failures or D3 VTR errors from an incomplete MXF file\n");
+            mxf_log_warn("Cannot show PSE failures or D3 VTR errors from an incomplete MXF file\n");
             headerByteCount = reader->headerPartition->headerByteCount;
         }
     }
@@ -754,7 +754,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
                 if (reader->duration != duration)
                 {
                     /* warn when durations differ - always choose the largest */
-                    mxf_log(MXF_WLOG, "Track durations differ: found %"PFi64" after %"PFi64
+                    mxf_log_warn("Track durations differ: found %"PFi64" after %"PFi64
                         " - will output the largest duration\n", reader->duration, duration);
                     if (reader->duration < duration)
                     {
@@ -837,7 +837,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
             }
             if (!knownDMTrack)
             {
-                mxf_log(MXF_WLOG, "Unknown descriptive metadata track found in the file source package - info tool update required\n");
+                mxf_log_warn("Unknown descriptive metadata track found in the file source package - info tool update required\n");
             }
         }
     }
@@ -1435,7 +1435,7 @@ int main(int argc, const char* argv[])
         MXFPageFile* mxfPageFile;
         if (!mxf_page_file_open_read(mxfFilename, &mxfPageFile))
         {
-            mxf_log(MXF_ELOG, "Failed to open page file '%s'\n", mxfFilename);
+            mxf_log_error("Failed to open page file '%s'\n", mxfFilename);
             goto fail;
         }
         reader->mxfFile = mxf_page_file_get_file(mxfPageFile);
@@ -1444,20 +1444,20 @@ int main(int argc, const char* argv[])
     {
         if (!mxf_disk_file_open_read(mxfFilename, &reader->mxfFile))
         {
-            mxf_log(MXF_ELOG, "Failed to open disk file '%s'\n", mxfFilename);
+            mxf_log_error("Failed to open disk file '%s'\n", mxfFilename);
             goto fail;
         }
     }
     
     if (!get_info(reader, showPSEFailures, showVTRErrors))
     {
-        mxf_log(MXF_ELOG, "Failed to extract info from '%s'\n", mxfFilename);
+        mxf_log_error("Failed to extract info from '%s'\n", mxfFilename);
         goto fail;
     }
     
     if (!noSourceTimecode && reader->contentPackageLen <= 0)
     {
-        mxf_log(MXF_WLOG, "Not including source timecodes - no essence data?\n");
+        mxf_log_warn("Not including source timecodes - no essence data?\n");
         noSourceTimecode = 1;
     }
         
@@ -1465,7 +1465,7 @@ int main(int argc, const char* argv[])
     {
         if (!write_summary(reader, showPSEFailures, showVTRErrors, noSourceTimecode))
         {
-            mxf_log(MXF_ELOG, "Failed to write summary info\n");
+            mxf_log_error("Failed to write summary info\n");
             goto fail;
         }
     }
@@ -1473,7 +1473,7 @@ int main(int argc, const char* argv[])
     {
         if (!write_info(reader, showPSEFailures, showVTRErrors, noSourceTimecode))
         {
-            mxf_log(MXF_ELOG, "Failed to write info\n");
+            mxf_log_error("Failed to write info\n");
             goto fail;
         }
     }

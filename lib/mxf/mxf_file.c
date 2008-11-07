@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.c,v 1.4 2008/10/22 09:32:19 john_f Exp $
+ * $Id: mxf_file.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * Wraps a files, buffers etc. in an MXF file and provides low-level functions
  *
@@ -966,9 +966,17 @@ int mxf_read_uuid(MXFFile* mxfFile, mxfUUID* value)
     return mxf_read_ul(mxfFile, (mxfUL*)value);
 }
 
-int mxf_read_local_tag(MXFFile* mxfFile, mxfLocalTag* value)
+int mxf_read_local_tag(MXFFile* mxfFile, mxfLocalTag* tag)
 {
-    return mxf_read_uint16(mxfFile, value);
+    return mxf_read_uint16(mxfFile, tag);
+}
+
+int mxf_read_local_tl(MXFFile* mxfFile, mxfLocalTag* tag, uint16_t* len)
+{
+    CHK_ORET(mxf_read_local_tag(mxfFile, tag));
+    CHK_ORET(mxf_read_uint16(mxfFile, len));
+    
+    return 1;
 }
 
 int mxf_skip(MXFFile* mxfFile, uint64_t len)
@@ -1005,9 +1013,17 @@ int mxf_skip(MXFFile* mxfFile, uint64_t len)
 }
 
 
-int mxf_write_local_tag(MXFFile* mxfFile, mxfLocalTag value)
+int mxf_write_local_tag(MXFFile* mxfFile, mxfLocalTag tag)
 {
-    return mxf_write_uint16(mxfFile, value);
+    return mxf_write_uint16(mxfFile, tag);
+}
+
+int mxf_write_local_tl(MXFFile* mxfFile, mxfLocalTag tag, uint16_t len)
+{
+    CHK_ORET(mxf_write_local_tag(mxfFile, tag));
+    CHK_ORET(mxf_write_uint16(mxfFile, len));
+    
+    return 1;
 }
 
 int mxf_write_k(MXFFile* mxfFile, const mxfKey* key)
@@ -1045,7 +1061,7 @@ int mxf_write_fixed_l(MXFFile* mxfFile, uint8_t llen, uint64_t len)
     {
         if (len >= 0x80)
         {
-            mxf_log(MXF_ELOG, "Could not write BER length %"PFi64" for llen equal 1" LOG_LOC_FORMAT, len, LOG_LOC_PARAMS);
+            mxf_log_error("Could not write BER length %"PFi64" for llen equal 1" LOG_LOC_FORMAT, len, LOG_LOC_PARAMS);
             return 0;
         }
         
@@ -1058,7 +1074,7 @@ int mxf_write_fixed_l(MXFFile* mxfFile, uint8_t llen, uint64_t len)
     {
         if (llen != 9 && (len >> ((llen - 1) * 8)) > 0)
         {
-            mxf_log(MXF_ELOG, "Could not write BER length %"PFu64" for llen equal %u" LOG_LOC_FORMAT, len, llen, LOG_LOC_PARAMS);
+            mxf_log_error("Could not write BER length %"PFu64" for llen equal %u" LOG_LOC_FORMAT, len, llen, LOG_LOC_PARAMS);
             return 0;
         }
         

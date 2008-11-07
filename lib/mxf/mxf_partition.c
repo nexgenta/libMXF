@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_partition.c,v 1.3 2008/10/22 09:32:19 john_f Exp $
+ * $Id: mxf_partition.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF file partitions
  *
@@ -344,8 +344,7 @@ int mxf_write_partition(MXFFile* mxfFile, MXFPartition* partition)
     CHK_ORET((filePos = mxf_file_tell(mxfFile)) >= 0);
     partition->thisPartition = filePos - mxf_get_runin_len(mxfFile);
     
-    CHK_ORET(mxf_write_k(mxfFile, &partition->key));
-    CHK_ORET(mxf_write_l(mxfFile, packLen));
+    CHK_ORET(mxf_write_kl(mxfFile, &partition->key, packLen));
     
     CHK_ORET(mxf_write_uint16(mxfFile, partition->majorVersion));
     CHK_ORET(mxf_write_uint16(mxfFile, partition->minorVersion));

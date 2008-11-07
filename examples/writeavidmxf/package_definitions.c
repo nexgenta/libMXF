@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.c,v 1.3 2008/05/07 15:21:46 philipn Exp $
+ * $Id: package_definitions.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
  *
  * Functions to create package definitions
  *
@@ -215,7 +215,7 @@ int create_file_source_package(PackageDefinitions* definitions, const mxfUMID* u
     
     if (filename == NULL)
     {
-        mxf_log(MXF_ELOG, "File source package filename is null" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("File source package filename is null" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
     

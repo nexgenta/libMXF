@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.c,v 1.2 2008/02/06 16:58:54 john_f Exp $
+ * $Id: mxf_reader.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * Main functions for reading MXF files
  *
@@ -278,7 +278,7 @@ int open_mxf_reader_2(const char* filename, MXFDataModel* dataModel, MXFReader**
 
     if (!mxf_disk_file_open_read(filename, &newMXFFile))
     {
-        mxf_log(MXF_ELOG, "Failed to open '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to open '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
         goto fail;
     }
     
@@ -315,7 +315,7 @@ int init_mxf_reader_2(MXFFile** mxfFile, MXFDataModel* dataModel, MXFReader** re
     
     if (!mxf_read_header_pp_kl(newReader->mxfFile, &key, &llen, &len))
     {
-        mxf_log(MXF_ELOG, "Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Could not find header partition pack key" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         goto fail;
     }
     CHK_OFAIL(mxf_read_partition(newReader->mxfFile, &key, &headerPartition));
@@ -340,7 +340,7 @@ int init_mxf_reader_2(MXFFile** mxfFile, MXFDataModel* dataModel, MXFReader** re
     else
     {
         /* if format_is_supported() succeeded then we shouldn't be here */
-        mxf_log(MXF_ELOG, "MXF format not supported" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("MXF format not supported" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         goto fail;
     }
 
@@ -611,16 +611,16 @@ int get_num_source_timecodes(MXFReader* reader)
             /* read the first frame, which will extract the source timecodes as a side-effect */
             if (!read_next_frame(reader, NULL))
             {
-                mxf_log(MXF_ELOG, "Failed to read first frame to update the number of source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_error("Failed to read first frame to update the number of source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             }
             if (!position_at_frame(reader, 0))
             {
-                mxf_log(MXF_ELOG, "Failed to position reader back to frame 0" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_error("Failed to position reader back to frame 0" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             }
         }
         else
         {
-            mxf_log(MXF_WLOG, "Result of get_num_source_timecodes could be incorrect because "
+            mxf_log_warn("Result of get_num_source_timecodes could be incorrect because "
                 "MXF file is not seekable and first frame has not been read" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         }
     }
@@ -732,13 +732,13 @@ int position_at_source_timecode(MXFReader* reader, MXFTimecode* timecode, int ty
         }
         if (timecodeIndex == NULL)
         {
-            mxf_log(MXF_ELOG, "MXF file does not have specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("MXF file does not have specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
 
         if (timecodeIndex->isDropFrame != timecode->isDropFrame)
         {
-            mxf_log(MXF_ELOG, "Timecode drop frame flag mismatch for specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Timecode drop frame flag mismatch for specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
         
@@ -782,13 +782,13 @@ int position_at_source_timecode(MXFReader* reader, MXFTimecode* timecode, int ty
         }
         if (timecodeIndex == NULL)
         {
-            mxf_log(MXF_ELOG, "MXF file does not have specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("MXF file does not have specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
 
         if (timecodeIndex->isDropFrame != timecode->isDropFrame)
         {
-            mxf_log(MXF_ELOG, "Timecode drop frame flag mismatch for specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Timecode drop frame flag mismatch for specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             return 0;
         }
         
@@ -808,7 +808,7 @@ int position_at_source_timecode(MXFReader* reader, MXFTimecode* timecode, int ty
             }
         }
         
-        mxf_log(MXF_ELOG, "Could not find frame with specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Could not find frame with specified source timecode" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         /* restore to original position */
         CHK_ORET(position_at_frame(reader, originalFrameNumber));
         return 0;
@@ -958,7 +958,7 @@ int initialise_playout_timecode(MXFReader* reader, MXFMetadataSet* materialPacka
         {
             if (haveTimecodeTrack)
             {
-                mxf_log(MXF_WLOG, "Multiple playout timecode tracks present in Material Package - use first encountered" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                mxf_log_warn("Multiple playout timecode tracks present in Material Package - use first encountered" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                 break;
             }
             
@@ -978,7 +978,7 @@ int initialise_playout_timecode(MXFReader* reader, MXFMetadataSet* materialPacka
                 CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &sequenceComponentCount));
                 if (sequenceComponentCount != 1)
                 {
-                    mxf_log(MXF_WLOG, "Material Package playout timecode has multiple components" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+                    mxf_log_warn("Material Package playout timecode has multiple components" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
                 }
     
                 /* extract the sequence of TimecodeComponents */

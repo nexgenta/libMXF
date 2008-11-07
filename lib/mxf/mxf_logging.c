@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_logging.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_logging.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * libMXF logging functions
  *
@@ -23,7 +23,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 #include <assert.h>
 
 #include <time.h>
@@ -32,6 +31,7 @@
 #include <mxf/mxf_logging.h>
 
 
+mxf_vlog_func mxf_vlog = mxf_vlog_default;
 mxf_log_func mxf_log = mxf_log_default;
 MXFLogLevel g_mxfLogLevel = MXF_DLOG;
 
@@ -59,12 +59,11 @@ static void logmsg(FILE* file, MXFLogLevel level, const char* format, va_list p_
     vfprintf(file, format, p_arg);
 }
 
-static void log_to_file(MXFLogLevel level, const char* format, ...)
+static void vlog_to_file(MXFLogLevel level, const char* format, va_list p_arg)
 {
     char timeStr[128];
     const time_t t = time(NULL);
     const struct tm* gmt = gmtime(&t);
-    va_list p_arg;
 
     if (level < g_mxfLogLevel)
     {
@@ -73,7 +72,7 @@ static void log_to_file(MXFLogLevel level, const char* format, ...)
     
     assert(gmt != NULL);
     assert(g_mxfFileLog != NULL);
-    if (g_mxfFileLog == NULL)
+    if (g_mxfFileLog == NULL || gmt == NULL)
     {
         return;
     }
@@ -81,23 +80,27 @@ static void log_to_file(MXFLogLevel level, const char* format, ...)
     strftime(timeStr, 128, "%Y-%m-%d %H:%M:%S", gmt);
     fprintf(g_mxfFileLog, "(%s) ", timeStr);
     
-    va_start(p_arg, format);
     logmsg(g_mxfFileLog, level, format, p_arg);
+}
+
+static void log_to_file(MXFLogLevel level, const char* format, ...)
+{
+    va_list p_arg;
+
+    va_start(p_arg, format);
+    vlog_to_file(level, format, p_arg);
     va_end(p_arg);
 }
 
 
 
-void mxf_log_default(MXFLogLevel level, const char* format, ...)
+void mxf_vlog_default(MXFLogLevel level, const char* format, va_list p_arg)
 {
-    va_list p_arg;
-    
     if (level < g_mxfLogLevel)
     {
         return;
     }
     
-    va_start(p_arg, format);
     if (level == MXF_ELOG)
     {
         logmsg(stderr, level, format, p_arg);
@@ -106,6 +109,14 @@ void mxf_log_default(MXFLogLevel level, const char* format, ...)
     {
         logmsg(stdout, level, format, p_arg);
     }
+}
+
+void mxf_log_default(MXFLogLevel level, const char* format, ...)
+{
+    va_list p_arg;
+    
+    va_start(p_arg, format);
+    mxf_vlog_default(level, format, p_arg);
     va_end(p_arg);
 }
 
@@ -116,8 +127,17 @@ int mxf_log_file_open(const char* filename)
         return 0;
     }
     
+    mxf_vlog = vlog_to_file;
     mxf_log = log_to_file;
     return 1;
+}
+
+void mxf_log_file_flush()
+{
+    if (g_mxfFileLog != NULL)
+    {
+        fflush(g_mxfFileLog);
+    }
 }
 
 void mxf_log_file_close()
@@ -128,4 +148,42 @@ void mxf_log_file_close()
         g_mxfFileLog = NULL;
     }
 }
+
+
+void mxf_log_debug(const char* format, ...)
+{
+    va_list p_arg;
+    
+    va_start(p_arg, format);
+    mxf_vlog(MXF_DLOG, format, p_arg);
+    va_end(p_arg);
+}
+
+void mxf_log_info(const char* format, ...)
+{
+    va_list p_arg;
+    
+    va_start(p_arg, format);
+    mxf_vlog(MXF_ILOG, format, p_arg);
+    va_end(p_arg);
+}
+
+void mxf_log_warn(const char* format, ...)
+{
+    va_list p_arg;
+    
+    va_start(p_arg, format);
+    mxf_vlog(MXF_WLOG, format, p_arg);
+    va_end(p_arg);
+}
+
+void mxf_log_error(const char* format, ...)
+{
+    va_list p_arg;
+    
+    va_start(p_arg, format);
+    mxf_vlog(MXF_ELOG, format, p_arg);
+    va_end(p_arg);
+}
+
 

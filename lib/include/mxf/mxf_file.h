@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.h,v 1.3 2008/05/07 15:22:22 philipn Exp $
+ * $Id: mxf_file.h,v 1.4 2008/11/07 14:12:59 philipn Exp $
  *
  * Wraps a C-file and provides low-level MXF file functions
  *
@@ -112,12 +112,14 @@ int mxf_read_ul(MXFFile* mxfFile, mxfUL* value);
 int mxf_read_key(MXFFile* mxfFile, mxfKey* value);
 int mxf_read_uid(MXFFile* mxfFile, mxfUID* value);
 int mxf_read_uuid(MXFFile* mxfFile, mxfUUID* value);
-int mxf_read_local_tag(MXFFile* mxfFile, mxfLocalTag* value);
+int mxf_read_local_tag(MXFFile* mxfFile, mxfLocalTag* tag);
+int mxf_read_local_tl(MXFFile* mxfFile, mxfLocalTag* tag, uint16_t* len);
 
 int mxf_skip(MXFFile* mxfFile, uint64_t len);
 
 
-int mxf_write_local_tag(MXFFile* mxfFile, mxfLocalTag value);
+int mxf_write_local_tag(MXFFile* mxfFile, mxfLocalTag tag);
+int mxf_write_local_tl(MXFFile* mxfFile, mxfLocalTag tag, uint16_t len);
 int mxf_write_k(MXFFile* mxfFile, const mxfKey* key);
 uint8_t mxf_write_l(MXFFile* mxfFile, uint64_t len);
 int mxf_write_kl(MXFFile* mxfFile, const mxfKey* key, uint64_t len);

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_index_table.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_index_table.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF index table
  *
@@ -249,46 +249,35 @@ int mxf_write_index_table_segment(MXFFile* mxfFile, const MXFIndexTableSegment* 
         }
     }
     
-    CHK_ORET(mxf_write_k(mxfFile, &g_IndexTableSegment_key));
-    CHK_ORET(mxf_write_l(mxfFile, segmentLen));
+    CHK_ORET(mxf_write_kl(mxfFile, &g_IndexTableSegment_key, segmentLen));
     
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3c0a));
-    CHK_ORET(mxf_write_uint16(mxfFile, mxfUUID_extlen));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3c0a, mxfUUID_extlen));
     CHK_ORET(mxf_write_uuid(mxfFile, &segment->instanceUID));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0b));
-    CHK_ORET(mxf_write_uint16(mxfFile, 8));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0b, 8));
     CHK_ORET(mxf_write_int32(mxfFile, segment->indexEditRate.numerator));
     CHK_ORET(mxf_write_int32(mxfFile, segment->indexEditRate.denominator));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0c));
-    CHK_ORET(mxf_write_uint16(mxfFile, 8));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0c, 8));
     CHK_ORET(mxf_write_int64(mxfFile, segment->indexStartPosition));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0d));
-    CHK_ORET(mxf_write_uint16(mxfFile, 8));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0d, 8));
     CHK_ORET(mxf_write_int64(mxfFile, segment->indexDuration));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f05));
-    CHK_ORET(mxf_write_uint16(mxfFile, 4));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f05, 4));
     CHK_ORET(mxf_write_uint32(mxfFile, segment->editUnitByteCount));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f06));
-    CHK_ORET(mxf_write_uint16(mxfFile, 4));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f06, 4));
     CHK_ORET(mxf_write_uint32(mxfFile, segment->indexSID));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f07));
-    CHK_ORET(mxf_write_uint16(mxfFile, 4));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f07, 4));
     CHK_ORET(mxf_write_uint32(mxfFile, segment->bodySID));
     if (segment->indexEntryArray != NULL)
     {
-        CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f08));
-        CHK_ORET(mxf_write_uint16(mxfFile, 1));
+        CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f08, 1));
         CHK_ORET(mxf_write_uint8(mxfFile, segment->sliceCount));
-        CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0e));
-        CHK_ORET(mxf_write_uint16(mxfFile, 1));
+        CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0e, 1));
         CHK_ORET(mxf_write_uint8(mxfFile, segment->posTableCount));
     }
 
     if (segment->deltaEntryArray != NULL)
     {
         MXFDeltaEntry* entry = segment->deltaEntryArray;
-        CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f09));
-        CHK_ORET(mxf_write_uint16(mxfFile, (uint16_t)(8 + deltaEntryArrayLen * 6)));
+        CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f09, (uint16_t)(8 + deltaEntryArrayLen * 6)));
         CHK_ORET(mxf_write_uint32(mxfFile, deltaEntryArrayLen));
         CHK_ORET(mxf_write_uint32(mxfFile, 6));
         while (entry != NULL)
@@ -303,8 +292,7 @@ int mxf_write_index_table_segment(MXFFile* mxfFile, const MXFIndexTableSegment* 
     {
         MXFIndexEntry* entry = segment->indexEntryArray;
         uint32_t i;
-        CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0a));
-        CHK_ORET(mxf_write_uint16(mxfFile, (uint16_t)(8 + indexEntryArrayLen * (11 + segment->sliceCount * 4 + segment->posTableCount * 8))));
+        CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0a, (uint16_t)(8 + indexEntryArrayLen * (11 + segment->sliceCount * 4 + segment->posTableCount * 8))));
         CHK_ORET(mxf_write_uint32(mxfFile, indexEntryArrayLen));
         CHK_ORET(mxf_write_uint32(mxfFile, 11 + segment->sliceCount * 4 + segment->posTableCount * 8));
         while (entry != NULL)
@@ -355,57 +343,47 @@ int mxf_read_index_table_segment(MXFFile* mxfFile, uint64_t segmentLen, MXFIndex
     totalLen = 0;
     while (totalLen < segmentLen)
     {
-        CHK_OFAIL(mxf_read_local_tag(mxfFile, &localTag));
-        CHK_OFAIL(mxf_read_uint16(mxfFile, &localLen));
+        CHK_OFAIL(mxf_read_local_tl(mxfFile, &localTag, &localLen));
         totalLen += mxfLocalTag_extlen + 2;
         
         switch (localTag)
         {
             case 0x3c0a:
-                CHK_OFAIL(mxf_read_uuid(mxfFile, &newSegment->instanceUID));
                 CHK_OFAIL(localLen == mxfUUID_extlen);
-                totalLen += localLen;
+                CHK_OFAIL(mxf_read_uuid(mxfFile, &newSegment->instanceUID));
                 break;
             case 0x3f0b:
+                CHK_OFAIL(localLen == 8);
                 CHK_OFAIL(mxf_read_int32(mxfFile, &newSegment->indexEditRate.numerator));
                 CHK_OFAIL(mxf_read_int32(mxfFile, &newSegment->indexEditRate.denominator));
-                CHK_OFAIL(localLen == 8);
-                totalLen += localLen;
                 break;
             case 0x3f0c:
-                CHK_OFAIL(mxf_read_int64(mxfFile, &newSegment->indexStartPosition));
                 CHK_OFAIL(localLen == 8);
-                totalLen += localLen;
+                CHK_OFAIL(mxf_read_int64(mxfFile, &newSegment->indexStartPosition));
                 break;
             case 0x3f0d:
-                CHK_OFAIL(mxf_read_int64(mxfFile, &newSegment->indexDuration));
                 CHK_OFAIL(localLen == 8);
-                totalLen += localLen;
+                CHK_OFAIL(mxf_read_int64(mxfFile, &newSegment->indexDuration));
                 break;
             case 0x3f05:
-                CHK_OFAIL(mxf_read_uint32(mxfFile, &newSegment->editUnitByteCount));
                 CHK_OFAIL(localLen == 4);
-                totalLen += localLen;
+                CHK_OFAIL(mxf_read_uint32(mxfFile, &newSegment->editUnitByteCount));
                 break;
             case 0x3f06:
-                CHK_OFAIL(mxf_read_uint32(mxfFile, &newSegment->indexSID));
                 CHK_OFAIL(localLen == 4);
-                totalLen += localLen;
+                CHK_OFAIL(mxf_read_uint32(mxfFile, &newSegment->indexSID));
                 break;
             case 0x3f07:
-                CHK_OFAIL(mxf_read_uint32(mxfFile, &newSegment->bodySID));
                 CHK_OFAIL(localLen == 4);
-                totalLen += localLen;
+                CHK_OFAIL(mxf_read_uint32(mxfFile, &newSegment->bodySID));
                 break;
             case 0x3f08:
-                CHK_OFAIL(mxf_read_uint8(mxfFile, &newSegment->sliceCount));
                 CHK_OFAIL(localLen == 1);
-                totalLen += localLen;
+                CHK_OFAIL(mxf_read_uint8(mxfFile, &newSegment->sliceCount));
                 break;
             case 0x3f0e:
-                CHK_OFAIL(mxf_read_uint8(mxfFile, &newSegment->posTableCount));
                 CHK_OFAIL(localLen == 1);
-                totalLen += localLen;
+                CHK_OFAIL(mxf_read_uint8(mxfFile, &newSegment->posTableCount));
                 break;
             case 0x3f09:
                 CHK_OFAIL(mxf_read_uint32(mxfFile, &deltaEntryArrayLen));
@@ -419,7 +397,6 @@ int mxf_read_index_table_segment(MXFFile* mxfFile, uint64_t segmentLen, MXFIndex
                     CHK_OFAIL(mxf_read_uint32(mxfFile, &elementData));
                     CHK_OFAIL(mxf_add_delta_entry(newSegment, posTableIndex, slice, elementData));
                 }
-                totalLen += localLen;
                 break;
             case 0x3f0a:
                 if (newSegment->sliceCount > 0)
@@ -453,13 +430,13 @@ int mxf_read_index_table_segment(MXFFile* mxfFile, uint64_t segmentLen, MXFIndex
                     CHK_OFAIL(mxf_add_index_entry(newSegment, temporalOffset, keyFrameOffset, flags,
                         streamOffset, sliceOffset, posTable));
                 }
-                totalLen += localLen;
                 break;
             default:
-                mxf_log(MXF_WLOG, "Unknown local item (%u) in index table segment", localTag);
+                mxf_log_warn("Unknown local item (%u) in index table segment", localTag);
                 CHK_OFAIL(mxf_skip(mxfFile, localLen));
-                totalLen += localLen;
         }
+
+        totalLen += localLen;
         
     }
     CHK_ORET(totalLen == segmentLen);
@@ -488,38 +465,28 @@ int mxf_write_index_table_segment_header(MXFFile* mxfFile, const MXFIndexTableSe
             numIndexEntries * (11 + segment->sliceCount * 4 + segment->posTableCount * 8);
     }
     
-    CHK_ORET(mxf_write_k(mxfFile, &g_IndexTableSegment_key));
-    CHK_ORET(mxf_write_l(mxfFile, segmentLen));
+    CHK_ORET(mxf_write_kl(mxfFile, &g_IndexTableSegment_key, segmentLen));
     
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3c0a));
-    CHK_ORET(mxf_write_uint16(mxfFile, mxfUUID_extlen));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3c0a, mxfUUID_extlen));
     CHK_ORET(mxf_write_uuid(mxfFile, &segment->instanceUID));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0b));
-    CHK_ORET(mxf_write_uint16(mxfFile, 8));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0b, 8));
     CHK_ORET(mxf_write_int32(mxfFile, segment->indexEditRate.numerator));
     CHK_ORET(mxf_write_int32(mxfFile, segment->indexEditRate.denominator));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0c));
-    CHK_ORET(mxf_write_uint16(mxfFile, 8));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0c, 8));
     CHK_ORET(mxf_write_int64(mxfFile, segment->indexStartPosition));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0d));
-    CHK_ORET(mxf_write_uint16(mxfFile, 8));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0d, 8));
     CHK_ORET(mxf_write_int64(mxfFile, segment->indexDuration));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f05));
-    CHK_ORET(mxf_write_uint16(mxfFile, 4));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f05, 4));
     CHK_ORET(mxf_write_uint32(mxfFile, segment->editUnitByteCount));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f06));
-    CHK_ORET(mxf_write_uint16(mxfFile, 4));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f06, 4));
     CHK_ORET(mxf_write_uint32(mxfFile, segment->indexSID));
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f07));
-    CHK_ORET(mxf_write_uint16(mxfFile, 4));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f07, 4));
     CHK_ORET(mxf_write_uint32(mxfFile, segment->bodySID));
     if (numIndexEntries > 0)
     {
-        CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f08));
-        CHK_ORET(mxf_write_uint16(mxfFile, 1));
+        CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f08, 1));
         CHK_ORET(mxf_write_uint8(mxfFile, segment->sliceCount));
-        CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0e));
-        CHK_ORET(mxf_write_uint16(mxfFile, 1));
+        CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0e, 1));
         CHK_ORET(mxf_write_uint8(mxfFile, segment->posTableCount));
     }
 
@@ -529,8 +496,7 @@ int mxf_write_index_table_segment_header(MXFFile* mxfFile, const MXFIndexTableSe
 
 int mxf_write_delta_entry_array_header(MXFFile* mxfFile, uint32_t numDeltaEntries)
 {
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f09));
-    CHK_ORET(mxf_write_uint16(mxfFile, (uint16_t)(8 + numDeltaEntries * 6)));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f09, (uint16_t)(8 + numDeltaEntries * 6)));
     CHK_ORET(mxf_write_uint32(mxfFile, numDeltaEntries));
     CHK_ORET(mxf_write_uint32(mxfFile, 6));
 
@@ -549,8 +515,7 @@ int mxf_write_delta_entry(MXFFile* mxfFile, MXFDeltaEntry* entry)
 int mxf_write_index_entry_array_header(MXFFile* mxfFile, uint8_t sliceCount, uint8_t posTableCount, 
     uint32_t numIndexEntries)
 {
-    CHK_ORET(mxf_write_local_tag(mxfFile, 0x3f0a));
-    CHK_ORET(mxf_write_uint16(mxfFile, (uint16_t)(8 + numIndexEntries * (11 + sliceCount * 4 + posTableCount * 8))));
+    CHK_ORET(mxf_write_local_tl(mxfFile, 0x3f0a, (uint16_t)(8 + numIndexEntries * (11 + sliceCount * 4 + posTableCount * 8))));
     CHK_ORET(mxf_write_uint32(mxfFile, numIndexEntries));
     CHK_ORET(mxf_write_uint32(mxfFile, 11 + sliceCount * 4 + posTableCount * 8));
 

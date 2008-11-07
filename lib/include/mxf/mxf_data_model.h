@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.h,v 1.3 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_data_model.h,v 1.4 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -133,6 +133,7 @@ typedef enum
     
     /* array */
     MXF_UTF16STRING_TYPE,
+    MXF_UTF16STRINGARRAY_TYPE,
     MXF_INT32ARRAY_TYPE,
     MXF_UINT32ARRAY_TYPE,
     MXF_INT64ARRAY_TYPE,
@@ -141,6 +142,7 @@ typedef enum
     MXF_INT32BATCH_TYPE,
     MXF_UINT32BATCH_TYPE,
     MXF_AUIDARRAY_TYPE,
+    MXF_ULARRAY_TYPE,
     MXF_ULBATCH_TYPE,
     MXF_STRONGREFARRAY_TYPE,
     MXF_STRONGREFBATCH_TYPE,
@@ -225,6 +227,7 @@ int mxf_find_item_def_in_set_def(const mxfKey* key, const MXFSetDef* setDef, MXF
 MXFItemType* mxf_get_item_def_type(MXFDataModel* dataModel, unsigned int typeId);
 
 int mxf_is_subclass_of(MXFDataModel* dataModel, const mxfKey* setKey, const mxfKey* parentSetKey);
+int mxf_is_subclass_of_2(MXFDataModel* dataModel, MXFSetDef* setDef, const mxfKey* parentSetKey);
 
 
 #ifdef __cplusplus

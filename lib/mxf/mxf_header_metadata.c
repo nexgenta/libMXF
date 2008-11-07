@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_header_metadata.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_header_metadata.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * MXF header metadata
  *
@@ -428,6 +428,7 @@ int mxf_read_filtered_header_metadata(MXFFile* mxfFile, MXFReadFilter* filter,
     int skip = 0;
     MXFMetadataSet* newSet = NULL;
     uint64_t count = 0;
+    int result;
 
     CHK_ORET(headerByteCount != 0);
     
@@ -464,22 +465,25 @@ int mxf_read_filtered_header_metadata(MXFFile* mxfFile, MXFReadFilter* filter,
                 
                 if (!skip)
                 {
-                    CHK_ORET(mxf_read_and_return_set(mxfFile, &key, len, headerMetadata, 0, &newSet));
+                    CHK_ORET((result = mxf_read_and_return_set(mxfFile, &key, len, headerMetadata, 0, &newSet)) > 0);
 
-                    /* signal after read */
-                    skip = 0;
-                    if (filter->after_set_read != NULL)
+                    if (result == 1) /* set was read and returned in "set" parameter */
                     {
-                        CHK_OFAIL(filter->after_set_read(filter->privateData, headerMetadata, newSet, &skip));
-                    }
-                    
-                    if (!skip)
-                    {
-                        CHK_OFAIL(mxf_add_set(headerMetadata, newSet));
-                    }
-                    else
-                    {
-                        mxf_free_set(&newSet);
+                        /* signal after read */
+                        skip = 0;
+                        if (filter->after_set_read != NULL)
+                        {
+                            CHK_OFAIL(filter->after_set_read(filter->privateData, headerMetadata, newSet, &skip));
+                        }
+                        
+                        if (!skip)
+                        {
+                            CHK_OFAIL(mxf_add_set(headerMetadata, newSet));
+                        }
+                        else
+                        {
+                            mxf_free_set(&newSet);
+                        }
                     }
                 }
                 else
@@ -489,7 +493,7 @@ int mxf_read_filtered_header_metadata(MXFFile* mxfFile, MXFReadFilter* filter,
             }
             else
             {
-                CHK_ORET(mxf_read_set(mxfFile, &key, len, headerMetadata, 1));
+                CHK_ORET(mxf_read_set(mxfFile, &key, len, headerMetadata, 1) > 0);
             }
         }
         count += len;
@@ -559,7 +563,7 @@ int mxf_read_and_return_set(MXFFile* mxfFile, const mxfKey* key, uint64_t len,
             /* skip items not registered in the primer. Log warning because the file is invalid */
             else
             {
-                mxf_log(MXF_WLOG, "Encountered item with tag %d not registered in the primer" LOG_LOC_FORMAT,
+                mxf_log_warn("Encountered item with tag %d not registered in the primer" LOG_LOC_FORMAT,
                     itemTag, LOG_LOC_PARAMS);
                 CHK_OFAIL(mxf_skip(mxfFile, (int64_t)itemLen));
             }
@@ -570,12 +574,12 @@ int mxf_read_and_return_set(MXFFile* mxfFile, const mxfKey* key, uint64_t len,
         
         if (totalLen != len)
         {
-            mxf_log(MXF_ELOG, "Incorrect metadata set length encountered" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Incorrect metadata set length encountered" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             goto fail;
         }
         if (!haveInstanceUID)
         {
-            mxf_log(MXF_ELOG, "Metadata set does not have InstanceUID item" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            mxf_log_error("Metadata set does not have InstanceUID item" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
             goto fail;
         }
 

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_logging.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_logging.h,v 1.3 2008/11/07 14:12:59 philipn Exp $
  *
  * libMXF logging functions
  *
@@ -25,6 +25,9 @@
 #define __MXF_LOGGING_H__
 
 
+#include <stdarg.h>
+
+
 #ifdef __cplusplus
 extern "C" 
 {
@@ -40,21 +43,32 @@ typedef enum
 } MXFLogLevel;
 
 
+typedef void (*mxf_vlog_func) (MXFLogLevel level, const char* format, va_list p_arg);
 typedef void (*mxf_log_func) (MXFLogLevel level, const char* format, ...);
 
 /* is set by default to the mxf_log_default function */
+extern mxf_vlog_func mxf_vlog;
 extern mxf_log_func mxf_log;
 extern MXFLogLevel g_mxfLogLevel;
 
 
 /* outputs to stderr for MXF_ELOG or stdout for the other levels */
+void mxf_vlog_default(MXFLogLevel level, const char* format, va_list p_arg);
 void mxf_log_default(MXFLogLevel level, const char* format, ...);
 
 
 /* sets mxf_log to log to the file 'filename' */
 int mxf_log_file_open(const char* filename);
 
+void mxf_log_file_flush();
 void mxf_log_file_close();
+
+
+/* log level in function name */
+void mxf_log_debug(const char* format, ...);
+void mxf_log_info(const char* format, ...);
+void mxf_log_warn(const char* format, ...);
+void mxf_log_error(const char* format, ...);
 
 
 

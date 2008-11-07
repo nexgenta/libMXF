@@ -45,7 +45,7 @@ int test_read(const char* filename)
 
     if (!mxf_disk_file_open_read(filename, &mxfFile))
     {
-        mxf_log(MXF_ELOG, "Failed to open '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to open '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
         return 0;
     }
 
@@ -123,7 +123,7 @@ int test_read(const char* filename)
     
     if (!mxf_byte_array_wrap_read(data, sizeof(data), &mxfFile))
     {
-        mxf_log(MXF_ELOG, "Failed to open byte array as MXF file" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to open byte array as MXF file" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
     }
 
@@ -204,7 +204,7 @@ int test_write(const char* filename)
     
     if (!mxf_disk_file_open_new(filename, &mxfFile))
     {
-        mxf_log(MXF_ELOG, "Failed to create '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to create '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
         return 0;
     }
 
@@ -226,7 +226,7 @@ int test_modify(const char* filename)
     
     if (!mxf_disk_file_open_modify(filename, &mxfFile))
     {
-        mxf_log(MXF_ELOG, "Failed to open modify '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
+        mxf_log_error("Failed to open modify '%s'" LOG_LOC_FORMAT, filename, LOG_LOC_PARAMS);
         return 0;
     }
 

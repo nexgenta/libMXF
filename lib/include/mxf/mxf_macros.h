@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_macros.h,v 1.4 2008/09/24 17:28:15 philipn Exp $
+ * $Id: mxf_macros.h,v 1.5 2008/11/07 14:12:59 philipn Exp $
  *
  * General purpose macros
  *
@@ -39,14 +39,14 @@ extern "C"
 #define CHK_ORET(cmd) \
     if (!(cmd)) \
     { \
-        mxf_log(MXF_ELOG, "'%s' failed, in %s:%d\n", #cmd, __FILE__, __LINE__); \
+        mxf_log_error("'%s' failed, in %s:%d\n", #cmd, __FILE__, __LINE__); \
         return 0; \
     }
 
 #define CHK_OFAIL(cmd) \
     if (!(cmd)) \
     { \
-        mxf_log(MXF_ELOG, "'%s' failed, in %s:%d\n", #cmd, __FILE__, __LINE__); \
+        mxf_log_error("'%s' failed, in %s:%d\n", #cmd, __FILE__, __LINE__); \
         goto fail; \
     }
 
@@ -79,7 +79,7 @@ extern "C"
 * Helpers for logging
 */
 
-/* e.g. mxf_log(MXF_ELOG, "Some error %d" LOG_LOC_FORMAT, x, LOG_LOC_PARAMS); */
+/* e.g. mxf_log_error("Some error %d" LOG_LOC_FORMAT, x, LOG_LOC_PARAMS); */
 #define LOG_LOC_FORMAT      ", in %s:%d\n"
 #define LOG_LOC_PARAMS      __FILE__, __LINE__      
 
