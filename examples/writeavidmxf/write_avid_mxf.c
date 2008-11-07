@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.11 2008/11/07 14:12:59 philipn Exp $
+ * $Id: write_avid_mxf.c,v 1.12 2008/11/07 16:55:09 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -1099,7 +1099,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             {
                 newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidMJPEGClipWrapped);
                 newTrackWriter->frameSize = 0; /* variable */
-                switch (filePackage->essenceInfo.avidMJPEGInfo.resolution)
+                switch (filePackage->essenceInfo.mjpegResolution)
                 {
                     case Res21:
                         newTrackWriter->resolutionID = g_AvidMJPEG21_ResolutionID;
@@ -1457,19 +1457,19 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 switch (filePackage->essenceType)
                 {
                     case IMX30:
-                        newTrackWriter->frameSize = 150000;
+                        newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
                         newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX30);
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_30);
                         newTrackWriter->resolutionID = 162;
                         break;
                     case IMX40:
-                        newTrackWriter->frameSize = 200000;
+                        newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
                         newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX40);
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_40);
                         newTrackWriter->resolutionID = 161;
                         break;
                     case IMX50:
-                        newTrackWriter->frameSize = 250000;
+                        newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
                         newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX50);
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_50);
                         newTrackWriter->resolutionID = 160;
@@ -1744,7 +1744,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->essenceElementKey = MXF_EE_K(BWFClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_AES3BWF_TRACK_NUM(0x01, MXF_BWF_CLIP_WRAPPED_EE_TYPE, 0x01);
             newTrackWriter->essenceElementLLen = 8;
-            newTrackWriter->bitsPerSample = filePackage->essenceInfo.pcmInfo.bitsPerSample;
+            newTrackWriter->bitsPerSample = filePackage->essenceInfo.pcmBitsPerSample;
             newTrackWriter->blockAlign = (uint8_t)((newTrackWriter->bitsPerSample + 7) / 8);
             newTrackWriter->avgBps = newTrackWriter->blockAlign * 48000;
             if (memcmp(&newTrackWriter->sampleRate, &newTrackWriter->samplingRate, sizeof(mxfRational)) == 0)

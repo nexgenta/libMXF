@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.5 2008/10/29 17:54:26 john_f Exp $
+ * $Id: package_definitions.h,v 1.6 2008/11/07 16:55:09 philipn Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -74,18 +74,10 @@ typedef enum
 
 typedef struct
 {
-    AvidMJPEGResolution resolution;
-} AvidMJPEGInfo;
-
-typedef struct
-{
-    int bitsPerSample;
-} PCMInfo;
-
-typedef union
-{
-    AvidMJPEGInfo avidMJPEGInfo;
-    PCMInfo pcmInfo;
+    AvidMJPEGResolution mjpegResolution;
+    int imxFrameSize;
+    
+    int pcmBitsPerSample;
 } EssenceInfo;
 
 

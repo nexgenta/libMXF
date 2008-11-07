@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.11 2008/10/29 17:54:26 john_f Exp $
+ * $Id: main.c,v 1.12 2008/11/07 16:55:09 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -40,6 +40,7 @@
 
 #define DV_DIF_BLOCK_SIZE           80
 #define DV_DIF_SEQUENCE_SIZE        (150 * DV_DIF_BLOCK_SIZE)
+
 
 
 typedef struct
@@ -138,6 +139,11 @@ static const unsigned char FMT_ID[4] = {'f', 'm', 't', ' '};
 static const unsigned char BEXT_ID[4] = {'b', 'e', 'x', 't'};
 static const unsigned char DATA_ID[4] = {'d', 'a', 't', 'a'};
 static const uint16_t WAVE_FORMAT_PCM = 0x0001;
+
+
+static const int g_defaultIMX30FrameSize = 150000;
+static const int g_defaultIMX40FrameSize = 200000;
+static const int g_defaultIMX50FrameSize = 250000;
 
 
 
@@ -785,6 +791,7 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --IMX30 <filename>         IMX 30 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
     fprintf(stderr, "  --IMX40 <filename>         IMX 40 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
     fprintf(stderr, "  --IMX50 <filename>         IMX 50 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
+    fprintf(stderr, "       --imx-size <size>     IMX frame size in bytes. Default is %d/%d/%d for IMX30/40/50\n", g_defaultIMX30FrameSize, g_defaultIMX40FrameSize, g_defaultIMX50FrameSize);
     fprintf(stderr, "  --DNxHD720p120 <filename>  DNxHD 1280x720p50 120 Mbps\n");
     fprintf(stderr, "  --DNxHD720p185 <filename>  DNxHD 1280x720p50 185 Mbps\n");
     fprintf(stderr, "  --DNxHD1080i120 <filename> DNxHD 1920x1080i50 120 Mbps\n");
@@ -799,9 +806,12 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --wavpcm <filename>        raw 48kHz PCM audio contained in a WAV file\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "<timecode> format is a frame count or d?hh:mm:ss:ff (optional 'd' indicates drop frame)\n");
-    fprintf(stderr, "<umid> format is [0-9a-fA-F]{64}, a sequence of 32 hexadecimal bytes\n");
-    fprintf(stderr, "<timestamp> format is YYYY-MM-DDThh:mm:ss:qm where qm is in units of 1/250th second\n");
+    fprintf(stderr, "NOTES:\n");
+    fprintf(stderr, "- <timecode> format is a frame count or d?hh:mm:ss:ff (optional 'd' indicates drop frame)\n");
+    fprintf(stderr, "- <umid> format is [0-9a-fA-F]{64}, a sequence of 32 hexadecimal bytes\n");
+    fprintf(stderr, "- <timestamp> format is YYYY-MM-DDThh:mm:ss:qm where qm is in units of 1/250th second\n");
+    fprintf(stderr, "- The IMX frames must have a fixed size.\n");
+    fprintf(stderr, "\n");
 }
 
 
@@ -1082,7 +1092,7 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].isVideo = 1;
             inputs[inputIndex].essenceType = AvidMJPEG;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
-            inputs[inputIndex].essenceInfo.avidMJPEGInfo.resolution = Res21;
+            inputs[inputIndex].essenceInfo.mjpegResolution = Res21;
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
             inputIndex++;
             cmdlnIndex += 2;
@@ -1103,27 +1113,27 @@ int main(int argc, const char* argv[])
             }
             if (strcmp(argv[cmdlnIndex + 1], "2:1") == 0)
             {
-                inputs[inputIndex - 1].essenceInfo.avidMJPEGInfo.resolution = Res21;
+                inputs[inputIndex - 1].essenceInfo.mjpegResolution = Res21;
             }
             else if (strcmp(argv[cmdlnIndex + 1], "3:1") == 0)
             {
-                inputs[inputIndex - 1].essenceInfo.avidMJPEGInfo.resolution = Res31;
+                inputs[inputIndex - 1].essenceInfo.mjpegResolution = Res31;
             }
             else if (strcmp(argv[cmdlnIndex + 1], "10:1") == 0)
             {
-                inputs[inputIndex - 1].essenceInfo.avidMJPEGInfo.resolution = Res101;
+                inputs[inputIndex - 1].essenceInfo.mjpegResolution = Res101;
             }
             else if (strcmp(argv[cmdlnIndex + 1], "10:1m") == 0)
             {
-                inputs[inputIndex - 1].essenceInfo.avidMJPEGInfo.resolution = Res101m;
+                inputs[inputIndex - 1].essenceInfo.mjpegResolution = Res101m;
             }
             else if (strcmp(argv[cmdlnIndex + 1], "15:1s") == 0)
             {
-                inputs[inputIndex - 1].essenceInfo.avidMJPEGInfo.resolution = Res151s;
+                inputs[inputIndex - 1].essenceInfo.mjpegResolution = Res151s;
             }
             else if (strcmp(argv[cmdlnIndex + 1], "20:1") == 0)
             {
-                inputs[inputIndex - 1].essenceInfo.avidMJPEGInfo.resolution = Res201;
+                inputs[inputIndex - 1].essenceInfo.mjpegResolution = Res201;
             }
             else
             {
@@ -1163,16 +1173,59 @@ int main(int argc, const char* argv[])
                 return 1;
             }
             inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = IMX30;
-            if (argv[cmdlnIndex][5] == '4')
+            if (argv[cmdlnIndex][5] == '3')
+            {
+                inputs[inputIndex].essenceType = IMX30;
+                inputs[inputIndex].essenceInfo.imxFrameSize = g_defaultIMX30FrameSize;
+            }
+            else if (argv[cmdlnIndex][5] == '4')
+            {
                 inputs[inputIndex].essenceType = IMX40;
-            if (argv[cmdlnIndex][5] == '5')
+                inputs[inputIndex].essenceInfo.imxFrameSize = g_defaultIMX40FrameSize;
+            }
+            else /* argv[cmdlnIndex][5] == '5' */
+            {
                 inputs[inputIndex].essenceType = IMX50;
-            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
-            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+                inputs[inputIndex].essenceInfo.imxFrameSize = g_defaultIMX50FrameSize;
+            }
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
             inputIndex++;
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--imx-size") == 0)
+        {
+            int result;
+            int imxFrameSize;
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            if (inputIndex == 0 || 
+                (inputs[inputIndex - 1].essenceType != IMX30 && 
+                    inputs[inputIndex - 1].essenceType != IMX40 && 
+                    inputs[inputIndex - 1].essenceType != IMX50))
+            {
+                usage(argv[0]);
+                fprintf(stderr, "The --imx-size must follow a --IMX30/40/50 input\n");
+                return 1;
+            }
+            if ((result = sscanf(argv[cmdlnIndex + 1], "%d", &imxFrameSize)) != 1)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Failed to read --imx-size integer value '%s'\n", argv[cmdlnIndex + 1]);
+                return 1;
+            }
+            if (imxFrameSize < 1)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Invalid --imx-size value '%s'\n", argv[cmdlnIndex + 1]);
+                return 1;
+            }
+                
+            inputs[inputIndex - 1].essenceInfo.imxFrameSize = imxFrameSize;
             cmdlnIndex += 2;
         }
         else if (strcmp(argv[cmdlnIndex], "--DNxHD720p120") == 0)
@@ -1335,7 +1388,7 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].isVideo = 0;
             inputs[inputIndex].essenceType = PCM;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
-            inputs[inputIndex].essenceInfo.pcmInfo.bitsPerSample = 16;
+            inputs[inputIndex].essenceInfo.pcmBitsPerSample = 16;
             inputs[inputIndex].bytesPerSample = 2;
             inputs[inputIndex].trackNumber = ++audioTrackNumber;
             inputIndex++;
@@ -1368,7 +1421,7 @@ int main(int argc, const char* argv[])
                 inputs[inputIndex].isWAVFile = 1;
                 inputs[inputIndex].channelIndex = i;
                 inputs[inputIndex].wavInput = inputs[inputIndex - i].wavInput;
-                inputs[inputIndex].essenceInfo.pcmInfo.bitsPerSample = 
+                inputs[inputIndex].essenceInfo.pcmBitsPerSample = 
                     inputs[inputIndex].wavInput.audioSampleBits;
                 inputs[inputIndex].bytesPerSample = inputs[inputIndex].wavInput.bytesPerSample;
                 inputs[inputIndex].trackNumber = ++audioTrackNumber;
@@ -1380,7 +1433,7 @@ int main(int argc, const char* argv[])
         else if (strcmp(argv[cmdlnIndex], "--bps") == 0)
         {
             int result;
-            int bitsPerSample;
+            int pcmBitsPerSample;
             if (cmdlnIndex + 1 >= argc)
             {
                 usage(argv[0]);
@@ -1393,20 +1446,20 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "The --bps must follow a --pcm input\n");
                 return 1;
             }
-            if ((result = sscanf(argv[cmdlnIndex + 1], "%d", &bitsPerSample)) != 1)
+            if ((result = sscanf(argv[cmdlnIndex + 1], "%d", &pcmBitsPerSample)) != 1)
             {
                 usage(argv[0]);
                 fprintf(stderr, "Failed to read --bps integer value '%s'\n", argv[cmdlnIndex + 1]);
                 return 1;
             }
-            if (bitsPerSample < 1 || bitsPerSample > 32)
+            if (pcmBitsPerSample < 1 || pcmBitsPerSample > 32)
             {
                 usage(argv[0]);
                 fprintf(stderr, "Invalid --bps value '%s'\n", argv[cmdlnIndex + 1]);
                 return 1;
             }
                 
-            inputs[inputIndex - 1].essenceInfo.pcmInfo.bitsPerSample = bitsPerSample;
+            inputs[inputIndex - 1].essenceInfo.pcmBitsPerSample = pcmBitsPerSample;
             cmdlnIndex += 2;
         }
         else
@@ -1518,7 +1571,7 @@ int main(int argc, const char* argv[])
             inputs[i].mjpegState.dataSize = inputs[i].mjpegState.bufferSize;
             inputs[i].mjpegState.position = inputs[i].mjpegState.bufferSize;
             inputs[i].mjpegState.prevPosition = inputs[i].mjpegState.bufferSize;
-            inputs[i].mjpegState.resolution = inputs[i].essenceInfo.avidMJPEGInfo.resolution;
+            inputs[i].mjpegState.resolution = inputs[i].essenceInfo.mjpegResolution;
         }
         else if (inputs[i].essenceType == DVBased25 || inputs[i].essenceType == IECDV25)
         {
@@ -1556,17 +1609,17 @@ int main(int argc, const char* argv[])
         }
         else if (inputs[i].essenceType == IMX30)
         {
-            inputs[i].frameSize = 150000;
+            inputs[i].frameSize = inputs[i].essenceInfo.imxFrameSize;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == IMX40)
         {
-            inputs[i].frameSize = 200000;
+            inputs[i].frameSize = inputs[i].essenceInfo.imxFrameSize;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == IMX50)
         {
-            inputs[i].frameSize = 250000;
+            inputs[i].frameSize = inputs[i].essenceInfo.imxFrameSize;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DNxHD720p120)
