@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_extensions_data_model.h,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_avid_extensions_data_model.h,v 1.6 2008/11/07 14:38:34 philipn Exp $
  *
  * Avid data model extension definitions
  *
@@ -45,10 +45,10 @@
 #define MXF_LABEL(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15)
 #endif
 #if !defined (MXF_SET_DEFINITION)
-#define MXF_SET_DEFINITION(parentName, name, label),
+#define MXF_SET_DEFINITION(parentName, name, label)
 #endif
 #if !defined (MXF_ITEM_DEFINITION)
-#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired),
+#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired)
 #endif
 
 
