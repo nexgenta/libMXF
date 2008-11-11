@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_uu_metadata.c,v 1.3 2008/02/18 10:18:48 philipn Exp $
+ * $Id: mxf_uu_metadata.c,v 1.4 2008/11/11 10:34:32 philipn Exp $
  *
  * Utility functions for processing header metadata
  *
@@ -136,7 +136,10 @@ int mxf_uu_get_track_reference(MXFMetadataSet* trackSet, mxfUMID* sourcePackageU
                 break;
             }
         }
-        CHK_ORET(mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(SourceClip)));
+        if (!mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(SourceClip)))
+        {
+            return 0;
+        }
     }
     else
     {
