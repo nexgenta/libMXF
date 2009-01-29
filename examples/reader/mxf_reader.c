@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_reader.c,v 1.4 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * Main functions for reading MXF files
  *
@@ -30,6 +30,7 @@
 #include <mxf/mxf_uu_metadata.h>
 #include <mxf_opatom_reader.h>
 #include <mxf_op1a_reader.h>
+#include <mxf/mxf_avid.h>
 
 
 static int convert_timecode_to_position(TimecodeIndex* index, MXFTimecode* timecode, mxfPosition* position)
@@ -427,6 +428,11 @@ MXFTrack* get_mxf_track(MXFReader* reader, int trackIndex)
     return track;
 }
 
+void get_frame_rate(MXFReader* reader, mxfRational* frameRate)
+{
+    *frameRate = reader->clip.frameRate;
+}
+
 int64_t get_duration(MXFReader* reader)
 {
     return reader->clip.duration;
@@ -449,6 +455,28 @@ int get_num_tracks(MXFReader* reader)
     }
     
     return count;
+}
+
+int clip_has_video(MXFReader* reader)
+{
+    return reader->clip.hasAssociatedVideo;
+}
+
+int set_frame_rate(MXFReader* reader, const mxfRational* frameRate)
+{
+    if (memcmp(frameRate, &reader->clip.frameRate, sizeof(*frameRate)) == 0)
+    {
+        return 1;
+    }
+    
+    if (clip_has_video(reader))
+    {
+        /* we don't allow the frame rate to be changed if the clip has video */
+        return 0;
+    }
+
+    /* note: this will also update the clip duration and frame rate */
+    return reader->essenceReader->set_frame_rate(reader, frameRate);
 }
 
 MXFHeaderMetadata* get_header_metadata(MXFReader* reader)
@@ -1316,5 +1344,155 @@ int set_essence_container_timecode(MXFReader* reader, mxfPosition position,
 fail:
     SAFE_FREE(&timecodeIndex);
     return 0;
+}
+
+int64_t mxfr_convert_length(const mxfRational* frameRateIn, int64_t lengthIn, const mxfRational* frameRateOut)
+{
+    double factor;
+    int64_t lengthOut;
+    
+    if (lengthIn < 0 || memcmp(frameRateIn, frameRateOut, sizeof(*frameRateIn)) == 0 ||
+        frameRateIn->numerator < 1 || frameRateIn->denominator < 1 || frameRateOut->numerator < 1 || frameRateOut->denominator < 1)
+    {
+        return lengthIn;
+    }
+    
+    factor = frameRateOut->numerator * frameRateIn->denominator / (double)(frameRateOut->denominator * frameRateIn->numerator);
+    lengthOut = (int64_t)(lengthIn * factor + 0.5);
+    
+    if (lengthOut < 0)
+    {
+        /* e.g. if lengthIn was the max value and the new rate is faster */
+        return lengthIn;
+    }
+    
+    return lengthOut;
+}
+
+int get_clip_duration(MXFHeaderMetadata* headerMetadata, MXFClip* clip, int isOPAtom)
+{
+    MXFMetadataSet* materialPackageSet;
+    MXFMetadataSet* materialPackageTrackSet;
+    MXFArrayItemIterator arrayIter;
+    mxfUL dataDefUL;
+    int64_t duration;
+    mxfRational editRate;
+    int64_t videoDuration;
+    int haveVideoTrack = 0;
+
+    
+    if (!mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(MaterialPackage), &materialPackageSet))
+    {
+        return 0;
+    }
+    
+    CHK_ORET(mxf_uu_get_package_tracks(materialPackageSet, &arrayIter));
+    while (mxf_uu_next_track(headerMetadata, &arrayIter, &materialPackageTrackSet))
+    {
+        /* CHK_OFAIL(mxf_uu_get_track_datadef(materialPackageTrackSet, &dataDefUL)); */
+        /* NOTE: not failing because files from Omneon were found to have a missing DataDefinition item 
+           in the Sequence and DMSourceClip referenced by a static DM Track */
+        if (!mxf_uu_get_track_datadef(materialPackageTrackSet, &dataDefUL))
+        {
+            continue;
+        }
+        
+        if (isOPAtom && 
+            !mxf_is_picture(&dataDefUL) && !mxf_is_sound(&dataDefUL) && !mxf_is_timecode(&dataDefUL))
+        {
+            /* some Avid OPAtom files have a weak reference to a DataDefinition instead of a UL */ 
+            mxf_avid_get_data_def(headerMetadata, (mxfUUID*)&dataDefUL, &dataDefUL);
+        }
+        
+        if (mxf_is_picture(&dataDefUL) || mxf_is_sound(&dataDefUL))
+        {
+            CHK_ORET(mxf_get_rational_item(materialPackageTrackSet, &MXF_ITEM_K(Track, EditRate), &editRate));
+            CHK_ORET(mxf_uu_get_track_duration(materialPackageTrackSet, &duration));
+
+            /* the clip duration is the duration of the shortest track in video track edit units */
+            if (mxf_is_picture(&dataDefUL))
+            {
+                if (haveVideoTrack)
+                {
+                    videoDuration = mxfr_convert_length(&editRate, duration, &clip->frameRate);
+                    if (videoDuration < clip->duration)
+                    {
+                        clip->duration = videoDuration;
+                    }
+                }
+                else
+                {
+                    if (clip->duration > 0)
+                    {
+                        videoDuration = mxfr_convert_length(&clip->frameRate, clip->duration, &editRate);
+                        if (duration < videoDuration)
+                        {
+                            clip->duration = duration;
+                        }
+                        else
+                        {
+                            clip->duration = videoDuration;
+                        }
+                        clip->frameRate = editRate;
+                    }
+                    else
+                    {
+                        clip->duration = duration;
+                        clip->frameRate = editRate;
+                    }
+                }
+
+                haveVideoTrack = 1;
+            }
+            else /* mxf_is_sound(&dataDefUL) */
+            {
+                if (haveVideoTrack)
+                {
+                    videoDuration = mxfr_convert_length(&editRate, duration, &clip->frameRate);
+                    if (videoDuration < clip->duration)
+                    {
+                        clip->duration = videoDuration;
+                    }
+                }
+                else
+                {
+                    /* assume PAL frame rate */
+                    videoDuration = mxfr_convert_length(&editRate, duration, &g_palFrameRate);
+                    if (clip->duration > 0)
+                    {
+                        if (videoDuration < clip->duration)
+                        {
+                            clip->frameRate = g_palFrameRate;
+                            clip->duration = videoDuration;
+                        }
+                    }
+                    else
+                    {
+                        clip->frameRate = g_palFrameRate;
+                        clip->duration = videoDuration;
+                    }
+                }
+            }
+        }
+    }
+
+    clip->hasAssociatedVideo = haveVideoTrack;
+
+    return 1;
+}
+
+int mxfr_is_pal_frame_rate(const mxfRational* frameRate)
+{
+    return memcmp(frameRate, &g_palFrameRate, sizeof(*frameRate)) == 0;
+}
+
+int mxfr_is_ntsc_frame_rate(const mxfRational* frameRate)
+{
+    return memcmp(frameRate, &g_ntscFrameRate, sizeof(*frameRate)) == 0;
+}
+
+int mxfr_is_prof_sampling_rate(const mxfRational* samplingRate)
+{
+    return memcmp(samplingRate, &g_profAudioSamplingRate, sizeof(*samplingRate)) == 0;
 }
 

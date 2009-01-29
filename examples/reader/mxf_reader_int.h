@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader_int.h,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: mxf_reader_int.h,v 1.2 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * Internal functions for reading MXF files
  *
@@ -33,10 +33,13 @@ typedef struct _EssenceTrack
 {
     struct _EssenceTrack* next;
     
+    int isVideo;
     uint32_t trackNumber;
     
     int64_t frameSize;  /* -1 indicates variable frame size, 0 indicates sequence */
     uint32_t frameSizeSeq[15];
+    int frameSizeSeqSize;
+    int64_t frameSeqSize;
     
     mxfRational frameRate; /* required playout frame rate */
     int64_t playoutDuration;
@@ -62,6 +65,7 @@ typedef struct
     int64_t (*get_last_written_frame_number) (MXFReader* reader);
     MXFHeaderMetadata* (*get_header_metadata) (MXFReader* reader);
     int (*have_footer_metadata)(MXFReader* reader);
+    int (*set_frame_rate)(MXFReader* reader, const mxfRational* frameRate);
 
     EssenceReaderData* data;
 } EssenceReader;
@@ -111,6 +115,12 @@ struct _MXFReader
 };
 
 
+static const mxfRational g_palFrameRate = {25, 1};
+static const mxfRational g_ntscFrameRate = {30000, 1001};
+static const mxfRational g_profAudioSamplingRate = {48000, 1};
+
+
+
 int add_track(MXFReader* reader, MXFTrack** track);
 
 int add_essence_track(EssenceReader* essenceReader, EssenceTrack** essenceTrack);
@@ -127,6 +137,14 @@ int initialise_default_playout_timecode(MXFReader* reader);
 int initialise_source_timecodes(MXFReader* reader, MXFMetadataSet* sourcePackageSet);
 int set_essence_container_timecode(MXFReader* reader, mxfPosition position, 
     int type, int count, int isDropFrame, uint8_t hour, uint8_t min, uint8_t sec, uint8_t frame);
+
+int64_t mxfr_convert_length(const mxfRational* frameRateIn, int64_t lengthIn, const mxfRational* frameRateOut);
+
+int get_clip_duration(MXFHeaderMetadata* headerMetadata, MXFClip* clip, int isOPAtom);
+
+int mxfr_is_pal_frame_rate(const mxfRational* frameRate);
+int mxfr_is_ntsc_frame_rate(const mxfRational* frameRate);
+int mxfr_is_prof_sampling_rate(const mxfRational* samplingRate);
 
 
 #endif

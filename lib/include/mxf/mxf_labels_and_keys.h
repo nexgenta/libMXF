@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.6 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -133,16 +133,16 @@ static const mxfUL MXF_CMDEF_L(D10_50_625_50) =
 static const mxfUL MXF_CMDEF_L(D10_50_525_60) = 
     MXF_D10_CMDEV_L(0x01, 0x02);
 
-static const mxfUL MXF_CMDEF_L(D10_50_625_40) = 
+static const mxfUL MXF_CMDEF_L(D10_40_625_50) = 
     MXF_D10_CMDEV_L(0x01, 0x03);
 
-static const mxfUL MXF_CMDEF_L(D10_50_525_40) = 
+static const mxfUL MXF_CMDEF_L(D10_40_525_60) = 
     MXF_D10_CMDEV_L(0x01, 0x04);
 
-static const mxfUL MXF_CMDEF_L(D10_50_625_30) = 
+static const mxfUL MXF_CMDEF_L(D10_30_625_50) = 
     MXF_D10_CMDEV_L(0x01, 0x05);
 
-static const mxfUL MXF_CMDEF_L(D10_50_525_30) = 
+static const mxfUL MXF_CMDEF_L(D10_30_525_60) = 
     MXF_D10_CMDEV_L(0x01, 0x06);
 
     

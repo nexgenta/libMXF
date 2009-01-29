@@ -1,5 +1,5 @@
 /*
- * $Id: test_mxf_reader.c,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: test_mxf_reader.c,v 1.2 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * Test the MXF Reader 
  *
@@ -202,6 +202,8 @@ static int test1(const char* mxfFilename, MXFTimecode* startTimecode, int source
     }
     
     clip = get_mxf_clip(input);
+    printf("Clip frame rate = %d/%d fps\n", clip->frameRate.numerator, clip->frameRate.denominator);
+    printf("Clip duration = %"PFi64" frames\n", clip->duration);
     
     if (startTimecode->hour != INVALID_TIMECODE_HOUR)
     {

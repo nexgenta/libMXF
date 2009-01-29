@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_opatom_reader.c,v 1.6 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * MXF OP-Atom reader
  *
@@ -34,8 +34,6 @@
 
 
 
-/* TODO: handle frame size sequences for audio */
-
 struct _EssenceReaderData
 {
     MXFPartition* headerPartition;
@@ -43,6 +41,7 @@ struct _EssenceReaderData
     int haveFooterMetadata;
     
     uint64_t essenceStartPos;
+    uint64_t essenceDataSize; 
     
     mxfPosition currentPosition;
     
@@ -50,6 +49,97 @@ struct _EssenceReaderData
     int64_t numAvidFrameOffsets;
 };
 
+
+static int64_t get_audio_essence_element_frame_count(uint64_t essenceDataSize, EssenceTrack* essenceTrack)
+{
+    if (essenceDataSize <= 0 || essenceTrack->frameSize == 0)
+    {
+        return 0;
+    }
+    else if (essenceTrack->frameSize > 0)
+    {
+        return (int64_t)(essenceDataSize / essenceTrack->frameSize);
+    }
+    else /* essenceTrack->frameSize < 0 */
+    {
+        int i;
+        int64_t numSeqs;
+        uint64_t remainder;
+        int64_t numFrames;
+        
+        numSeqs = (int64_t)(essenceDataSize / essenceTrack->frameSeqSize);
+        numFrames = numSeqs * essenceTrack->frameSizeSeqSize;
+        
+        remainder = essenceDataSize - numSeqs * essenceTrack->frameSeqSize;
+        for (i = 0; i < essenceTrack->frameSizeSeqSize; i++)
+        {
+            if (remainder < essenceTrack->frameSizeSeq[i])
+            {
+                break;
+            }
+            remainder -= essenceTrack->frameSizeSeq[i];
+            numFrames++;
+        }
+        
+        return numFrames;
+    }
+}
+
+static uint64_t get_audio_file_offset(EssenceReaderData* data, EssenceTrack* essenceTrack, int64_t frameNumber)
+{
+    if (essenceTrack->frameSize == 0)
+    {
+        return 0;
+    }
+    else if (essenceTrack->frameSize > 0)
+    {
+        return data->essenceStartPos + frameNumber * essenceTrack->frameSize;
+    }
+    else /* essenceTrack->frameSize < 0 */
+    {
+        int i;
+        int seqIndex;
+        uint64_t offset;
+
+        offset = (frameNumber / essenceTrack->frameSizeSeqSize) * essenceTrack->frameSeqSize;
+
+        seqIndex = frameNumber % essenceTrack->frameSizeSeqSize;
+        for (i = 0; i < seqIndex; i++)
+        {
+            offset += essenceTrack->frameSizeSeq[i];
+        }
+        
+        return data->essenceStartPos + offset;
+    }
+}
+
+static uint32_t get_audio_frame_size(EssenceTrack* essenceTrack, int64_t frameNumber)
+{
+    if (essenceTrack->frameSize == 0)
+    {
+        return 0;
+    }
+    else if (essenceTrack->frameSize > 0)
+    {
+        return essenceTrack->frameSize;
+    }
+    else /* essenceTrack->frameSize < 0 */
+    {
+        return essenceTrack->frameSizeSeq[frameNumber % essenceTrack->frameSizeSeqSize];
+    }
+}
+
+static int get_data_def_ul(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* trackSet, mxfUL* dataDefUL)
+{
+    CHK_ORET(mxf_uu_get_track_datadef(trackSet, dataDefUL));
+    if (!mxf_is_picture(dataDefUL) && !mxf_is_sound(dataDefUL) && !mxf_is_timecode(dataDefUL))
+    {
+        /* some Avid files have a weak reference to a DataDefinition instead of a UL */ 
+        mxf_avid_get_data_def(headerMetadata, (mxfUUID*)dataDefUL, dataDefUL);
+    }
+    
+    return 1;
+}
 
 static int is_avid_mjpeg_essence_element(const mxfKey* key)
 {
@@ -282,6 +372,75 @@ static int read_avid_imx_frame_size(MXFReader* reader, int64_t* frameSize)
     return 0;
 }
 
+static int opatom_set_frame_rate(MXFReader* reader, const mxfRational* frameRate)
+{
+    EssenceTrack* essenceTrack;
+    MXFTrack* track;
+    int64_t numEssenceElementFrames;
+    
+    /* can only call this function when reader positioned before first frame */
+    CHK_ORET(reader->essenceReader->data->currentPosition == 0);
+    
+    CHK_ORET((track = get_mxf_track(reader, 0)) != NULL);
+
+    essenceTrack = get_essence_track(reader->essenceReader, 0);
+    
+    if (essenceTrack->isVideo)
+    {
+        if (memcmp(&essenceTrack->frameRate, frameRate, sizeof(*frameRate)) != 0)
+        {
+            /* can't change the frame rate for video essence */
+            return 0;
+        }
+    }
+    else
+    {
+        CHK_ORET(mxfr_is_pal_frame_rate(frameRate) || mxfr_is_ntsc_frame_rate(frameRate));
+        
+        essenceTrack->playoutDuration = mxfr_convert_length(&essenceTrack->frameRate, essenceTrack->playoutDuration, frameRate);
+        essenceTrack->frameRate = *frameRate;
+    
+        if (mxfr_is_pal_frame_rate(&essenceTrack->frameRate))
+        {
+            essenceTrack->frameSize = (uint32_t)(track->audio.blockAlign * 
+                track->audio.samplingRate.numerator * essenceTrack->frameRate.denominator / 
+                (double)(track->audio.samplingRate.denominator * essenceTrack->frameRate.numerator));
+
+            reader->clip.duration = mxfr_convert_length(&reader->clip.frameRate, reader->clip.duration, frameRate);
+            reader->clip.frameRate = *frameRate;
+        }
+        else
+        {
+            /* currently support 48kHz only */
+            CHK_ORET(mxfr_is_prof_sampling_rate(&track->audio.samplingRate));
+            
+            essenceTrack->frameSize = -1;
+            essenceTrack->frameSizeSeq[0] = 1602 * track->audio.blockAlign;
+            essenceTrack->frameSizeSeq[1] = 1601 * track->audio.blockAlign;
+            essenceTrack->frameSizeSeq[2] = 1602 * track->audio.blockAlign;
+            essenceTrack->frameSizeSeq[3] = 1601 * track->audio.blockAlign;
+            essenceTrack->frameSizeSeq[4] = 1602 * track->audio.blockAlign;
+            essenceTrack->frameSizeSeqSize = 5;
+            essenceTrack->frameSeqSize = (1602 * 3 + 1601 * 2) * track->audio.blockAlign;
+
+            reader->clip.duration = mxfr_convert_length(&reader->clip.frameRate, reader->clip.duration, frameRate);
+            reader->clip.frameRate = *frameRate;
+        }
+
+        /* adjust the clip duration if the essence data size is known at this point and it contains less frames */
+        if (reader->essenceReader->data->essenceDataSize > 0)
+        {
+            numEssenceElementFrames = get_audio_essence_element_frame_count(reader->essenceReader->data->essenceDataSize, essenceTrack);
+            if (reader->clip.duration > numEssenceElementFrames)
+            {
+                reader->clip.duration = numEssenceElementFrames;
+            }
+        }
+    }
+    
+    return 1;
+}
+
 static int process_metadata(MXFReader* reader, MXFPartition* partition)
 {
     MXFFile* mxfFile = reader->mxfFile;
@@ -301,8 +460,6 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
     int haveVideoOrAudioTrack;
     MXFTrack* track;
     EssenceTrack* essenceTrack;
-    mxfRational videoEditRate;
-    int haveVideoTrack;
     mxfUMID sourcePackageUID;
     mxfUMID packageUID;
     uint32_t trackID;
@@ -391,12 +548,7 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
     CHK_ORET(mxf_uu_get_package_tracks(sourcePackageSet, &arrayIter));
     while (mxf_uu_next_track(data->headerMetadata, &arrayIter, &sourcePackageTrackSet))
     {
-        CHK_ORET(mxf_uu_get_track_datadef(sourcePackageTrackSet, &dataDefUL));
-        if (!mxf_is_picture(&dataDefUL) && !mxf_is_sound(&dataDefUL) && !mxf_is_timecode(&dataDefUL))
-        {
-            /* some Avid files have a weak reference to a DataDefinition instead of a UL */ 
-            mxf_avid_get_data_def(data->headerMetadata, (mxfUUID*)&dataDefUL, &dataDefUL);
-        }
+        CHK_ORET(get_data_def_ul(data->headerMetadata, sourcePackageTrackSet, &dataDefUL));
         
         if (mxf_is_picture(&dataDefUL) || mxf_is_sound(&dataDefUL))
         {
@@ -411,17 +563,16 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
                 essenceTrack->trackNumber = 0;
             }
             CHK_ORET(mxf_get_rational_item(sourcePackageTrackSet, &MXF_ITEM_K(Track, EditRate), &essenceTrack->frameRate));
-            clean_rate(&essenceTrack->frameRate);
-            reader->clip.frameRate = essenceTrack->frameRate;
             CHK_ORET(mxf_uu_get_track_duration(sourcePackageTrackSet, &essenceTrack->playoutDuration));
-            reader->clip.duration = essenceTrack->playoutDuration;
             if (mxf_is_picture(&dataDefUL))
             {
                 track->video.frameRate = essenceTrack->frameRate;
+                essenceTrack->isVideo = 1;
                 track->isVideo = 1;
             }
             else
             {
+                essenceTrack->isVideo = 0;
                 track->isVideo = 0;
             }
             
@@ -450,50 +601,30 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
         return 0;
     }
 
-    
-    
-    /* if essence is audio and the material package has a video track then use that 
-       edit rate for the clip, else default to 25/1 */
 
-    materialPackageSet = NULL;
-    mxf_find_singular_set_by_key(data->headerMetadata, &MXF_SET_K(MaterialPackage), &materialPackageSet);
+    /* get the clip duration */
+    
+    if (!get_clip_duration(data->headerMetadata, &reader->clip, 1))
+    {
+        /* no clip info could be read from the material package - get clip info from the source package */
+        if (track->isVideo)
+        {
+            reader->clip.frameRate = essenceTrack->frameRate;
+            reader->clip.duration = essenceTrack->playoutDuration;
+        }
+        else
+        {
+            reader->clip.frameRate = g_palFrameRate;
+            reader->clip.duration = mxfr_convert_length(&essenceTrack->frameRate, essenceTrack->playoutDuration, &g_palFrameRate);
+        }
+    }
+    
+    
+    /* set audio track duration, frame rate and frame size(s) using clip info */
+
     if (!track->isVideo)
     {
-        haveVideoTrack = 0;
-        if (materialPackageSet != NULL)
-        {
-            CHK_ORET(mxf_uu_get_package_tracks(materialPackageSet, &arrayIter));
-            while (mxf_uu_next_track(data->headerMetadata, &arrayIter, &materialPackageTrackSet))
-            {
-                CHK_ORET(mxf_uu_get_track_datadef(materialPackageTrackSet, &dataDefUL));
-                if (mxf_is_picture(&dataDefUL))
-                {
-                    CHK_ORET(mxf_get_rational_item(materialPackageTrackSet, &MXF_ITEM_K(Track, EditRate), &videoEditRate));
-                    clean_rate(&videoEditRate);
-                    haveVideoTrack = 1;
-                    break;
-                }
-            }
-        }
-        
-        /* default to 25/1 edit rate */
-        if (!haveVideoTrack)
-        {
-            videoEditRate.numerator = 25;
-            videoEditRate.denominator = 1;
-        }
-
-        essenceTrack->playoutDuration = essenceTrack->playoutDuration * 
-            videoEditRate.numerator * essenceTrack->frameRate.denominator / 
-            (double)(essenceTrack->frameRate.numerator * videoEditRate.denominator);
-        reader->clip.duration = essenceTrack->playoutDuration;
-        
-        essenceTrack->frameRate = videoEditRate;
-        reader->clip.frameRate = essenceTrack->frameRate;
-        
-        essenceTrack->frameSize = (uint32_t)(track->audio.blockAlign * 
-            track->audio.samplingRate.numerator * essenceTrack->frameRate.denominator / 
-            (double)(track->audio.samplingRate.denominator * essenceTrack->frameRate.numerator));
+        opatom_set_frame_rate(reader, &reader->clip.frameRate);
     }
 
     
@@ -551,9 +682,16 @@ static int opatom_position_at_frame(MXFReader* reader, int64_t frameNumber)
     essenceTrack = get_essence_track(reader->essenceReader, 0);
     if (essenceTrack->frameSize < 0)
     {
-        CHK_OFAIL(reader->essenceReader->data->avidFrameOffsets != NULL);
-        CHK_OFAIL(get_avid_mjpeg_frame_info(reader, frameNumber, &fileOffset, &frameSize));
-        CHK_OFAIL(mxf_file_seek(mxfFile, data->essenceStartPos + fileOffset, SEEK_SET));
+        if (essenceTrack->isVideo)
+        {
+            CHK_OFAIL(reader->essenceReader->data->avidFrameOffsets != NULL);
+            CHK_OFAIL(get_avid_mjpeg_frame_info(reader, frameNumber, &fileOffset, &frameSize));
+            CHK_OFAIL(mxf_file_seek(mxfFile, data->essenceStartPos + fileOffset, SEEK_SET));
+        }
+        else /* audio frame sequence */
+        {
+            CHK_OFAIL(mxf_file_seek(mxfFile, get_audio_file_offset(data, essenceTrack, frameNumber), SEEK_SET));
+        }
     }
     else
     {
@@ -593,12 +731,23 @@ static int64_t opatom_get_last_written_frame_number(MXFReader* reader)
 
     if (essenceTrack->frameSize < 0)
     {
-        /* if the index table wasn't read then we don't know the length */
-        if (reader->essenceReader->data->avidFrameOffsets == NULL)
+        if (essenceTrack->isVideo)
         {
-            return -1;
+            /* if the index table wasn't read then we don't know the length */
+            if (reader->essenceReader->data->avidFrameOffsets == NULL)
+            {
+                return -1;
+            }
+            targetPosition = reader->clip.duration - 1;
         }
-        targetPosition = reader->clip.duration - 1;
+        else /* audio frame sequence */
+        {
+            targetPosition = get_audio_essence_element_frame_count(fileSize - data->essenceStartPos, essenceTrack) - 1;
+            if (reader->clip.duration >= 0 && targetPosition >= reader->clip.duration)
+            {
+                targetPosition = reader->clip.duration - 1;
+            }
+        }
     }
     else
     {
@@ -628,9 +777,17 @@ static int opatom_skip_next_frame(MXFReader* reader)
     
     if (essenceTrack->frameSize < 0)
     {
-        CHK_OFAIL(reader->essenceReader->data->avidFrameOffsets != NULL);
-        CHK_OFAIL(get_avid_mjpeg_frame_info(reader, reader->essenceReader->data->currentPosition, &fileOffset, &frameSize));
-        CHK_OFAIL(mxf_skip(mxfFile, frameSize));
+        if (essenceTrack->isVideo)
+        {
+            CHK_OFAIL(reader->essenceReader->data->avidFrameOffsets != NULL);
+            CHK_OFAIL(get_avid_mjpeg_frame_info(reader, reader->essenceReader->data->currentPosition, &fileOffset, &frameSize));
+            CHK_OFAIL(mxf_skip(mxfFile, frameSize));
+        }
+        else /* audio frame sequence */
+        {
+            frameSize = get_audio_frame_size(essenceTrack, reader->essenceReader->data->currentPosition);
+            CHK_OFAIL(mxf_skip(mxfFile, frameSize));
+        }
     }
     else
     {
@@ -656,10 +813,10 @@ static int opatom_read_next_frame(MXFReader* reader, MXFReaderListener* listener
     MXFFile* mxfFile = reader->mxfFile;
     int64_t filePos;
     EssenceTrack* essenceTrack;
-    uint8_t* buffer;
-    uint64_t bufferSize;
-    int64_t frameSize;
-    int64_t fileOffset;
+    uint8_t* buffer = NULL;
+    uint64_t bufferSize = 0;
+    int64_t frameSize = 0;
+    int64_t fileOffset = 0;
     
     essenceTrack = get_essence_track(reader->essenceReader, 0);
     
@@ -668,16 +825,33 @@ static int opatom_read_next_frame(MXFReader* reader, MXFReaderListener* listener
     
     if (essenceTrack->frameSize < 0)
     {
-        CHK_OFAIL(reader->essenceReader->data->avidFrameOffsets != NULL);
-        CHK_OFAIL(get_avid_mjpeg_frame_info(reader, reader->essenceReader->data->currentPosition, &fileOffset, &frameSize));
-        if (accept_frame(listener, 0))
+        if (essenceTrack->isVideo)
         {
-            CHK_OFAIL(read_frame(reader, listener, 0, frameSize, &buffer, &bufferSize));
-            CHK_OFAIL(send_frame(reader, listener, 0, buffer, bufferSize));
+            CHK_OFAIL(reader->essenceReader->data->avidFrameOffsets != NULL);
+            CHK_OFAIL(get_avid_mjpeg_frame_info(reader, reader->essenceReader->data->currentPosition, &fileOffset, &frameSize));
+            if (accept_frame(listener, 0))
+            {
+                CHK_OFAIL(read_frame(reader, listener, 0, frameSize, &buffer, &bufferSize));
+                CHK_OFAIL(send_frame(reader, listener, 0, buffer, bufferSize));
+            }
+            else
+            {
+                CHK_OFAIL(mxf_skip(mxfFile, frameSize));
+            }
         }
-        else
+        else /* audio frame sequence */
         {
-            CHK_OFAIL(mxf_skip(mxfFile, frameSize));
+            frameSize = get_audio_frame_size(essenceTrack, reader->essenceReader->data->currentPosition);
+            
+            if (accept_frame(listener, 0))
+            {
+                CHK_OFAIL(read_frame(reader, listener, 0, frameSize, &buffer, &bufferSize));
+                CHK_OFAIL(send_frame(reader, listener, 0, buffer, bufferSize));
+            }
+            else
+            {
+                CHK_OFAIL(mxf_skip(mxfFile, frameSize));
+            }
         }
     }
     else
@@ -765,15 +939,17 @@ int opa_is_supported(MXFPartition* headerPartition)
     {
         return 1;
     }
-    else if (mxf_equals_ul(label, &MXF_EC_L(AvidIMX30)) ||
-        mxf_equals_ul(label, &MXF_EC_L(AvidIMX40)) ||
-        mxf_equals_ul(label, &MXF_EC_L(AvidIMX50)))
+    else if (mxf_equals_ul(label, &MXF_EC_L(AvidIMX30_625_50)) ||
+        mxf_equals_ul(label, &MXF_EC_L(AvidIMX40_625_50)) ||
+        mxf_equals_ul(label, &MXF_EC_L(AvidIMX50_625_50)) ||
+        mxf_equals_ul(label, &MXF_EC_L(AvidIMX30_525_60)) ||
+        mxf_equals_ul(label, &MXF_EC_L(AvidIMX40_525_60)) ||
+        mxf_equals_ul(label, &MXF_EC_L(AvidIMX50_525_60)))
     {
         return 1;
     }
 
-        
-    
+
     return 0;
 }
 
@@ -804,6 +980,7 @@ int opa_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
     essenceReader->get_last_written_frame_number = opatom_get_last_written_frame_number;
     essenceReader->get_header_metadata = opatom_get_header_metadata;
     essenceReader->have_footer_metadata = opatom_have_footer_metadata;
+    essenceReader->set_frame_rate = opatom_set_frame_rate;
     
     data = essenceReader->data;
 
@@ -826,9 +1003,12 @@ int opa_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
     
     /* read the Avid IMX's index table edit unit byte count to set the frame size */
     
-    if (mxf_equals_ul(&MXF_EC_L(AvidIMX30), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
-        mxf_equals_ul(&MXF_EC_L(AvidIMX40), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
-        mxf_equals_ul(&MXF_EC_L(AvidIMX50), &get_mxf_track(reader, 0)->essenceContainerLabel))
+    if (mxf_equals_ul(&MXF_EC_L(AvidIMX30_625_50), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
+        mxf_equals_ul(&MXF_EC_L(AvidIMX40_625_50), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
+        mxf_equals_ul(&MXF_EC_L(AvidIMX50_625_50), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
+        mxf_equals_ul(&MXF_EC_L(AvidIMX30_525_60), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
+        mxf_equals_ul(&MXF_EC_L(AvidIMX40_525_60), &get_mxf_track(reader, 0)->essenceContainerLabel) ||
+        mxf_equals_ul(&MXF_EC_L(AvidIMX50_525_60), &get_mxf_track(reader, 0)->essenceContainerLabel))
     {
         CHK_OFAIL((filePos = mxf_file_tell(mxfFile)) >= 0);
         CHK_OFAIL(read_avid_imx_frame_size(reader, &essenceTrack->frameSize));
@@ -851,6 +1031,8 @@ int opa_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
         is_avid_mjpeg_essence_element(&key) ||
         is_avid_dnxhd_essence_element(&key));
 
+    data->essenceDataSize = len;
+        
     CHK_OFAIL((filePos = mxf_file_tell(mxfFile)) >= 0);
     data->essenceStartPos = filePos;
     data->currentPosition = 0;
@@ -864,10 +1046,3 @@ fail:
     /* essenceReader->close() will be called when closing the reader */
     return 0;
 }
-
-
-
-
-
-
-

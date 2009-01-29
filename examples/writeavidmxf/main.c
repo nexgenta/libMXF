@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.12 2008/11/07 16:55:09 philipn Exp $
+ * $Id: main.c,v 1.13 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -141,9 +141,12 @@ static const unsigned char DATA_ID[4] = {'d', 'a', 't', 'a'};
 static const uint16_t WAVE_FORMAT_PCM = 0x0001;
 
 
-static const int g_defaultIMX30FrameSize = 150000;
-static const int g_defaultIMX40FrameSize = 200000;
-static const int g_defaultIMX50FrameSize = 250000;
+static const int g_defaultIMX30FrameSizePAL = 150000;
+static const int g_defaultIMX40FrameSizePAL = 200000;
+static const int g_defaultIMX50FrameSizePAL = 250000;
+static const int g_defaultIMX30FrameSizeNTSC = 126976;
+static const int g_defaultIMX40FrameSizeNTSC = 167936;
+static const int g_defaultIMX50FrameSizeNTSC = 208896;
 
 
 
@@ -311,7 +314,8 @@ static int read_next_mjpeg_image_data(FILE* file, MJPEGState* state,
                 }
                 else
                 {
-                    fprintf(stderr, "Error: image start is non-0xFF byte\n");
+                    fprintf(stderr, "Warning: MJPEG image start is non-0xFF byte - trailing data ignored\n");
+                    fprintf(stderr, "Warning: near file offset %ld\n", ftell(file));
                     return 0;
                 }
                 break;
@@ -791,7 +795,9 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --IMX30 <filename>         IMX 30 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
     fprintf(stderr, "  --IMX40 <filename>         IMX 40 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
     fprintf(stderr, "  --IMX50 <filename>         IMX 50 Mbps MPEG-2 video (D-10, SMPTE 356M)\n");
-    fprintf(stderr, "       --imx-size <size>     IMX frame size in bytes. Default is %d/%d/%d for IMX30/40/50\n", g_defaultIMX30FrameSize, g_defaultIMX40FrameSize, g_defaultIMX50FrameSize);
+    fprintf(stderr, "       --imx-size <size>     IMX fixed frame size in bytes\n");
+    fprintf(stderr, "                             Default is %d/%d/%d for IMX30/40/50 PAL\n", g_defaultIMX30FrameSizePAL, g_defaultIMX40FrameSizePAL, g_defaultIMX50FrameSizePAL);
+    fprintf(stderr, "                             Default is %d/%d/%d for IMX30/40/50 NTSC\n", g_defaultIMX30FrameSizeNTSC, g_defaultIMX40FrameSizeNTSC, g_defaultIMX50FrameSizeNTSC);
     fprintf(stderr, "  --DNxHD720p120 <filename>  DNxHD 1280x720p50 120 Mbps\n");
     fprintf(stderr, "  --DNxHD720p185 <filename>  DNxHD 1280x720p50 185 Mbps\n");
     fprintf(stderr, "  --DNxHD1080i120 <filename> DNxHD 1920x1080i50 120 Mbps\n");
@@ -1176,17 +1182,17 @@ int main(int argc, const char* argv[])
             if (argv[cmdlnIndex][5] == '3')
             {
                 inputs[inputIndex].essenceType = IMX30;
-                inputs[inputIndex].essenceInfo.imxFrameSize = g_defaultIMX30FrameSize;
+                inputs[inputIndex].essenceInfo.imxFrameSize = isPAL ? g_defaultIMX30FrameSizePAL : g_defaultIMX30FrameSizeNTSC;
             }
             else if (argv[cmdlnIndex][5] == '4')
             {
                 inputs[inputIndex].essenceType = IMX40;
-                inputs[inputIndex].essenceInfo.imxFrameSize = g_defaultIMX40FrameSize;
+                inputs[inputIndex].essenceInfo.imxFrameSize = isPAL ? g_defaultIMX40FrameSizePAL : g_defaultIMX40FrameSizeNTSC;
             }
             else /* argv[cmdlnIndex][5] == '5' */
             {
                 inputs[inputIndex].essenceType = IMX50;
-                inputs[inputIndex].essenceInfo.imxFrameSize = g_defaultIMX50FrameSize;
+                inputs[inputIndex].essenceInfo.imxFrameSize = isPAL ? g_defaultIMX50FrameSizePAL : g_defaultIMX50FrameSizeNTSC;
             }
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;

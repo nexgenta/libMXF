@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.6 2008/11/11 10:35:29 philipn Exp $
+ * $Id: mxf_essence_helper.c,v 1.7 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -195,7 +195,7 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_625_50_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_625_50_extended_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_625_50_picture_only)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX50)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX50_625_50)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 304 * 2;
@@ -208,7 +208,8 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_525_60_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_525_60_extended_template)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_525_60_picture_only)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_50_525_60_picture_only)) ||
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX50_525_60)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 256 * 2;
@@ -222,7 +223,7 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_625_50_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_625_50_extended_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_625_50_picture_only)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX40)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX40_625_50)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 304 * 2;
@@ -235,7 +236,8 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_525_60_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_525_60_extended_template)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_525_60_picture_only)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_40_525_60_picture_only)) ||
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX40_525_60)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 256 * 2;
@@ -249,7 +251,7 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_625_50_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_625_50_extended_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_625_50_picture_only)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX30)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX30_625_50)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 304 * 2;
@@ -262,7 +264,8 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_525_60_defined_template)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_525_60_extended_template)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_525_60_picture_only)))
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(D10_30_525_60_picture_only)) ||
+        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidIMX30_525_60)))
     {
         track->video.frameWidth = 720;
         track->video.frameHeight = 256 * 2;
@@ -440,81 +443,34 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidMJPEGClipWrapped)))
     {
-        CHK_ORET(mxf_get_int32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ResolutionID), &avidResolutionID));
-        switch (avidResolutionID)
-        {
-            case 0x4c: /* 2:1 */
-                track->video.frameWidth = 720;
-                track->video.frameHeight = 296 * 2;
-                track->video.displayWidth = 720;
-                track->video.displayHeight = 288 * 2;
-                track->video.displayXOffset = 0;
-                track->video.displayYOffset = 8 * 2;
-                track->video.horizSubsampling = 2;
-                track->video.vertSubsampling = 1;
-                essenceTrack->frameSize = -1; /* variable */
-                break;
-            case 0x4d: /* 3:1 */
-                track->video.frameWidth = 720;
-                track->video.frameHeight = 296 * 2;
-                track->video.displayWidth = 720;
-                track->video.displayHeight = 288 * 2;
-                track->video.displayXOffset = 0;
-                track->video.displayYOffset = 8 * 2;
-                track->video.horizSubsampling = 2;
-                track->video.vertSubsampling = 1;
-                essenceTrack->frameSize = -1; /* variable */
-                break;
-            case 0x4b: /* 10:1 */
-                track->video.frameWidth = 720;
-                track->video.frameHeight = 296 * 2;
-                track->video.displayWidth = 720;
-                track->video.displayHeight = 288 * 2;
-                track->video.displayXOffset = 0;
-                track->video.displayYOffset = 8 * 2;
-                track->video.horizSubsampling = 2;
-                track->video.vertSubsampling = 1;
-                essenceTrack->frameSize = -1; /* variable */
-                break;
-            case 0x6e: /* 10:1m */
-                track->video.frameWidth = 288;
-                track->video.frameHeight = 296;
-                track->video.displayWidth = 288;
-                track->video.displayHeight = 288;
-                track->video.displayXOffset = 0;
-                track->video.displayYOffset = 8 * 2;
-                track->video.horizSubsampling = 2;
-                track->video.vertSubsampling = 1;
-                track->video.singleField = 1;
-                essenceTrack->frameSize = -1; /* variable */
-                break;
-            case 0x4e: /* 15:1s */
-                track->video.frameWidth = 352;
-                track->video.frameHeight = 296;
-                track->video.displayWidth = 352;
-                track->video.displayHeight = 288;
-                track->video.displayXOffset = 0;
-                track->video.displayYOffset = 8 * 2;
-                track->video.horizSubsampling = 2;
-                track->video.vertSubsampling = 1;
-                track->video.singleField = 1;
-                essenceTrack->frameSize = -1; /* variable */
-                break;
-            case 0x52: /* 20:1 */
-                track->video.frameWidth = 720;
-                track->video.frameHeight = 296 * 2;
-                track->video.displayWidth = 720;
-                track->video.displayHeight = 288 * 2;
-                track->video.displayXOffset = 0;
-                track->video.displayYOffset = 8 * 2;
-                track->video.horizSubsampling = 2;
-                track->video.vertSubsampling = 1;
-                essenceTrack->frameSize = -1; /* variable */
-                break;
-            default:
-                mxf_log_error("Unsupported Avid MJPEG resolution %d" LOG_LOC_FORMAT, avidResolutionID, LOG_LOC_PARAMS);
-                return 0;
-        }
+        /* MJPEG is essentially a private Avid extension, so we can rely on observed MXF output from Avid */
+        /* e.g. Avid always outputs correct DisplayWidth/HeightX/YOffset properties for MJPEG */
+        CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, StoredHeight), &fieldHeight));
+        CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, StoredWidth), &fieldWidth));
+        CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayHeight), &displayHeight));
+        CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayWidth), &displayWidth));
+        CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayYOffset), &displayYOffset));
+        CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayXOffset), &displayXOffset));
+        CHK_ORET(mxf_get_uint8_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameLayout), &frameLayout));
+        CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, HorizontalSubsampling), &track->video.horizSubsampling));
+        CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, VerticalSubsampling), &track->video.vertSubsampling));
+
+        /* SeparateFields formats (2:1, 3:1, 10:1, 20:1) need to have their height doubled */
+        /* for display while OneField formats (2:1s, 15:1s, 4:1s, 10:1m, 4:1m) don't.      */ 
+        int factor;
+        if (frameLayout == 1)  /* SeparateFields */
+            factor = 2;
+        else
+            factor = 1;
+
+        track->video.frameWidth = fieldWidth;
+        track->video.frameHeight = fieldHeight * factor;
+        track->video.displayWidth = displayWidth;
+        track->video.displayHeight = displayHeight * factor;
+        track->video.displayXOffset = displayXOffset;
+        track->video.displayYOffset = displayYOffset * 2;
+
+        essenceTrack->frameSize = -1; /* variable */
     }
     else
     {

@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.12 2008/11/07 16:55:09 philipn Exp $
+ * $Id: write_avid_mxf.c,v 1.13 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -1095,15 +1095,15 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     {
         case AvidMJPEG:
             newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
+            newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidMJPEGClipWrapped);
+            newTrackWriter->frameSize = 0; /* variable */
             if (clipWriter->projectFormat == PAL_25i)
             {
-                newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidMJPEGClipWrapped);
-                newTrackWriter->frameSize = 0; /* variable */
                 switch (filePackage->essenceInfo.mjpegResolution)
                 {
                     case Res21:
                         newTrackWriter->resolutionID = g_AvidMJPEG21_ResolutionID;
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG21);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG21_PAL);
                         newTrackWriter->videoLineMap[0] = 15;
                         newTrackWriter->videoLineMap[1] = 328;
                         newTrackWriter->videoLineMapLen = 2;
@@ -1120,7 +1120,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         break;
                     case Res31:
                         newTrackWriter->resolutionID = g_AvidMJPEG31_ResolutionID;
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG31);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG31_PAL);
                         newTrackWriter->videoLineMap[0] = 15;
                         newTrackWriter->videoLineMap[1] = 328;
                         newTrackWriter->videoLineMapLen = 2;
@@ -1137,7 +1137,24 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         break;
                     case Res101:
                         newTrackWriter->resolutionID = g_AvidMJPEG101_ResolutionID;
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101_PAL);
+                        newTrackWriter->videoLineMap[0] = 15;
+                        newTrackWriter->videoLineMap[1] = 328;
+                        newTrackWriter->videoLineMapLen = 2;
+                        newTrackWriter->storedHeight = 296;
+                        newTrackWriter->storedWidth = 720;
+                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledWidth = 720;
+                        newTrackWriter->displayHeight = 288;
+                        newTrackWriter->displayWidth = 720;
+                        newTrackWriter->displayYOffset = 8;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 1; /* SeparateFields */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
+                    case Res201:
+                        newTrackWriter->resolutionID = g_AvidMJPEG201_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG201_PAL);
                         newTrackWriter->videoLineMap[0] = 15;
                         newTrackWriter->videoLineMap[1] = 328;
                         newTrackWriter->videoLineMapLen = 2;
@@ -1154,7 +1171,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         break;
                     case Res101m:
                         newTrackWriter->resolutionID = g_AvidMJPEG101m_ResolutionID;
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101m);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101m_PAL);
                         newTrackWriter->videoLineMap[0] = 15;
                         newTrackWriter->videoLineMapLen = 1;
                         newTrackWriter->storedHeight = 296;
@@ -1170,7 +1187,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         break;
                     case Res151s:
                         newTrackWriter->resolutionID = g_AvidMJPEG151s_ResolutionID;
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG151s);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG151s_PAL);
                         newTrackWriter->videoLineMap[0] = 15;
                         newTrackWriter->videoLineMapLen = 1;
                         newTrackWriter->storedHeight = 296;
@@ -1184,37 +1201,122 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->frameLayout = 2; /* SingleField */
                         newTrackWriter->colorSiting = 4; /* Rec601 */
                         break;
-                    case Res201:
-                        newTrackWriter->resolutionID = g_AvidMJPEG201_ResolutionID;
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG201);
-                        newTrackWriter->videoLineMap[0] = 15;
-                        newTrackWriter->videoLineMap[1] = 328;
+                    default:
+                        assert(0);
+                        return 0;
+                }
+            }
+            else
+            {
+                switch (filePackage->essenceInfo.mjpegResolution)
+                {
+                    case Res21:
+                        newTrackWriter->resolutionID = g_AvidMJPEG21_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG21_NTSC);
+                        newTrackWriter->videoLineMap[0] = 16;
+                        newTrackWriter->videoLineMap[1] = 278;
                         newTrackWriter->videoLineMapLen = 2;
-                        newTrackWriter->storedHeight = 296;
+                        newTrackWriter->storedHeight = 248;
                         newTrackWriter->storedWidth = 720;
-                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledHeight = 248;
                         newTrackWriter->sampledWidth = 720;
-                        newTrackWriter->displayHeight = 288;
+                        newTrackWriter->displayHeight = 243;
                         newTrackWriter->displayWidth = 720;
-                        newTrackWriter->displayYOffset = 8;
+                        newTrackWriter->displayYOffset = 5;
                         newTrackWriter->displayXOffset = 0;
                         newTrackWriter->frameLayout = 1; /* SeparateFields */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
+                    case Res31:
+                        newTrackWriter->resolutionID = g_AvidMJPEG31_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG31_NTSC);
+                        newTrackWriter->videoLineMap[0] = 16;
+                        newTrackWriter->videoLineMap[1] = 278;
+                        newTrackWriter->videoLineMapLen = 2;
+                        newTrackWriter->storedHeight = 248;
+                        newTrackWriter->storedWidth = 720;
+                        newTrackWriter->sampledHeight = 248;
+                        newTrackWriter->sampledWidth = 720;
+                        newTrackWriter->displayHeight = 243;
+                        newTrackWriter->displayWidth = 720;
+                        newTrackWriter->displayYOffset = 5;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 1; /* SeparateFields */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
+                    case Res101:
+                        newTrackWriter->resolutionID = g_AvidMJPEG101_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101_NTSC);
+                        newTrackWriter->videoLineMap[0] = 16;
+                        newTrackWriter->videoLineMap[1] = 278;
+                        newTrackWriter->videoLineMapLen = 2;
+                        newTrackWriter->storedHeight = 248;
+                        newTrackWriter->storedWidth = 720;
+                        newTrackWriter->sampledHeight = 248;
+                        newTrackWriter->sampledWidth = 720;
+                        newTrackWriter->displayHeight = 243;
+                        newTrackWriter->displayWidth = 720;
+                        newTrackWriter->displayYOffset = 5;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 1; /* SeparateFields */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
+                    case Res201:
+                        newTrackWriter->resolutionID = g_AvidMJPEG201_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG201_NTSC);
+                        newTrackWriter->videoLineMap[0] = 16;
+                        newTrackWriter->videoLineMap[1] = 278;
+                        newTrackWriter->videoLineMapLen = 2;
+                        newTrackWriter->storedHeight = 248;
+                        newTrackWriter->storedWidth = 720;
+                        newTrackWriter->sampledHeight = 248;
+                        newTrackWriter->sampledWidth = 720;
+                        newTrackWriter->displayHeight = 243;
+                        newTrackWriter->displayWidth = 720;
+                        newTrackWriter->displayYOffset = 5;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 1; /* SeparateFields */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
+                    case Res101m:
+                        newTrackWriter->resolutionID = g_AvidMJPEG101m_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101m_NTSC);
+                        newTrackWriter->videoLineMap[0] = 16;
+                        newTrackWriter->videoLineMapLen = 1;
+                        newTrackWriter->storedHeight = 248;
+                        newTrackWriter->storedWidth = 288;
+                        newTrackWriter->sampledHeight = 248;
+                        newTrackWriter->sampledWidth = 288;
+                        newTrackWriter->displayHeight = 243;
+                        newTrackWriter->displayWidth = 288;
+                        newTrackWriter->displayYOffset = 5;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 2; /* SingleField */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
+                    case Res151s:
+                        newTrackWriter->resolutionID = g_AvidMJPEG151s_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG151s_NTSC);
+                        newTrackWriter->videoLineMap[0] = 16;
+                        newTrackWriter->videoLineMapLen = 1;
+                        newTrackWriter->storedHeight = 248;
+                        newTrackWriter->storedWidth = 352;
+                        newTrackWriter->sampledHeight = 248;
+                        newTrackWriter->sampledWidth = 352;
+                        newTrackWriter->displayHeight = 243;
+                        newTrackWriter->displayWidth = 352;
+                        newTrackWriter->displayYOffset = 5;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 2; /* SingleField */
                         newTrackWriter->colorSiting = 4; /* Rec601 */
                         break;
                     default:
                         assert(0);
                         return 0;
                 }
-                newTrackWriter->horizSubsampling = 2;
-                newTrackWriter->vertSubsampling = 1;
             }
-            else
-            {
-                /* TODO */
-                mxf_log_error("Avid MJPEG NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
-                assert(0);
-                return 0;
-            }
+            newTrackWriter->horizSubsampling = 2;		/* All JPEG formats are 4:2:2 */
+            newTrackWriter->vertSubsampling = 1;
             newTrackWriter->essenceElementKey = MXF_EE_K(AvidMJPEGClipWrapped);
             newTrackWriter->sourceTrackNumber = g_AvidMJPEGTrackNumber;
             newTrackWriter->essenceElementLLen = 8;
@@ -1430,7 +1532,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     newTrackWriter->essenceContainerLabel = MXF_EC_L(DV1080i50ClipWrapped);
                     newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DV1080i50);
                     break;
-                case DV720p50:        /* Not part of SMPTE 370M but being shipped by Panasonic */
+                case DV720p50:        /* Standardised in later version of SMPTE 370M */
                     newTrackWriter->essenceElementKey = MXF_EE_K(DV720p50);
                     newTrackWriter->essenceContainerLabel = MXF_EC_L(DV720p50ClipWrapped);
                     newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DV720p50);
@@ -1458,19 +1560,19 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 {
                     case IMX30:
                         newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
-                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX30);
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_30);
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX30_625_50);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_30_625_50);
                         newTrackWriter->resolutionID = 162;
                         break;
                     case IMX40:
                         newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
-                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX40);
-                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_40);
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX40_625_50);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_40_625_50);
                         newTrackWriter->resolutionID = 161;
                         break;
                     case IMX50:
                         newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
-                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX50);
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX50_625_50);
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_50_625_50);
                         newTrackWriter->resolutionID = 160;
                         break;
@@ -1494,8 +1596,43 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             }
             else
             {
-                mxf_log_error("IMX NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
-                assert(0);
+                switch (filePackage->essenceType)
+                {
+                    case IMX30:
+                        newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX30_525_60);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_30_525_60);
+                        newTrackWriter->resolutionID = 162;
+                        break;
+                    case IMX40:
+                        newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX40_525_60);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_30_525_60);
+                        newTrackWriter->resolutionID = 161;
+                        break;
+                    case IMX50:
+                        newTrackWriter->frameSize = filePackage->essenceInfo.imxFrameSize;
+                        newTrackWriter->essenceContainerLabel = MXF_EC_L(AvidIMX50_525_60);
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(D10_30_525_60);
+                        newTrackWriter->resolutionID = 160;
+                        break;
+                    default:
+                        assert(0);
+                        return 0;
+                }
+                newTrackWriter->displayHeight = 243;
+                newTrackWriter->displayWidth = 720;
+                newTrackWriter->displayYOffset = 13;
+                newTrackWriter->displayXOffset = 0;
+                newTrackWriter->storedHeight = 256;
+                newTrackWriter->storedWidth = 720;
+                newTrackWriter->videoLineMap[0] = 7;
+                newTrackWriter->videoLineMap[1] = 270;
+                newTrackWriter->videoLineMapLen = 2;
+                newTrackWriter->horizSubsampling = 2;
+                newTrackWriter->vertSubsampling = 1;
+                newTrackWriter->colorSiting = 4; /* Rec601 */
+                newTrackWriter->frameLayout = 1; /* SeparateFields */
             }
             newTrackWriter->essenceElementKey = MXF_EE_K(IMX);
             newTrackWriter->sourceTrackNumber = MXF_D10_PICTURE_TRACK_NUM(0x01);

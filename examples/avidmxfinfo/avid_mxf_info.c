@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: avid_mxf_info.c,v 1.6 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -990,27 +990,33 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
         }
         else
         {
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG21)))
+            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG21_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG21_NTSC)))
             {
                 info->essenceType = MJPEG_2_1_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31)))
+            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31_NTSC)))
             {
                 info->essenceType = MJPEG_3_1_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101)))
+            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101_NTSC)))
             {
                 info->essenceType = MJPEG_10_1_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101m)))
+            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101m_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101m_NTSC)))
             {
                 info->essenceType = MJPEG_10_1_M_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG151s)))
+            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG151s_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG151s_NTSC)))
             {
                 info->essenceType = MJPEG_15_1_S_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG201)))
+            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG201_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG201_NTSC)))
             {
                 info->essenceType = MJPEG_20_1_ESSENCE_TYPE;
             }

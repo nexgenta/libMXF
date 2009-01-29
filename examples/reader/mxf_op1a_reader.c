@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_op1a_reader.c,v 1.2 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_op1a_reader.c,v 1.3 2009/01/29 07:21:42 stuart_hc Exp $
  *
  * MXF OP-1A reader
  *
@@ -45,6 +45,7 @@ typedef struct
 {
     MXFTrack* track;
     
+    int isVideo;
     uint32_t trackID;
     uint32_t trackNumber;
     mxfRational editRate;
@@ -82,6 +83,8 @@ struct _EssenceReaderData
     FileIndex* index;
     NSFileIndex nsIndex; /* file index for non-seekable file */
 };
+
+
 
 static void free_partition_in_list(void* data)
 {
@@ -308,7 +311,6 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
     mxfUL dataDefUL;
     MXFTrack* track;
     EssenceTrack* essenceTrack;
-    int haveVideoTrack;
     MXFList wrappedTracks;
     MXFList sortedWrappedTracks;
     WrappedTrack* newWrappedTrack = NULL;
@@ -350,9 +352,13 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
     }
     
     
+    /* get the clip duration */
+    
+    CHK_OFAIL(get_clip_duration(data->headerMetadata, &reader->clip, 0));
+    
+    
     /* get the tracks from the (single) material package */
 
-    haveVideoTrack = 0;
     haveZeroTrackNumber = 0;
     CHK_OFAIL(mxf_find_singular_set_by_key(data->headerMetadata, &MXF_SET_K(MaterialPackage), &materialPackageSet));
     CHK_OFAIL(mxf_uu_get_package_tracks(materialPackageSet, &arrayIter));
@@ -365,6 +371,7 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
         {
             continue;
         }
+        
         if (mxf_is_picture(&dataDefUL) || mxf_is_sound(&dataDefUL))
         {
             CHK_MALLOC_OFAIL(newWrappedTrack, WrappedTrack);
@@ -386,26 +393,18 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
             }
             CHK_OFAIL(mxf_get_uint32_item(materialPackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), &wrappedTrack->trackID));
             CHK_OFAIL(mxf_get_rational_item(materialPackageTrackSet, &MXF_ITEM_K(Track, EditRate), &wrappedTrack->editRate));
-            clean_rate(&wrappedTrack->editRate);
             CHK_OFAIL(mxf_uu_get_track_duration(materialPackageTrackSet, &wrappedTrack->duration));
             CHK_OFAIL(mxf_uu_get_track_reference(materialPackageTrackSet, &wrappedTrack->sourcePackageUID, &wrappedTrack->sourceTrackID));
-            track->isVideo = mxf_is_picture(&dataDefUL);
+            wrappedTrack->isVideo = mxf_is_picture(&dataDefUL);
+            track->isVideo = wrappedTrack->isVideo;
             track->materialTrackID = wrappedTrack->trackID;
             track->materialTrackNumber = wrappedTrack->trackNumber;
-
-            if (track->isVideo)
+            
+            if (wrappedTrack->isVideo)
             {
                 track->video.frameRate = wrappedTrack->editRate;
-                reader->clip.frameRate = wrappedTrack->editRate;
-                reader->clip.duration = wrappedTrack->duration;
-                haveVideoTrack = 1;
             }
-            else
-            {
-                reader->clip.frameRate = wrappedTrack->editRate;
-                reader->clip.duration = wrappedTrack->duration;
-            }
-            
+
             if (wrappedTrack->trackNumber == 0)
             {
                 haveZeroTrackNumber = 1;
@@ -469,6 +468,8 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
 
         CHK_OFAIL(add_essence_track(essenceReader, &essenceTrack));
             
+        essenceTrack->isVideo = sortedWrappedTrack->isVideo;
+        
         if (mxf_have_item(sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber)))
         {
             CHK_OFAIL(mxf_get_uint32_item(sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), &essenceTrack->trackNumber));
@@ -522,7 +523,6 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
     /* initialise the source timecodes */
     
     initialise_source_timecodes(reader, sourcePackageSet);
-    
     
     
     
@@ -954,6 +954,15 @@ static int op1a_have_footer_metadata(MXFReader* reader)
     return reader->essenceReader->data->haveFooterMetadata;
 }
 
+static int op1a_set_frame_rate(MXFReader* reader, const mxfRational* frameRate)
+{
+     /* avoid compiler warnings */
+    (void) reader;
+    (void) frameRate;
+    
+    /* currently only support the frame rate defined in the file */
+    return 0;
+}
 
 int op1a_is_supported(MXFPartition* headerPartition)
 {
@@ -1039,6 +1048,7 @@ int op1a_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
     essenceReader->get_last_written_frame_number = op1a_get_last_written_frame_number;
     essenceReader->get_header_metadata = op1a_get_header_metadata;
     essenceReader->have_footer_metadata = op1a_have_footer_metadata;
+    essenceReader->set_frame_rate = op1a_set_frame_rate;
     
     data = essenceReader->data;
 
