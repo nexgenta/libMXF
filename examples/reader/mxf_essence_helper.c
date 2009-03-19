@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.7 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: mxf_essence_helper.c,v 1.8 2009/03/19 17:38:12 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -287,6 +287,54 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         track->video.horizSubsampling = 2;
         track->video.vertSubsampling = 1;
         essenceTrack->frameSize = 606208;
+    }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD1080i185ClipWrapped)))
+    {
+        track->video.frameWidth = 1920;
+        track->video.frameHeight = 540 * 2;
+        track->video.displayWidth = 1920;
+        track->video.displayHeight = 540 * 2;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 917504;
+    }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD1080p36ClipWrapped)))
+    {
+        track->video.frameWidth = 1920;
+        track->video.frameHeight = 540 * 2;
+        track->video.displayWidth = 1920;
+        track->video.displayHeight = 540 * 2;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 188416;
+    }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD720p120ClipWrapped)))
+    {
+        track->video.frameWidth = 1280;
+        track->video.frameHeight = 720;
+        track->video.displayWidth = 1280;
+        track->video.displayHeight = 720;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 303104;
+    }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD720p185ClipWrapped)))
+    {
+        track->video.frameWidth = 1280;
+        track->video.frameHeight = 720;
+        track->video.displayWidth = 1280;
+        track->video.displayHeight = 720;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 458752;
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped)))
