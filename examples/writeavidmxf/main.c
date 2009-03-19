@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.13 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: main.c,v 1.14 2009/03/19 17:39:12 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -778,7 +778,7 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --project <name>           Avid project name.\n");
     fprintf(stderr, "  --tape <name>              tape name.\n");
     fprintf(stderr, "  --ntsc                     NTSC. Default is DV file frame rate or PAL\n");
-    fprintf(stderr, "  --nolegacy                 don't use the legacy definitions\n");
+    fprintf(stderr, "  --legacy                   use legacy DataDefs, for DV essence use legacy descriptor properties\n");
     fprintf(stderr, "  --aspect <ratio>           video aspect ratio x:y. Default is DV file aspect ratio or 4:3\n");
     fprintf(stderr, "  --comment <string>         add 'Comments' user comment to the MaterialPackage\n");
     fprintf(stderr, "  --desc <string>            add 'Descript' user comment to the MaterialPackage\n");
@@ -841,7 +841,7 @@ int main(int argc, const char* argv[])
     int audioTrackNumber = 0;
     int videoTrackNumber = 0;
     int done = 0;
-    int useLegacy = 1;
+    int useLegacy = 0;
     size_t numRead;
     uint16_t numAudioChannels;
     int haveImage;
@@ -930,9 +930,9 @@ int main(int argc, const char* argv[])
             isPAL = 0;
             cmdlnIndex++;
         }
-        else if (strcmp(argv[cmdlnIndex], "--nolegacy") == 0)
+        else if (strcmp(argv[cmdlnIndex], "--legacy") == 0)
         {
-            useLegacy = 0;
+            useLegacy = 1;
             cmdlnIndex++;
         }
         else if (strcmp(argv[cmdlnIndex], "--aspect") == 0)
@@ -1799,12 +1799,12 @@ int main(int argc, const char* argv[])
         
         /* create file package */
         mxf_generate_old_aafsdk_umid(&filePackageUID);
-        CHK_OFAIL(create_file_source_package(packageDefinitions, &filePackageUID, NULL, &filePackageCreated,
+        CHK_OFAIL(create_file_source_package(packageDefinitions, &filePackageUID, "", &filePackageCreated,
             filename, inputs[i].essenceType, &inputs[i].essenceInfo, &filePackage));
             
             
         /* track in tape source package */
-        CHK_OFAIL(create_track(packageDefinitions->tapeSourcePackage, i + 1, 0, trackName, inputs[i].isVideo,
+        CHK_OFAIL(create_track(packageDefinitions->tapeSourcePackage, i + 1, inputs[i].trackNumber, trackName, inputs[i].isVideo,
             &projectEditRate, &g_Null_UMID, 0, 0, tapeLen, &tapeTrack));
             
         /* track in file source package */

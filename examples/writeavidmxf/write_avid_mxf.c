@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.13 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: write_avid_mxf.c,v 1.14 2009/03/19 17:39:13 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -346,6 +346,7 @@ static void free_avid_clip_writer(AvidClipWriter** clipWriter)
     SAFE_FREE(clipWriter);
 }
 
+/* Take a char* string, convert to mxfUTF16Char* in wTmpString member */
 static int convert_string(AvidClipWriter* clipWriter, const char* input)
 {
     mxfUTF16Char* newOutput = NULL;
@@ -602,6 +603,11 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(Track), &writer->sourcePackageTrackSet));
     CHK_ORET(mxf_add_array_item_strongref(writer->sourcePackageSet, &MXF_ITEM_K(GenericPackage, Tracks), writer->sourcePackageTrackSet));
     CHK_ORET(mxf_set_uint32_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), track->id));
+    if (track->name != NULL)
+    {
+        CHK_ORET(convert_string(clipWriter, track->name));
+        CHK_ORET(mxf_set_utf16string_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackName), clipWriter->wTmpString));
+    }
     CHK_ORET(mxf_set_uint32_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), writer->sourceTrackNumber));
     CHK_ORET(mxf_set_rational_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(Track, EditRate), &track->editRate));
     CHK_ORET(mxf_set_position_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(Track, Origin), 0));
@@ -677,16 +683,27 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
             CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, SampledHeight), writer->sampledHeight));
             CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, SampledWidth), writer->sampledWidth));
         }
+        else
+        {
+            /* copy StoredWidth/Height into SampledWidth/Height, following Avid practice */
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, SampledHeight), writer->storedHeight));
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, SampledWidth), writer->storedWidth));
+        }
+        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, SampledYOffset), 0));
+        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, SampledXOffset), 0));
         if (writer->displayHeight != 0 || writer->displayWidth != 0)
         {
             CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayHeight), writer->displayHeight));
             CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayWidth), writer->displayWidth));
         }
-        if (writer->displayYOffset != 0 || writer->displayXOffset != 0)
+        else
         {
-            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayYOffset), writer->displayYOffset));
-            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayXOffset), writer->displayXOffset));
+            /* copy StoredWidth/Height intoDisplayWidth/Height, following Avid practice */
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayHeight), writer->storedHeight));
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayWidth), writer->storedWidth));
         }
+        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayYOffset), writer->displayYOffset));
+        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, DisplayXOffset), writer->displayXOffset));
         CHK_ORET(mxf_alloc_array_item_elements(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, VideoLineMap), 4, writer->videoLineMapLen, &arrayElement));
         for (i = 0; i < writer->videoLineMapLen; i++)
         {
@@ -826,7 +843,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         CHK_ORET(mxf_add_array_item_strongref(writer->sourcePackageSet, &MXF_ITEM_K(GenericPackage, Tracks), writer->sourcePackageTrackSet));
         CHK_ORET(mxf_set_uint32_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), maxTrackID + 1));
         CHK_ORET(mxf_set_utf16string_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackName), L"TC1"));
-        CHK_ORET(mxf_set_uint32_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), 0));
+        CHK_ORET(mxf_set_uint32_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), 1));
         CHK_ORET(mxf_set_rational_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(Track, EditRate), &clipWriter->projectEditRate));
         CHK_ORET(mxf_set_position_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(Track, Origin), 0));
     
@@ -1319,7 +1336,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->vertSubsampling = 1;
             newTrackWriter->essenceElementKey = MXF_EE_K(AvidMJPEGClipWrapped);
             newTrackWriter->sourceTrackNumber = g_AvidMJPEGTrackNumber;
-            newTrackWriter->essenceElementLLen = 8;
+            newTrackWriter->essenceElementLLen = 9;
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
@@ -1385,7 +1402,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->displayWidth = 0;
             newTrackWriter->essenceElementKey = MXF_EE_K(DVClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_DV_TRACK_NUM(0x01, MXF_DV_CLIP_WRAPPED_EE_TYPE, 0x01);
-            newTrackWriter->essenceElementLLen = 8;
+            newTrackWriter->essenceElementLLen = 9;
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
@@ -1451,7 +1468,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->displayWidth = 0;
             newTrackWriter->essenceElementKey = MXF_EE_K(DVClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_DV_TRACK_NUM(0x01, MXF_DV_CLIP_WRAPPED_EE_TYPE, 0x01);
-            newTrackWriter->essenceElementLLen = 8;
+            newTrackWriter->essenceElementLLen = 9;
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
@@ -1500,7 +1517,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->displayWidth = 0;
             newTrackWriter->essenceElementKey = MXF_EE_K(DVClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_DV_TRACK_NUM(0x01, MXF_DV_CLIP_WRAPPED_EE_TYPE, 0x01);
-            newTrackWriter->essenceElementLLen = 8;
+            newTrackWriter->essenceElementLLen = 9;
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->resolutionID = 0x8e;
@@ -1636,7 +1653,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             }
             newTrackWriter->essenceElementKey = MXF_EE_K(IMX);
             newTrackWriter->sourceTrackNumber = MXF_D10_PICTURE_TRACK_NUM(0x01);
-            newTrackWriter->essenceElementLLen = 8;
+            newTrackWriter->essenceElementLLen = 9;
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0);
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
@@ -1824,7 +1841,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             }
             newTrackWriter->essenceElementKey = MXF_EE_K(UncClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_UNC_TRACK_NUM(0x01, MXF_UNC_CLIP_WRAPPED_EE_TYPE, 0x01);
-            newTrackWriter->essenceElementLLen = 8;
+            newTrackWriter->essenceElementLLen = 9;
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
             newTrackWriter->sampleRate = track->editRate;
             newTrackWriter->resolutionID = 0xaa;
@@ -1880,7 +1897,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->essenceContainerLabel = MXF_EC_L(BWFClipWrapped);
             newTrackWriter->essenceElementKey = MXF_EE_K(BWFClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_AES3BWF_TRACK_NUM(0x01, MXF_BWF_CLIP_WRAPPED_EE_TYPE, 0x01);
-            newTrackWriter->essenceElementLLen = 8;
+            newTrackWriter->essenceElementLLen = 9;
             newTrackWriter->bitsPerSample = filePackage->essenceInfo.pcmBitsPerSample;
             newTrackWriter->blockAlign = (uint8_t)((newTrackWriter->bitsPerSample + 7) / 8);
             newTrackWriter->avgBps = newTrackWriter->blockAlign * 48000;
