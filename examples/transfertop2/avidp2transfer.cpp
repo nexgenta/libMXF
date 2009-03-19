@@ -1,9 +1,10 @@
 /*
- * $Id: avidp2transfer.cpp,v 1.3 2008/11/07 14:12:59 philipn Exp $
+ * $Id: avidp2transfer.cpp,v 1.4 2009/03/19 17:37:27 john_f Exp $
  *
  * Reads an Avid AAF composition file and transfers referenced MXF files to P2
  *
- * Copyright (C) 2006  Philip de Nier <philipn@users.sourceforge.net>
+ * Copyright (C) 2006-2009 British Broadcasting Corporation, All Rights Reserved
+ * Author: Philip de Nier <philipn@users.sourceforge.net>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -771,9 +772,9 @@ string AvidP2Transfer::rewriteFilepath(string filepath)
                     break;
                 }
             }
-            else if (fp[i] == ':' &&
-                (i == 2 && fp[0] == '/' && isalpha(fp[i-1]) ||
-                i == 1 && isalpha(fp[i-1])))
+            else if ((fp[i] == ':' &&
+                i == 2 && fp[0] == '/' && isalpha(fp[i-1])) ||
+                (i == 1 && isalpha(fp[i-1])))
             {
                 fp.erase(i, 1);
                 break;
