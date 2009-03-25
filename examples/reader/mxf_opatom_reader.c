@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.7 2009/03/19 17:38:12 john_f Exp $
+ * $Id: mxf_opatom_reader.c,v 1.8 2009/03/25 13:49:01 john_f Exp $
  *
  * MXF OP-Atom reader
  *
@@ -932,6 +932,11 @@ int opa_is_supported(MXFPartition* headerPartition)
         return 1;
     }
     else if (mxf_equals_ul(label, &MXF_EC_L(AvidMJPEGClipWrapped)))
+    {
+        return 1;
+    }
+    else if (mxf_equals_ul(label, &MXF_EC_L(DVBased_100_1080_50_I_ClipWrapped)) ||
+        mxf_equals_ul(label, &MXF_EC_L(DVBased_100_720_50_P_ClipWrapped)))
     {
         return 1;
     }

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.8 2009/03/19 17:38:12 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.9 2009/03/25 13:49:01 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -275,6 +275,30 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         track->video.displayYOffset = 13 * 2;
         track->video.horizSubsampling = 2;
         track->video.vertSubsampling = 1;
+    }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_1080_50_I_ClipWrapped)))
+    {
+        track->video.frameWidth = 1440;
+        track->video.frameHeight = 540 * 2;
+        track->video.displayWidth = 1920;
+        track->video.displayHeight = 540 * 2;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 576000;
+    }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_720_50_P_ClipWrapped)))
+    {
+        track->video.frameWidth = 960;
+        track->video.frameHeight = 720;
+        track->video.displayWidth = 1290;
+        track->video.displayHeight = 720;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 288000;
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD1080i120ClipWrapped)))
     {
