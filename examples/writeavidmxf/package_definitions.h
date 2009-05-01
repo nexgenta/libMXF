@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.6 2008/11/07 16:55:09 philipn Exp $
+ * $Id: package_definitions.h,v 1.7 2009/05/01 13:47:15 john_f Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -107,6 +107,7 @@ typedef struct
     char* name;
     int isPicture;
     mxfRational editRate;
+    int64_t origin;
     mxfUMID sourcePackageUID;
     uint32_t sourceTrackID;
     int64_t startPosition;
