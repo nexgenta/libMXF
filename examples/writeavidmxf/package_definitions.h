@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.7 2009/05/01 13:47:15 john_f Exp $
+ * $Id: package_definitions.h,v 1.8 2009/05/14 07:34:56 stuart_hc Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -143,7 +143,7 @@ void clear_user_comments(PackageDefinitions* definitions);
 /* note: number is ignored for file source packages */
 int create_track(Package* package, uint32_t id, uint32_t number, const char* name, int isPicture, 
     const mxfRational* editRate, const mxfUMID* sourcePackageUID, uint32_t sourceTrackID, 
-    int64_t startPosition, int64_t length, Track** track);
+    int64_t startPosition, int64_t length, int64_t origin, Track** track);
 
 
 

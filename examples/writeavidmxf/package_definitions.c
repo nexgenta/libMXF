@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
+ * $Id: package_definitions.c,v 1.5 2009/05/14 07:34:56 stuart_hc Exp $
  *
  * Functions to create package definitions
  *
@@ -272,7 +272,7 @@ void clear_user_comments(PackageDefinitions* definitions)
 
 int create_track(Package* package, uint32_t id, uint32_t number, const char* name, int isPicture, 
     const mxfRational* editRate, const mxfUMID* sourcePackageUID, uint32_t sourceTrackID, 
-    int64_t startPosition, int64_t length, Track** track)
+    int64_t startPosition, int64_t length, int64_t origin, Track** track)
 {
     Track* newTrack = NULL;
     
@@ -297,6 +297,7 @@ int create_track(Package* package, uint32_t id, uint32_t number, const char* nam
     newTrack->sourceTrackID = sourceTrackID;
     newTrack->startPosition = startPosition;
     newTrack->length = length;
+    newTrack->origin = origin;
     
     CHK_OFAIL(mxf_append_list_element(&package->tracks, newTrack));
     
