@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.14 2009/03/19 17:39:13 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.15 2009/05/14 07:33:58 stuart_hc Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -226,7 +226,8 @@ static const uint32_t g_bodySID = 1;
 static const uint32_t g_indexSID = 2;
 
 static const uint64_t g_fixedBodyPPOffset = 0x40020;
-static const uint64_t g_uncFixedBodyPPOffset = 0x60020;
+static const uint64_t g_uncFixedBodyPPOffset = 0x5ff20;       /* Observed in Avid MediaComposer 3.0 output */
+static const uint64_t g_uncHDFixedBodyPPOffset = 0x60020;
 static const uint64_t g_uncNTSCFixedBodyPPOffset = 0x5ff21;
 
 
@@ -800,8 +801,8 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
             }
             CHK_ORET(mxf_set_uint32_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), track->number));
             CHK_ORET(mxf_set_rational_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(Track, EditRate), &track->editRate));
-            CHK_ORET(mxf_set_position_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(Track, Origin), 0));
-        
+            CHK_ORET(mxf_set_position_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(Track, Origin), track->origin));
+
             /* Preface - ContentStorage - SourcePackage - Timeline Track - Sequence */    
             CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(Sequence), &writer->sequenceSet));
             CHK_ORET(mxf_set_strongref_item(writer->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), writer->sequenceSet));
@@ -814,8 +815,10 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
                 CHK_ORET(mxf_set_ul_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &writer->soundDataDef));
             }
             CHK_ORET(mxf_set_length_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, Duration), track->length));
+
+            //fprintf(stderr, "Track name %2s, length %"PRId64", origin %"PRId64", editrate numerator %d\n", track->name, track->length, track->origin, track->editRate.numerator);
         
-            /* Preface - ContentStorage - SourcePackage - Timeline Track - Sequence - SourceClip */    
+            /* Preface - ContentStorage - SourcePackage - Timeline Track - Sequence - SourceClip */
             CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(SourceClip), &writer->sourceClipSet));
             CHK_ORET(mxf_add_array_item_strongref(writer->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), writer->sourceClipSet));
             if (track->isPicture)
@@ -866,6 +869,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         /* Preface - ContentStorage - tape SourcePackage - TapeDescriptor */
         CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(TapeDescriptor), &writer->tapeDescriptorSet));
         CHK_ORET(mxf_set_strongref_item(writer->sourcePackageSet, &MXF_ITEM_K(SourcePackage, Descriptor), writer->tapeDescriptorSet));
+        CHK_ORET(mxf_set_int32_item(writer->tapeDescriptorSet, &MXF_ITEM_K(TapeDescriptor, ColorFrame), 0));
         
         
         /* attach a project name attribute to the package */
@@ -1039,11 +1043,18 @@ static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer, Packa
     if (writer->essenceType == Unc1080iUYVY ||
         writer->essenceType == Unc720pUYVY)
     {
-        CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncFixedBodyPPOffset));
+        CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncHDFixedBodyPPOffset));
     }
-    else if (writer->essenceType == UncUYVY && clipWriter->projectFormat == NTSC_30i)
+    else if (writer->essenceType == UncUYVY)
     {
-        CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncNTSCFixedBodyPPOffset));
+        if (clipWriter->projectFormat == NTSC_30i)
+        {
+            CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncNTSCFixedBodyPPOffset));
+        }
+        else
+        {
+            CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncFixedBodyPPOffset));
+        }
     }
     else
     {
@@ -1332,7 +1343,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         return 0;
                 }
             }
-            newTrackWriter->horizSubsampling = 2;		/* All JPEG formats are 4:2:2 */
+            newTrackWriter->horizSubsampling = 2;        /* All JPEG formats are 4:2:2 */
             newTrackWriter->vertSubsampling = 1;
             newTrackWriter->essenceElementKey = MXF_EE_K(AvidMJPEGClipWrapped);
             newTrackWriter->sourceTrackNumber = g_AvidMJPEGTrackNumber;
@@ -1949,7 +1960,9 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     }
     else
     {
-        mxf_file_set_min_llen(newTrackWriter->mxfFile, 4);
+        /* Avid Media Composer 3.0 emitted MXF files use LLen=9 everywhere. */
+        /* P2 emitted MXF files use LLen=4 for all KLVs except essence containers. */
+        mxf_file_set_min_llen(newTrackWriter->mxfFile, 9);
     }
     
     
@@ -1975,11 +1988,18 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     if (newTrackWriter->essenceType == Unc1080iUYVY ||
         newTrackWriter->essenceType == Unc720pUYVY)
     {
-        CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncFixedBodyPPOffset));
+        CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncHDFixedBodyPPOffset));
     }
-    else if (newTrackWriter->essenceType == UncUYVY && clipWriter->projectFormat == NTSC_30i)
+    else if (newTrackWriter->essenceType == UncUYVY)
     {
-        CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncNTSCFixedBodyPPOffset));
+        if (clipWriter->projectFormat == NTSC_30i)
+        {
+            CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncNTSCFixedBodyPPOffset));
+        }
+        else
+        {
+            CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncFixedBodyPPOffset));
+        }
     }
     else
     {
