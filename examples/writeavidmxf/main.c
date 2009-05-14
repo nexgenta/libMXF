@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.14 2009/03/19 17:39:12 john_f Exp $
+ * $Id: main.c,v 1.15 2009/05/14 07:32:43 stuart_hc Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -120,7 +120,7 @@ typedef struct
     /* DV input parameters */
     int isPAL;
     mxfRational imageAspectRatio;
-    
+
     /* used when writing MJPEG */    
     MJPEGState mjpegState;
 
@@ -700,7 +700,7 @@ static int parse_umid(const char* umidStr, mxfUMID* umid)
     return 1;
 }
 
-int parse_timecode(const char* timecodeStr, int isPAL, int64_t* frameCount)
+int parse_timecode(const char* timecodeStr, int isPAL, int isFilmRate, int64_t* frameCount)
 {
     int result;
     int hour, min, sec, frame;
@@ -708,7 +708,9 @@ int parse_timecode(const char* timecodeStr, int isPAL, int64_t* frameCount)
     const char* checkPtr;
     
     roundedTimecodeBase = (isPAL) ? 25 : 30;
-    
+    if (isFilmRate)
+        roundedTimecodeBase = 24;
+
     /* drop frame timecode */
     result = sscanf(timecodeStr, "d%d:%d:%d:%d", &hour, &min, &sec, &frame);
     if (result == 4)
@@ -777,7 +779,9 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --clip <name>              clip (MaterialPackage) name.\n");
     fprintf(stderr, "  --project <name>           Avid project name.\n");
     fprintf(stderr, "  --tape <name>              tape name.\n");
-    fprintf(stderr, "  --ntsc                     NTSC. Default is DV file frame rate or PAL\n");
+    fprintf(stderr, "  --ntsc                     NTSC framerate and frame size. Default is DV file frame rate or PAL\n");
+    fprintf(stderr, "  --film24                   use framerate of 24 instead of default 25fps\n");
+    fprintf(stderr, "  --film23.976               use framerate of 23.976 (24000/1001) instead of default 25fps\n");
     fprintf(stderr, "  --legacy                   use legacy DataDefs, for DV essence use legacy descriptor properties\n");
     fprintf(stderr, "  --aspect <ratio>           video aspect ratio x:y. Default is DV file aspect ratio or 4:3\n");
     fprintf(stderr, "  --comment <string>         add 'Comments' user comment to the MaterialPackage\n");
@@ -805,6 +809,8 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --DNxHD1080p36 <filename>  DNxHD 1920x1080p25 36 Mbps\n");
     fprintf(stderr, "  --DNxHD1080p120 <filename> DNxHD 1920x1080p25 120 Mbps\n");
     fprintf(stderr, "  --DNxHD1080p185 <filename> DNxHD 1920x1080p25 185 Mbps\n");
+    fprintf(stderr, "  --DNxHD1080p115 <filename> DNxHD 1920x1080p24/23.976 115 Mbps (requires film frame rate)\n");
+    fprintf(stderr, "  --DNxHD1080p175 <filename> DNxHD 1920x1080p24/23.976 175 Mbps (requires film frame rate)\n");
     fprintf(stderr, "  --unc <filename>           Uncompressed 8-bit UYVY SD\n");
     fprintf(stderr, "  --unc1080i <filename>      Uncompressed 8-bit UYVY HD 1920x1080i\n");
     fprintf(stderr, "  --pcm <filename>           raw 48kHz PCM audio\n");
@@ -829,6 +835,9 @@ int main(int argc, const char* argv[])
     const char* clipName = NULL;
     const char* tapeName = NULL;
     int isPAL = -1;
+    int isFilm24 = 0;
+    int isFilm23_976 = 0;                     /* Used for film 23.976 (24000/1001) DNxHD input */
+    const char* needFilmArg = NULL;
     Input inputs[MAX_INPUTS];
     int inputIndex = 0;
     int cmdlnIndex = 1;
@@ -928,6 +937,16 @@ int main(int argc, const char* argv[])
         else if (strcmp(argv[cmdlnIndex], "--ntsc") == 0)
         {
             isPAL = 0;
+            cmdlnIndex++;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--film24") == 0)
+        {
+            isFilm24 = 1;
+            cmdlnIndex++;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--film23.976") == 0)
+        {
+            isFilm23_976 = 1;
             cmdlnIndex++;
         }
         else if (strcmp(argv[cmdlnIndex], "--legacy") == 0)
@@ -1353,6 +1372,42 @@ int main(int argc, const char* argv[])
             inputIndex++;
             cmdlnIndex += 2;
         }
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p115") == 0)  /* identical to DNxHD1080p120 except for framerate */
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = DNxHD1080p120;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            needFilmArg = argv[cmdlnIndex];
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p175") == 0)  /* identical to DNxHD1080p185 except for framerate */
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = DNxHD1080p185;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            needFilmArg = argv[cmdlnIndex];
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
         else if (strcmp(argv[cmdlnIndex], "--unc") == 0)
         {
             if (cmdlnIndex + 1 >= argc)
@@ -1490,7 +1545,13 @@ int main(int argc, const char* argv[])
         fprintf(stderr, "No inputs\n");
         return 1;
     }
-    
+
+    if (needFilmArg && (!isFilm24 && !isFilm23_976))
+    {
+        fprintf(stderr, "%s requires --film24 or --film23.976 argument\n", needFilmArg);
+        return 1;
+    }
+
     /* set isPAL and check it doesn't clash with the DV frame rate */
     if (isPAL < 0)
     {
@@ -1529,6 +1590,17 @@ int main(int argc, const char* argv[])
         videoSampleRate.denominator = 1001;
     }
 
+    if (isFilm24)
+    {
+        videoSampleRate.numerator = 24;
+        videoSampleRate.denominator = 1;
+    }
+    if (isFilm23_976)
+    {
+        videoSampleRate.numerator = 24000;
+        videoSampleRate.denominator = 1001;
+    }
+
     /* set the imageAspectRatio */
     if (imageAspectRatio.numerator == 0 || imageAspectRatio.denominator == 0)
     {
@@ -1550,7 +1622,7 @@ int main(int argc, const char* argv[])
     /* parse the start timecode now that we know whether it is PAL or NTSC */
     if (startTimecodeStr != NULL)
     {
-        if (!parse_timecode(startTimecodeStr, isPAL, &videoStartPosition))
+        if (!parse_timecode(startTimecodeStr, isPAL, (isFilm24 || isFilm23_976), &videoStartPosition))
         {
             usage(argv[0]);
             fprintf(stderr, "Failed to accept --start-tc timecode value '%s'\n", startTimecodeStr);
@@ -1630,15 +1702,21 @@ int main(int argc, const char* argv[])
         }
         else if (inputs[i].essenceType == DNxHD720p120)
         {
-            videoSampleRate.numerator = 50;
-            videoSampleRate.denominator = 1;
+            if (isPAL)
+            {
+                videoSampleRate.numerator = 50;
+                videoSampleRate.denominator = 1;
+            }
             inputs[i].frameSize = 303104;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DNxHD720p185)
         {
-            videoSampleRate.numerator = 50;
-            videoSampleRate.denominator = 1;
+            if (isPAL)
+            {
+                videoSampleRate.numerator = 50;
+                videoSampleRate.denominator = 1;
+            }
             inputs[i].frameSize = 458752;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
@@ -1744,7 +1822,7 @@ int main(int argc, const char* argv[])
 
     /* set the tape length to 120 hours */
     tapeLen = (int64_t)(120 * 60 * 60 * 
-        videoSampleRate.numerator / (double)videoSampleRate.denominator + 0.5);
+        (videoSampleRate.numerator / (double)videoSampleRate.denominator) + 0.5);
     
     /* material package with user comments */    
     CHK_OFAIL(create_material_package(packageDefinitions, &materialPackageUID, clipName, &materialPackageCreated));
@@ -1805,16 +1883,16 @@ int main(int argc, const char* argv[])
             
         /* track in tape source package */
         CHK_OFAIL(create_track(packageDefinitions->tapeSourcePackage, i + 1, inputs[i].trackNumber, trackName, inputs[i].isVideo,
-            &projectEditRate, &g_Null_UMID, 0, 0, tapeLen, &tapeTrack));
+            &projectEditRate, &g_Null_UMID, 0, 0, tapeLen, 0, &tapeTrack));
             
         /* track in file source package */
         CHK_OFAIL(create_track(filePackage, 1, 0, trackName, inputs[i].isVideo,
-            &editRate, &packageDefinitions->tapeSourcePackage->uid, tapeTrack->id, startPosition, 0, 
+            &editRate, &packageDefinitions->tapeSourcePackage->uid, tapeTrack->id, startPosition, 0, 0,
             &fileTrack));
             
         /* track in material package */
         CHK_OFAIL(create_track(packageDefinitions->materialPackage, i + 1, inputs[i].trackNumber, trackName, 
-            inputs[i].isVideo, &editRate, &filePackage->uid, fileTrack->id, 0, fileTrack->length, 
+            inputs[i].isVideo, &editRate, &filePackage->uid, fileTrack->id, 0, fileTrack->length, 0,
             &materialTrack));
             
             
