@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.15 2009/05/14 07:33:58 stuart_hc Exp $
+ * $Id: write_avid_mxf.c,v 1.16 2009/05/21 10:19:12 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -101,6 +101,7 @@ typedef struct
     uint32_t horizSubsampling;
     uint32_t vertSubsampling;
     uint8_t frameLayout;
+    uint8_t componentDepth;
     uint8_t colorSiting;
     uint32_t imageAlignmentOffset;
     uint32_t imageStartOffset;
@@ -715,11 +716,20 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         CHK_ORET(mxf_set_uint8_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameLayout), writer->frameLayout));
         CHK_ORET(mxf_set_rational_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, AspectRatio), &clipWriter->imageAspectRatio));
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageAlignmentOffset), 1));
-        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), 8));
+        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), writer->componentDepth));
         CHK_ORET(mxf_set_uint8_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ColorSiting), writer->colorSiting));
-        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, BlackRefLevel), 16));
-        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, WhiteReflevel), 235));
-        CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ColorRange), 225));
+        if (writer->componentDepth == 10)
+        {
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, BlackRefLevel), 64));
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, WhiteReflevel), 940));
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ColorRange), 897));
+        }
+        else
+        {
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, BlackRefLevel), 16));
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, WhiteReflevel), 235));
+            CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ColorRange), 225));
+        }
         if (writer->imageAlignmentOffset != 0)
         {
             CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageAlignmentOffset), writer->imageAlignmentOffset));
@@ -1119,6 +1129,8 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     CHK_ORET(mxf_get_list_length(&filePackage->tracks) == 1);
     track = (Track*)mxf_get_list_element(&filePackage->tracks, 0);
     
+    newTrackWriter->componentDepth = 8;
+
     switch (filePackage->essenceType)
     {
         case AvidMJPEG:
@@ -1672,9 +1684,11 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             
         case DNxHD1080i120:
         case DNxHD1080i185:
+        case DNxHD1080i185X:
         case DNxHD1080p36:
         case DNxHD1080p120:
         case DNxHD1080p185:
+        case DNxHD1080p185X:
         case DNxHD720p120:
         case DNxHD720p185:
             newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
@@ -1709,6 +1723,14 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
                     newTrackWriter->frameSize = 917504;
                     break;
+                case DNxHD1080i185X:       /* DNxHD 1920x1080 50i 185MBps 10bit */
+                    newTrackWriter->componentDepth = 10;
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080i185XClipWrapped);
+                    newTrackWriter->resolutionID = 1241;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 917504;
+                    break;
                 case DNxHD1080p36:         /* DNxHD 1920x1080 25p 36MBps */
                     newTrackWriter->videoLineMap[0] = 42;
                     newTrackWriter->videoLineMap[1] = 0;
@@ -1733,7 +1755,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
                     newTrackWriter->frameSize = 606208;
                     break;
-                case DNxHD1080p185:        /* DNxHD 1920x1080 25p 185MBps */
+                case DNxHD1080p185:        /* DNxHD 1920x1080 25p 185MBps (and 24p 175Mbps) */
                     newTrackWriter->videoLineMap[0] = 42;
                     newTrackWriter->videoLineMap[1] = 0;
                     newTrackWriter->storedHeight = 1080;
@@ -1742,6 +1764,19 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
                     newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080p185ClipWrapped);
                     newTrackWriter->resolutionID = 1238;
+                    newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
+                    newTrackWriter->frameSize = 917504;
+                    break;
+                case DNxHD1080p185X:       /* DNxHD 1920x1080 25p 185MBps 10bit (and 24p 175MBps 10bit) */
+                    newTrackWriter->componentDepth = 10;
+                    newTrackWriter->videoLineMap[0] = 42;
+                    newTrackWriter->videoLineMap[1] = 0;
+                    newTrackWriter->storedHeight = 1080;
+                    newTrackWriter->displayHeight = 1080;
+                    newTrackWriter->frameLayout = 0; /* FullFrame */
+                    newTrackWriter->essenceElementKey = MXF_EE_K(DNxHD);
+                    newTrackWriter->essenceContainerLabel = MXF_EC_L(DNxHD1080p185XClipWrapped);
+                    newTrackWriter->resolutionID = 1235;
                     newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(DNxHD);
                     newTrackWriter->frameSize = 917504;
                     break;
@@ -2141,9 +2176,11 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
         case DNxHD720p185:
         case DNxHD1080i120:
         case DNxHD1080i185:
+        case DNxHD1080i185X:
         case DNxHD1080p36:
         case DNxHD1080p120:
         case DNxHD1080p185:
+        case DNxHD1080p185X:
         case PCM:
             CHK_ORET(size == numSamples * writer->editUnitByteCount);
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: test_writeavidmxf.sh,v 1.2 2008/10/29 17:54:26 john_f Exp $
+# $Id: test_writeavidmxf.sh,v 1.3 2009/05/21 10:19:12 john_f Exp $
 #
 # Simple test script
 #
@@ -31,9 +31,21 @@ fi
 dd if=/dev/zero bs=4147200 count=1 of=essence.dat 2>/dev/null
 
 # TODO: create DV test files
-for format in IMX30 IMX40 IMX50 DNxHD720p120 DNxHD720p185 DNxHD1080i120 DNxHD1080i185 DNxHD1080p36 DNxHD1080p120 DNxHD1080p185 unc unc1080i
+for format in IMX30 IMX40 IMX50 \
+	DNxHD720p120 DNxHD720p185 \
+	DNxHD1080i120 DNxHD1080i185 DNxHD1080i185X \
+	DNxHD1080p36 DNxHD1080p120 DNxHD1080p185 DNxHD1080p185X \
+	unc unc1080i
 do
 	command="$VALGRIND_CMD ./writeavidmxf --prefix test_$format --$format essence.dat --pcm essence.dat"
+	echo $command
+	$command || exit 1
+done
+
+for format in \
+	DNxHD1080p36 DNxHD1080p115 DNxHD1080p175 DNxHD1080p175X
+do
+	command="$VALGRIND_CMD ./writeavidmxf --prefix test_${format}_23.976 --film23.976 --$format essence.dat --pcm essence.dat"
 	echo $command
 	$command || exit 1
 done

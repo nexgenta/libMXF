@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.8 2009/05/14 07:34:56 stuart_hc Exp $
+ * $Id: package_definitions.h,v 1.9 2009/05/21 10:19:12 john_f Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -52,10 +52,12 @@ typedef enum
     DNxHD720p120,
     DNxHD720p185,
     DNxHD1080p36,
-    DNxHD1080p120,
+    DNxHD1080p120,     /* identical format to "DNxHD1080p115" */
     DNxHD1080p185,
+    DNxHD1080p185X,    /* identical format to "DNxHD1080p175X" */
     DNxHD1080i120,
     DNxHD1080i185,
+    DNxHD1080i185X,    /* identical format to "DNxHD1080i175X" */
     UncUYVY,
     Unc1080iUYVY,
     Unc720pUYVY,

@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.15 2009/05/14 07:32:43 stuart_hc Exp $
+ * $Id: main.c,v 1.16 2009/05/21 10:19:12 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -806,11 +806,14 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --DNxHD720p185 <filename>  DNxHD 1280x720p50 185 Mbps\n");
     fprintf(stderr, "  --DNxHD1080i120 <filename> DNxHD 1920x1080i50 120 Mbps\n");
     fprintf(stderr, "  --DNxHD1080i185 <filename> DNxHD 1920x1080i50 185 Mbps\n");
+    fprintf(stderr, "  --DNxHD1080i185X <filenam> DNxHD 1920x1080i50 185 Mbps 10bit\n");
     fprintf(stderr, "  --DNxHD1080p36 <filename>  DNxHD 1920x1080p25 36 Mbps\n");
     fprintf(stderr, "  --DNxHD1080p120 <filename> DNxHD 1920x1080p25 120 Mbps\n");
     fprintf(stderr, "  --DNxHD1080p185 <filename> DNxHD 1920x1080p25 185 Mbps\n");
+    fprintf(stderr, "  --DNxHD1080p185X <filenam> DNxHD 1920x1080p25 185 Mbps 10bit\n");
     fprintf(stderr, "  --DNxHD1080p115 <filename> DNxHD 1920x1080p24/23.976 115 Mbps (requires film frame rate)\n");
     fprintf(stderr, "  --DNxHD1080p175 <filename> DNxHD 1920x1080p24/23.976 175 Mbps (requires film frame rate)\n");
+    fprintf(stderr, "  --DNxHD1080p175X <filenam> DNxHD 1920x1080p24/23.976 175 Mbps 10bit (requires film frame rate)\n");
     fprintf(stderr, "  --unc <filename>           Uncompressed 8-bit UYVY SD\n");
     fprintf(stderr, "  --unc1080i <filename>      Uncompressed 8-bit UYVY HD 1920x1080i\n");
     fprintf(stderr, "  --pcm <filename>           raw 48kHz PCM audio\n");
@@ -1321,6 +1324,23 @@ int main(int argc, const char* argv[])
             inputIndex++;
             cmdlnIndex += 2;
         }
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080i185X") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            imageAspectRatio.numerator = 16;
+            imageAspectRatio.denominator = 9;
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = DNxHD1080i185X;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
         else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p36") == 0)
         {
             if (cmdlnIndex + 1 >= argc)
@@ -1338,7 +1358,8 @@ int main(int argc, const char* argv[])
             inputIndex++;
             cmdlnIndex += 2;
         }
-        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p120") == 0)
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p120") == 0 ||
+                 strcmp(argv[cmdlnIndex], "--DNxHD1080p115") == 0)   /* identical to DNxHD1080p120 except for framerate */
         {
             if (cmdlnIndex + 1 >= argc)
             {
@@ -1352,10 +1373,13 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].essenceType = DNxHD1080p120;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            if (strcmp(argv[cmdlnIndex], "--DNxHD1080p115") == 0)  /* requires film framerate */
+                needFilmArg = argv[cmdlnIndex];
             inputIndex++;
             cmdlnIndex += 2;
         }
-        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p185") == 0)
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p185") == 0 ||
+                 strcmp(argv[cmdlnIndex], "--DNxHD1080p175") == 0)   /* identical to DNxHD1080p185 except for framerate */
         {
             if (cmdlnIndex + 1 >= argc)
             {
@@ -1369,10 +1393,13 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].essenceType = DNxHD1080p185;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            if (strcmp(argv[cmdlnIndex], "--DNxHD1080p175") == 0)  /* requires film framerate */
+                needFilmArg = argv[cmdlnIndex];
             inputIndex++;
             cmdlnIndex += 2;
         }
-        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p115") == 0)  /* identical to DNxHD1080p120 except for framerate */
+        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p185X") == 0 ||
+                 strcmp(argv[cmdlnIndex], "--DNxHD1080p175X") == 0)   /* identical to DNxHD1080p185X except for framerate */
         {
             if (cmdlnIndex + 1 >= argc)
             {
@@ -1383,28 +1410,11 @@ int main(int argc, const char* argv[])
             imageAspectRatio.numerator = 16;
             imageAspectRatio.denominator = 9;
             inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = DNxHD1080p120;
+            inputs[inputIndex].essenceType = DNxHD1080p185X;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
-            needFilmArg = argv[cmdlnIndex];
-            inputIndex++;
-            cmdlnIndex += 2;
-        }
-        else if (strcmp(argv[cmdlnIndex], "--DNxHD1080p175") == 0)  /* identical to DNxHD1080p185 except for framerate */
-        {
-            if (cmdlnIndex + 1 >= argc)
-            {
-                usage(argv[0]);
-                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
-                return 1;
-            }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
-            inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = DNxHD1080p185;
-            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
-            inputs[inputIndex].trackNumber = ++videoTrackNumber;
-            needFilmArg = argv[cmdlnIndex];
+            if (strcmp(argv[cmdlnIndex], "--DNxHD1080p175X") == 0)  /* requires film framerate */
+                needFilmArg = argv[cmdlnIndex];
             inputIndex++;
             cmdlnIndex += 2;
         }
@@ -1730,7 +1740,8 @@ int main(int argc, const char* argv[])
             inputs[i].frameSize = 606208;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
-        else if (inputs[i].essenceType == DNxHD1080i185 || inputs[i].essenceType == DNxHD1080p185)
+        else if (inputs[i].essenceType == DNxHD1080i185 || inputs[i].essenceType == DNxHD1080p185 ||
+                 inputs[i].essenceType == DNxHD1080i185X || inputs[i].essenceType == DNxHD1080p185X)
         {
             inputs[i].frameSize = 917504;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
@@ -2025,6 +2036,7 @@ int main(int argc, const char* argv[])
             }
             else if (inputs[i].essenceType == DNxHD720p120 || inputs[i].essenceType == DNxHD720p185 ||
                      inputs[i].essenceType == DNxHD1080i120 || inputs[i].essenceType == DNxHD1080i185 ||
+                     inputs[i].essenceType == DNxHD1080i185X || inputs[i].essenceType == DNxHD1080p185X ||
                      inputs[i].essenceType == DNxHD1080p120 || inputs[i].essenceType == DNxHD1080p185 ||
                      inputs[i].essenceType == DNxHD1080p36)
             {
