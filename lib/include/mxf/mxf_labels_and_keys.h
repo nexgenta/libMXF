@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.7 2009/05/21 10:20:00 john_f Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.8 2009/06/18 11:56:48 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -157,7 +157,49 @@ static const mxfUL MXF_CMDEF_L(ALaw) =
 static const mxfUL MXF_CMDEF_L(MP4AdvancedRealTimeSimpleL3) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x03, 0x04, 0x01, 0x02, 0x02, 0x01, 0x20, 0x02, 0x03};
 
-  
+
+/* AVC Intra-Frame Coding */
+
+#define MXF_AVCI_CMDEV_L(profile, variant) \
+    {0x06, 0x0E, 0x2B, 0x34, 0x04, 0x01, 0x01, 0x0A, 0x04, 0x01, 0x02, 0x02, 0x01, 0x32, profile, variant}
+
+static const mxfUL MXF_CMDEF_L(AVCI_50_1080_60_I) =
+    MXF_AVCI_CMDEV_L(0x21, 0x01);
+
+static const mxfUL MXF_CMDEF_L(AVCI_50_1080_50_I) =
+    MXF_AVCI_CMDEV_L(0x21, 0x02);
+
+static const mxfUL MXF_CMDEF_L(AVCI_50_1080_30_P) =
+    MXF_AVCI_CMDEV_L(0x21, 0x03);
+
+static const mxfUL MXF_CMDEF_L(AVCI_50_1080_25_P) =
+    MXF_AVCI_CMDEV_L(0x21, 0x04);
+
+static const mxfUL MXF_CMDEF_L(AVCI_50_720_60_P) =
+    MXF_AVCI_CMDEV_L(0x21, 0x08);
+
+static const mxfUL MXF_CMDEF_L(AVCI_50_720_50_P) =
+    MXF_AVCI_CMDEV_L(0x21, 0x09);
+
+static const mxfUL MXF_CMDEF_L(AVCI_100_1080_60_I) =
+    MXF_AVCI_CMDEV_L(0x31, 0x01);
+
+static const mxfUL MXF_CMDEF_L(AVCI_100_1080_50_I) =
+    MXF_AVCI_CMDEV_L(0x31, 0x02);
+
+static const mxfUL MXF_CMDEF_L(AVCI_100_1080_30_P) =
+    MXF_AVCI_CMDEV_L(0x31, 0x03);
+
+static const mxfUL MXF_CMDEF_L(AVCI_100_1080_25_P) =
+    MXF_AVCI_CMDEV_L(0x31, 0x04);
+
+static const mxfUL MXF_CMDEF_L(AVCI_100_720_60_P) =
+    MXF_AVCI_CMDEV_L(0x31, 0x08);
+
+static const mxfUL MXF_CMDEF_L(AVCI_100_720_50_P) =
+    MXF_AVCI_CMDEV_L(0x31, 0x09);
+
+
 /* DNxHD */
 
 static const mxfUL MXF_CMDEF_L(DNxHD) =
@@ -377,6 +419,15 @@ static const mxfUL MXF_EC_L(ALawCustomWrapped) =
 
 #define MXF_MPEG_EC_L(regver, eckind, byte15, byte16) \
     MXF_GENERIC_CONTAINER_LABEL(regver, 0x02, eckind, byte15, byte16)
+
+
+/* AVC Intra-Frame Coding */
+
+static const mxfUL MXF_EC_L(AVCIFrameWrapped) =
+    MXF_MPEG_EC_L(0x0A, 0x10, 0x60, 0x01);
+
+static const mxfUL MXF_EC_L(AVCIClipWrapped) =
+    MXF_MPEG_EC_L(0x0A, 0x10, 0x60, 0x02);
 
 
 /* DNxHD */
