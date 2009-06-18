@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.h,v 1.4 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_data_model.h,v 1.5 2009/06/18 11:55:51 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -179,6 +179,7 @@ typedef enum
     MXF_STRONGREF_TYPE,
     MXF_WEAKREF_TYPE,
     MXF_ORIENTATION_TYPE,
+    MXF_CODED_CONTENT_TYPE_TYPE,
     
     MXF_EXTENSION_TYPE /* extension types must have integer value >= this */
     
