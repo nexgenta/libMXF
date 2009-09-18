@@ -1,5 +1,5 @@
 /*
- * $Id: writeaviddv50.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
+ * $Id: writeaviddv50.c,v 1.5 2009/09/18 14:39:15 philipn Exp $
  *
  * Example showing how to create Avid supported MXF OP-Atom files containing DV-50 
  *
@@ -311,7 +311,7 @@ int write_dv50(FILE* dv50File, MXFFile* mxfFile, int test)
     CHK_ORET((headerMetadataPos = mxf_file_tell(mxfFile)) >= 0);
     
     CHK_ORET(mxf_mark_header_start(mxfFile, headerPartition));
-    CHK_ORET(mxf_avid_write_header_metadata(mxfFile, headerMetadata));    
+    CHK_ORET(mxf_avid_write_header_metadata(mxfFile, headerMetadata, headerPartition));
     CHK_ORET(mxf_fill_to_kag(mxfFile, headerPartition));
     CHK_ORET(mxf_mark_header_end(mxfFile, headerPartition));
     
@@ -406,7 +406,7 @@ int write_dv50(FILE* dv50File, MXFFile* mxfFile, int test)
 
     CHK_ORET(mxf_file_seek(mxfFile, headerMetadataPos, SEEK_SET));
     CHK_ORET(mxf_mark_header_start(mxfFile, headerPartition));
-    CHK_ORET(mxf_avid_write_header_metadata(mxfFile, headerMetadata));    
+    CHK_ORET(mxf_avid_write_header_metadata(mxfFile, headerMetadata, headerPartition));
     CHK_ORET(mxf_fill_to_kag(mxfFile, headerPartition));
     CHK_ORET(mxf_mark_header_end(mxfFile, headerPartition));
     

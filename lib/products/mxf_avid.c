@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_avid.c,v 1.6 2009/09/18 14:39:15 philipn Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -453,6 +453,12 @@ fail:
 
 
 
+#define MXF_COMPOUND_TYPE_DEF(id, name) \
+    CHK_ORET(itemType = mxf_register_compound_type(dataModel, name, id));    
+
+#define MXF_COMPOUND_TYPE_MEMBER(name, typeId) \
+    CHK_ORET(mxf_register_compound_type_member(itemType, name, typeId));    
+
 #define MXF_SET_DEFINITION(parentName, name, label) \
     CHK_ORET(mxf_register_set_def(dataModel, #name, &MXF_SET_K(parentName), &MXF_SET_K(name)));
     
@@ -461,6 +467,8 @@ fail:
     
 int mxf_avid_load_extensions(MXFDataModel* dataModel)
 {
+    MXFItemType* itemType = NULL;
+    
 #include <mxf/mxf_avid_extensions_data_model.h>
 
     return 1;
@@ -486,7 +494,7 @@ fail:
 }
 
 
-int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata)
+int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata, MXFPartition* headerPartition)
 {
     int64_t rootPos;
     int64_t endPos;
@@ -508,6 +516,7 @@ int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMe
     /* write the primer pack, root set, meta-dictionary sets, preface sets and object directory */
     
     CHK_OFAIL(mxf_write_header_primer_pack(mxfFile, headerMetadata));
+    CHK_OFAIL(mxf_fill_to_kag(mxfFile, headerPartition));
     
     CHK_OFAIL((rootPos = mxf_file_tell(mxfFile)) >= 0);
     CHK_OFAIL(add_object_directory_entry(objectDirectory, &root.id, rootPos, 0x00));
@@ -693,6 +702,41 @@ fail:
 }
 
 
+int mxf_avid_set_rgb_color_item(MXFMetadataSet* set, const mxfKey* itemKey, const RGBColor* value)
+{
+    uint8_t* buffer = NULL;
+    
+    CHK_MALLOC_ARRAY_ORET(buffer, uint8_t, 3 * 2);
+    
+    mxf_set_uint16(value->red, buffer);
+    mxf_set_uint16(value->green, &buffer[2]);
+    mxf_set_uint16(value->blue, &buffer[4]);
+    
+    CHK_OFAIL(mxf_set_item(set, itemKey, buffer, 3 * 2));
+
+    SAFE_FREE(&buffer);
+    return 1;
+    
+fail:
+    SAFE_FREE(&buffer);
+    return 0;
+}
+
+int mxf_avid_get_rgb_color_item(MXFMetadataSet* set, const mxfKey* itemKey, RGBColor* value)
+{
+    MXFMetadataItem* item;
+
+    CHK_ORET(mxf_get_item(set, itemKey, &item));
+    CHK_ORET(item->length == 3 * 2);
+
+    mxf_get_uint16(item->value, &value->red);
+    mxf_get_uint16(&item->value[2], &value->green);
+    mxf_get_uint16(&item->value[4], &value->blue);
+
+    return 1;
+}
+
+
 /* in some Avid files, the StructuralComponent::DataDefinition is not a UL but is a 
    weak reference to a DataDefinition object in the Dictionary 
    So we try dereferencing it, expecting to find a DataDefinition object with Identification item,
@@ -797,6 +841,19 @@ int mxf_avid_get_user_comment(const mxfUTF16Char* name, const MXFList* names, co
     return mxf_avid_get_mob_attribute(name, names, values, value);
 }
 
+/* The ProductVersion type in AAF/Avid differs from MXF. The last record member (release aka type) is a UInt8 */ 
+int mxf_avid_set_product_version_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfProductVersion* value)
+{
+    uint8_t buffer[mxfProductVersion_extlen - 1]; /* -1 because last member is UInt8 and not UInt16 */
 
+    mxf_set_uint16(value->major, buffer); 
+    mxf_set_uint16(value->minor, &buffer[2]);
+    mxf_set_uint16(value->patch, &buffer[4]);
+    mxf_set_uint16(value->build, &buffer[6]);
+    mxf_set_uint8(value->release, &buffer[8]);
 
+    CHK_ORET(mxf_set_item(set, itemKey, buffer, mxfProductVersion_extlen - 1));
+
+    return 1;
+}
 

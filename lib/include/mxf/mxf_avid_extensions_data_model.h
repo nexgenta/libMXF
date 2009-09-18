@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_extensions_data_model.h,v 1.7 2009/05/14 07:30:54 stuart_hc Exp $
+ * $Id: mxf_avid_extensions_data_model.h,v 1.8 2009/09/18 14:39:15 philipn Exp $
  *
  * Avid data model extension definitions
  *
@@ -50,6 +50,17 @@
 #if !defined (MXF_ITEM_DEFINITION)
 #define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired)
 #endif
+
+
+
+/* types */
+
+#define MXF_RGB_COLOR_TYPE  (MXF_EXTENSION_TYPE + 0)
+
+MXF_COMPOUND_TYPE_DEF(MXF_RGB_COLOR_TYPE, "RGBColor");
+MXF_COMPOUND_TYPE_MEMBER("Red", MXF_UINT16_TYPE);
+MXF_COMPOUND_TYPE_MEMBER("Green", MXF_UINT16_TYPE);
+MXF_COMPOUND_TYPE_MEMBER("Blue", MXF_UINT16_TYPE);
 
 
 
@@ -830,6 +841,15 @@ MXF_SET_DEFINITION(PhysicalDescriptor, ImportDescriptor,
 
 MXF_SET_DEFINITION(PhysicalDescriptor, RecordingDescriptor,
     MXF_LABEL(0x06, 0x0e, 0x2b, 0x34, 0x02, 0x53, 0x01, 0x01, 0x0d, 0x01, 0x01, 0x01, 0x01, 0x01, 0x4b, 0x00)
+);
+
+
+
+MXF_ITEM_DEFINITION(DMSegment, CommentMarkerColor,
+    MXF_LABEL(0xa0, 0x69, 0x00, 0x60, 0x94, 0xeb, 0x75, 0xcb, 0xe9, 0x6e, 0x6d, 0x44, 0xc3, 0x83, 0x11, 0xd3),
+    0x0000,
+    MXF_RGB_COLOR_TYPE,
+    0
 );
 
 

@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.c,v 1.5 2009/05/14 07:34:56 stuart_hc Exp $
+ * $Id: package_definitions.c,v 1.6 2009/09/18 14:39:15 philipn Exp $
  *
  * Functions to create package definitions
  *
@@ -57,6 +57,31 @@ static void free_tagged_value_in_list(void* data)
     free_user_comment(&userComment);
 }
 
+static void free_locator(Locator** locator)
+{
+    if ((*locator) == NULL)
+    {
+        return;
+    }
+    
+    SAFE_FREE(&(*locator)->comment);
+    
+    SAFE_FREE(locator);
+}
+
+static void free_locator_in_list(void* data)
+{
+    Locator* locator;
+    
+    if (data == NULL)
+    {
+        return;
+    }
+    
+    locator = (Locator*)data;
+    free_locator(&locator);
+}
+
 static int create_user_comment(const char* name, const char* value, UserComment** userComment)
 {
     UserComment* newUserComment = NULL;
@@ -88,6 +113,29 @@ static int modify_user_comment(UserComment* userComment, const char* value)
     strcpy(userComment->value, value);
     
     return 1;
+}
+
+static int create_locator(int64_t position, const char* comment, AvidRGBColor color, Locator** locator)
+{
+    Locator* newLocator = NULL;
+
+    CHK_MALLOC_ORET(newLocator, Locator);
+    memset(newLocator, 0, sizeof(Locator));
+    
+    if (comment != NULL)
+    {
+        CHK_MALLOC_ARRAY_OFAIL(newLocator->comment, char, strlen(comment) + 1);
+        strcpy(newLocator->comment, comment);
+    }
+    newLocator->position = position;
+    newLocator->color = color;
+    
+    *locator = newLocator;
+    return 1;
+    
+fail:
+    free_locator(&newLocator);
+    return 0;
 }
 
 static void free_track(Track** track)
@@ -171,7 +219,7 @@ fail:
 }
 
 
-int create_package_definitions(PackageDefinitions** definitions)
+int create_package_definitions(PackageDefinitions** definitions, const mxfRational* locatorEditRate)
 {
     PackageDefinitions* newDefinitions;
     
@@ -179,6 +227,8 @@ int create_package_definitions(PackageDefinitions** definitions)
     memset(newDefinitions, 0, sizeof(PackageDefinitions));
     mxf_initialise_list(&newDefinitions->fileSourcePackages, free_package_in_list);
     mxf_initialise_list(&newDefinitions->userComments, free_tagged_value_in_list);
+    mxf_initialise_list(&newDefinitions->locators, free_locator_in_list);
+    newDefinitions->locatorEditRate = *locatorEditRate;
     
     *definitions = newDefinitions;
     return 1;
@@ -194,9 +244,20 @@ void free_package_definitions(PackageDefinitions** definitions)
     free_package(&(*definitions)->materialPackage);
     mxf_clear_list(&(*definitions)->fileSourcePackages);
     mxf_clear_list(&(*definitions)->userComments);
+    mxf_clear_list(&(*definitions)->locators);
     free_package(&(*definitions)->tapeSourcePackage);
     
     SAFE_FREE(definitions);
+}
+
+void init_essence_info(EssenceInfo* essenceInfo)
+{
+    memset(essenceInfo, 0, sizeof(*essenceInfo));
+    
+    essenceInfo->locked = -1;
+    essenceInfo->audioRefLevel = -256;
+    essenceInfo->dialNorm = -256;
+    essenceInfo->sequenceOffset = -1;
 }
 
 int create_material_package(PackageDefinitions* definitions, const mxfUMID* uid, 
@@ -270,6 +331,51 @@ void clear_user_comments(PackageDefinitions* definitions)
     mxf_clear_list(&definitions->userComments);
 }
 
+int add_locator(PackageDefinitions* definitions, int64_t position, const char *comment, AvidRGBColor color)
+{
+    Locator* newLocator = NULL;
+    Locator* locator;
+    MXFListIterator iter;
+    int inserted = 0;
+    
+    if (mxf_get_list_length(&definitions->locators) >= MAX_LOCATORS)
+    {
+        /* silently ignore */
+        return 1;
+    }
+        
+    CHK_ORET(create_locator(position, comment, color, &newLocator));
+    
+    mxf_initialise_list_iter(&iter, &definitions->locators);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        locator = (Locator*)mxf_get_iter_element(&iter);
+        
+        if (locator->position > position)
+        {
+            CHK_OFAIL(mxf_insert_list_element(&definitions->locators, mxf_get_list_iter_index(&iter),
+                1, newLocator));
+            inserted = 1;
+            break;
+        }
+    }
+    if (!inserted)
+    {
+        CHK_OFAIL(mxf_append_list_element(&definitions->locators, newLocator));
+    }
+    
+    return 1;
+
+fail:
+    free_locator(&locator);
+    return 0;
+}
+
+void clear_locators(PackageDefinitions* definitions)
+{
+    mxf_clear_list(&definitions->locators);
+}
+
 int create_track(Package* package, uint32_t id, uint32_t number, const char* name, int isPicture, 
     const mxfRational* editRate, const mxfUMID* sourcePackageUID, uint32_t sourceTrackID, 
     int64_t startPosition, int64_t length, int64_t origin, Track** track)
@@ -308,5 +414,4 @@ fail:
     free_track(&newTrack);
     return 0;
 }
-
 

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.h,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_avid.h,v 1.6 2009/09/18 14:39:15 philipn Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -47,19 +47,30 @@ extern "C"
 #include <mxf/mxf_avid_extensions_data_model.h>
 
 
+typedef struct
+{
+    uint16_t red;
+    uint16_t green;
+    uint16_t blue;
+} RGBColor;
+
+
 int mxf_avid_load_extensions(MXFDataModel* dataModel);
 
 
 int mxf_avid_read_filtered_header_metadata(MXFFile* mxfFile, int skipDataDefs, MXFHeaderMetadata* headerMetadata, 
     uint64_t headerByteCount, const mxfKey* key, uint8_t llen, uint64_t len);
 
-int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata);
+int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata, MXFPartition* headerPartition);
 
 
 void mxf_generate_aafsdk_umid(mxfUMID* umid);
 void mxf_generate_old_aafsdk_umid(mxfUMID* umid);
 
 int mxf_avid_set_indirect_string_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfUTF16Char* value);
+
+int mxf_avid_set_rgb_color_item(MXFMetadataSet* set, const mxfKey* itemKey, const RGBColor* value);
+int mxf_avid_get_rgb_color_item(MXFMetadataSet* set, const mxfKey* itemKey, RGBColor* value);
 
 int mxf_avid_get_data_def(MXFHeaderMetadata* headerMetadata, mxfUUID* uuid, mxfUL* dataDef);
 
@@ -77,6 +88,7 @@ int mxf_avid_read_string_user_comments(MXFMetadataSet* packageSet, MXFList** nam
 int mxf_avid_get_mob_attribute(const mxfUTF16Char* name, const MXFList* names, const MXFList* values, const mxfUTF16Char** value);
 int mxf_avid_get_user_comment(const mxfUTF16Char* name, const MXFList* names, const MXFList* values, const mxfUTF16Char** value);
 
+int mxf_avid_set_product_version_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfProductVersion* value);
 
 
 #ifdef __cplusplus

@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.16 2009/05/21 10:19:12 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.17 2009/09/18 14:39:15 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -81,6 +81,7 @@ typedef struct
     mxfUL pictureDataDef;
     mxfUL soundDataDef;
     mxfUL timecodeDataDef;
+    mxfUL dmDataDef;
     
     
     /* video only */
@@ -112,6 +113,10 @@ typedef struct
     uint32_t bitsPerSample;
     uint16_t blockAlign;
     uint32_t avgBps;
+    int locked;
+    int audioRefLevel;
+    int dialNorm;
+    int sequenceOffset;
 
     
     int64_t headerMetadataFilePos;
@@ -156,6 +161,8 @@ typedef struct
     MXFMetadataSet* videoSequenceSet;
     MXFMetadataSet* taggedValueSet;
     MXFMetadataSet* tapeDescriptorSet;
+    MXFMetadataSet* dmTrackSet;
+    MXFMetadataSet* dmSegmentSet;
     
     
     /* duration items that are updated when writing is completed */
@@ -186,7 +193,22 @@ struct _AvidClipWriter
     mxfUTF16Char* wTmpString;
     mxfUTF16Char* wTmpString2;
 };
-    
+
+
+/* AVID RGB values matching color names defined in enum AvidRGBColor */
+static const RGBColor g_rgbColors[] =
+{
+    {65534, 65535, 65535}, /* white */
+    {41471, 12134, 6564 }, /* red */
+    {58981, 58981, 6553 }, /* yellow */
+    {13107, 52428, 13107}, /* green */
+    {13107, 52428, 52428}, /* cyan */
+    {13107, 13107, 52428}, /* blue */
+    {52428, 13107, 52428}, /* magenta */
+    {0    , 0    , 0    }  /* black */
+};
+
+
 
 
 static const mxfUUID g_mxfIdentProductUID = 
@@ -194,6 +216,10 @@ static const mxfUUID g_mxfIdentProductUID =
 static const mxfUTF16Char* g_mxfIdentCompanyName = L"BBC Research";
 static const mxfUTF16Char* g_mxfIdentProductName = L"Avid MXF Writer";
 static const mxfUTF16Char* g_mxfIdentVersionString = L"Beta version";
+
+
+static uint32_t g_dmTrackID = 1000;
+static uint32_t g_dmTrackNumber = 1;
 
     
 /* 15 = GC Picture, 01 = element count=1, 01 = Avid JFIF, 01 = element number=1 */
@@ -227,9 +253,8 @@ static const uint32_t g_bodySID = 1;
 static const uint32_t g_indexSID = 2;
 
 static const uint64_t g_fixedBodyPPOffset = 0x40020;
-static const uint64_t g_uncFixedBodyPPOffset = 0x5ff20;       /* Observed in Avid MediaComposer 3.0 output */
-static const uint64_t g_uncHDFixedBodyPPOffset = 0x60020;
-static const uint64_t g_uncNTSCFixedBodyPPOffset = 0x5ff21;
+
+
 
 
 static void free_offsets_array_in_list(void* data)
@@ -414,11 +439,14 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     Package* tapePackage = packageDefinitions->tapeSourcePackage;
     MXFListIterator iter;
     Track* track;
+    Locator* locator;
     int i;
     uint32_t maxTrackID;
     int64_t tapeLen;
     UserComment* userComment;
     MXFMetadataSet* metaDictSet = NULL;
+    int32_t describedTrackID = -1;
+    int haveDescribedTrackID = 0;
         
     
     mxf_generate_uuid(&thisGeneration);
@@ -462,7 +490,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     CHK_ORET(mxf_set_uint32_item(writer->prefaceSet, &MXF_ITEM_K(Preface, ObjectModelVersion), 0x00000001));
     CHK_ORET(mxf_set_version_type_item(writer->prefaceSet, &MXF_ITEM_K(Preface, Version), 0x0101)); /* AAF SDK version */
     CHK_ORET(mxf_set_timestamp_item(writer->prefaceSet, &MXF_ITEM_K(Preface, LastModifiedDate), &clipWriter->now));
-    CHK_ORET(mxf_set_ul_item(writer->prefaceSet, &MXF_ITEM_K(Preface, OperationalPattern), &MXF_OP_L(atom, complexity02)));
+    CHK_ORET(mxf_set_ul_item(writer->prefaceSet, &MXF_ITEM_K(Preface, OperationalPattern), &MXF_OP_L(atom, complexity03)));
     CHK_ORET(mxf_alloc_array_item_elements(writer->prefaceSet, &MXF_ITEM_K(Preface, EssenceContainers), mxfUL_extlen, 1, &arrayElement));
     mxf_set_ul(&writer->essenceContainerLabel, arrayElement);
     if (clipWriter->wProjectName != NULL)
@@ -505,6 +533,18 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     while (mxf_next_list_iter_element(&iter))
     {
         track = (Track*)mxf_get_iter_element(&iter);
+        
+        /* get picture track id or first audio track id for locators below */
+        if (track->isPicture && !haveDescribedTrackID)
+        {
+            describedTrackID = track->id;
+            haveDescribedTrackID = 1;
+        }
+        else if (describedTrackID < 0)
+        {
+            describedTrackID = track->id;
+        }
+
         
         /* Preface - ContentStorage - MaterialPackage - Timeline Track */    
         CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(Track), &writer->materialPackageTrackSet));
@@ -559,6 +599,49 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         writer->durationItems[writer->numDurationItems].materialTrackID = track->id;
         writer->numDurationItems++;
         
+    }
+    
+    /* add a DMTrack if there are timed comments */
+    if (mxf_get_list_length(&packageDefinitions->locators) > 0)
+    {
+        /* Preface - ContentStorage - MaterialPackage - (DM) Event Track */    
+        CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(EventTrack), &writer->dmTrackSet));
+        CHK_ORET(mxf_add_array_item_strongref(writer->materialPackageSet, &MXF_ITEM_K(GenericPackage, Tracks), writer->dmTrackSet));
+        CHK_ORET(mxf_set_uint32_item(writer->dmTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), g_dmTrackID));
+        /* EventMobSlot in Avid AAF file has no name */
+        CHK_ORET(mxf_set_uint32_item(writer->dmTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), g_dmTrackNumber));
+        CHK_ORET(mxf_set_rational_item(writer->dmTrackSet, &MXF_ITEM_K(EventTrack, EventEditRate), &packageDefinitions->locatorEditRate));
+        /* not setting EventOrigin because this results in an error in Avid MediaComposer 3.0 */
+    
+        /* Preface - ContentStorage - MaterialPackage - (DM) Event Track - (DM) Sequence */    
+        CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(Sequence), &writer->sequenceSet));
+        CHK_ORET(mxf_set_strongref_item(writer->dmTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), writer->sequenceSet));
+        CHK_ORET(mxf_set_ul_item(writer->sequenceSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &writer->dmDataDef));
+
+        mxf_initialise_list_iter(&iter, &packageDefinitions->locators);
+        while (mxf_next_list_iter_element(&iter))
+        {
+            locator = (Locator*)mxf_get_iter_element(&iter);
+            
+            /* Preface - ContentStorage - MaterialPackage - (DM) Event Track - (DM) Sequence - DMSegment */    
+            CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(DMSegment), &writer->dmSegmentSet));
+            CHK_ORET(mxf_add_array_item_strongref(writer->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), writer->dmSegmentSet));
+            CHK_ORET(mxf_set_ul_item(writer->dmSegmentSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &writer->dmDataDef));
+            /* no duration set in Avid AAF file */
+            CHK_ORET(mxf_set_position_item(writer->dmSegmentSet, &MXF_ITEM_K(DMSegment, EventStartPosition), locator->position));
+            if (locator->comment != NULL)
+            {
+                CHK_ORET(convert_string(clipWriter, locator->comment));
+                CHK_ORET(mxf_set_utf16string_item(writer->dmSegmentSet, &MXF_ITEM_K(DMSegment, EventComment), clipWriter->wTmpString));
+            }
+            CHK_ORET(mxf_avid_set_rgb_color_item(writer->dmSegmentSet, &MXF_ITEM_K(DMSegment, CommentMarkerColor), &g_rgbColors[locator->color - AVID_WHITE]));
+
+            if (describedTrackID >= 0)
+            {
+                CHK_ORET(mxf_alloc_array_item_elements(writer->dmSegmentSet, &MXF_ITEM_K(DMSegment, TrackIDs), 4, 1, &arrayElement));
+                mxf_set_uint32(describedTrackID, arrayElement);
+            }
+        }
     }
 
     /* attach a project name attribute to the material package */
@@ -657,23 +740,12 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     
     if (track->isPicture)
     {
-        // const mxfUL codecUL = 
-        // {0xbf, 0xd6, 0x00, 0x10, 0x4b, 0xc9, 0x15, 0x6d, 0x18, 0x63, 0x4f, 0x8c, 0x3b, 0xab, 0x11, 0xd3};
         /* Preface - ContentStorage - SourcePackage - CDCIEssenceDescriptor */    
         CHK_ORET(mxf_create_set(writer->headerMetadata, &MXF_SET_K(CDCIEssenceDescriptor), &writer->cdciDescriptorSet));
         CHK_ORET(mxf_set_strongref_item(writer->sourcePackageSet, &MXF_ITEM_K(SourcePackage, Descriptor), writer->cdciDescriptorSet));
         CHK_ORET(mxf_set_rational_item(writer->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, SampleRate), &writer->sampleRate));
         CHK_ORET(mxf_set_length_item(writer->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, ContainerDuration), 0));
-        if (mxf_equals_ul(&writer->cdciEssenceContainerLabel, &g_Null_UL))
-        {
-            CHK_ORET(mxf_set_ul_item(writer->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, EssenceContainer), &writer->essenceContainerLabel));
-        }
-        else
-        {
-            /* the Avid MJPEGs and uncompressed (?) require the AAF-KLV container label here */
-            CHK_ORET(mxf_set_ul_item(writer->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, EssenceContainer), &writer->cdciEssenceContainerLabel));
-        }
-        // CHK_ORET(mxf_set_ul_item(writer->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, Codec), &codecUL));
+        CHK_ORET(mxf_set_ul_item(writer->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, EssenceContainer), &MXF_EC_L(AvidAAFKLVEssenceContainer)));
         if (!mxf_equals_ul(&writer->pictureEssenceCoding, &g_Null_UL))
         {
             CHK_ORET(mxf_set_ul_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, PictureEssenceCoding), &writer->pictureEssenceCoding));
@@ -738,7 +810,8 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         {
             CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageStartOffset), writer->imageStartOffset));
         }
-        if (writer->resolutionID != 0) {
+        if (writer->resolutionID != 0)
+        {
             CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ResolutionID), writer->resolutionID));
         }
         CHK_ORET(mxf_set_int32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameSampleSize), writer->frameSize));
@@ -753,13 +826,29 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         CHK_ORET(mxf_set_strongref_item(writer->sourcePackageSet, &MXF_ITEM_K(SourcePackage, Descriptor), writer->bwfDescriptorSet));
         CHK_ORET(mxf_set_rational_item(writer->bwfDescriptorSet, &MXF_ITEM_K(FileDescriptor, SampleRate), &writer->sampleRate));
         CHK_ORET(mxf_set_length_item(writer->bwfDescriptorSet, &MXF_ITEM_K(FileDescriptor, ContainerDuration), 0));
-        CHK_ORET(mxf_set_ul_item(writer->bwfDescriptorSet, &MXF_ITEM_K(FileDescriptor, EssenceContainer), &writer->essenceContainerLabel));
+        CHK_ORET(mxf_set_ul_item(writer->bwfDescriptorSet, &MXF_ITEM_K(FileDescriptor, EssenceContainer), &MXF_EC_L(AvidAAFKLVEssenceContainer)));
         CHK_ORET(mxf_set_rational_item(writer->bwfDescriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, AudioSamplingRate), &writer->samplingRate));
         CHK_ORET(mxf_set_uint32_item(writer->bwfDescriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, ChannelCount), 1));
         CHK_ORET(mxf_set_uint32_item(writer->bwfDescriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, QuantizationBits), writer->bitsPerSample));
+        if (writer->locked == 1 || writer->locked == 0)
+        {
+            CHK_ORET(mxf_set_boolean_item(writer->bwfDescriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, Locked), writer->locked));
+        }
+        if (writer->audioRefLevel >= -128 && writer->audioRefLevel <= 127)
+        {
+            CHK_ORET(mxf_set_int8_item(writer->bwfDescriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, AudioRefLevel), writer->audioRefLevel));
+        }
+        CHK_ORET(mxf_set_uint8_item(writer->bwfDescriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, ElectroSpatialFormulation), 2 /*single channel mode */));
+        if (writer->dialNorm >= -128 && writer->dialNorm <= 127)
+        {
+            CHK_ORET(mxf_set_int8_item(writer->bwfDescriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, DialNorm), writer->dialNorm));
+        }
+        if (writer->sequenceOffset >= 0 && writer->sequenceOffset < 5)
+        {
+            CHK_ORET(mxf_set_uint8_item(writer->bwfDescriptorSet, &MXF_ITEM_K(WaveAudioDescriptor, SequenceOffset), writer->sequenceOffset));
+        }
         CHK_ORET(mxf_set_uint16_item(writer->bwfDescriptorSet, &MXF_ITEM_K(WaveAudioDescriptor, BlockAlign), writer->blockAlign));
         CHK_ORET(mxf_set_uint32_item(writer->bwfDescriptorSet, &MXF_ITEM_K(WaveAudioDescriptor, AvgBps), writer->avgBps));
-
         writer->descriptorSet = writer->bwfDescriptorSet;  /* ContainerDuration updated when writing completed */
     }
     
@@ -899,7 +988,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     CHK_ORET(mxf_set_utf16string_item(writer->identSet, &MXF_ITEM_K(Identification, VersionString), g_mxfIdentVersionString));
     CHK_ORET(mxf_set_uuid_item(writer->identSet, &MXF_ITEM_K(Identification, ProductUID), &g_mxfIdentProductUID));
     CHK_ORET(mxf_set_timestamp_item(writer->identSet, &MXF_ITEM_K(Identification, ModificationDate), &clipWriter->now));
-    CHK_ORET(mxf_set_product_version_item(writer->identSet, &MXF_ITEM_K(Identification, ToolkitVersion), mxf_get_version()));
+    CHK_ORET(mxf_avid_set_product_version_item(writer->identSet, &MXF_ITEM_K(Identification, ToolkitVersion), mxf_get_version()));
     CHK_ORET(mxf_set_utf16string_item(writer->identSet, &MXF_ITEM_K(Identification, Platform), mxf_get_platform_wstring()));
     
     
@@ -1049,27 +1138,8 @@ static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer, Packa
     CHK_ORET(mxf_file_seek(writer->mxfFile, writer->headerMetadataFilePos, SEEK_SET));
     
     CHK_ORET(mxf_mark_header_start(writer->mxfFile, writer->headerPartition));
-    CHK_ORET(mxf_avid_write_header_metadata(writer->mxfFile, writer->headerMetadata));    
-    if (writer->essenceType == Unc1080iUYVY ||
-        writer->essenceType == Unc720pUYVY)
-    {
-        CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncHDFixedBodyPPOffset));
-    }
-    else if (writer->essenceType == UncUYVY)
-    {
-        if (clipWriter->projectFormat == NTSC_30i)
-        {
-            CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncNTSCFixedBodyPPOffset));
-        }
-        else
-        {
-            CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_uncFixedBodyPPOffset));
-        }
-    }
-    else
-    {
-        CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_fixedBodyPPOffset));
-    }
+    CHK_ORET(mxf_avid_write_header_metadata(writer->mxfFile, writer->headerMetadata, writer->headerPartition));    
+    CHK_ORET(mxf_fill_to_position(writer->mxfFile, g_fixedBodyPPOffset));
     CHK_ORET(mxf_mark_header_end(writer->mxfFile, writer->headerPartition));
 
     
@@ -1209,6 +1279,22 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->frameLayout = 1; /* SeparateFields */
                         newTrackWriter->colorSiting = 4; /* Rec601 */
                         break;
+                    case Res41m:
+                        newTrackWriter->resolutionID = g_AvidMJPEG41m_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG41m_PAL);
+                        newTrackWriter->videoLineMap[0] = 15;
+                        newTrackWriter->videoLineMapLen = 1;
+                        newTrackWriter->storedHeight = 296;
+                        newTrackWriter->storedWidth = 288;
+                        newTrackWriter->sampledHeight = 296;
+                        newTrackWriter->sampledWidth = 288;
+                        newTrackWriter->displayHeight = 288;
+                        newTrackWriter->displayWidth = 288;
+                        newTrackWriter->displayYOffset = 8;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 2; /* SingleField */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
                     case Res101m:
                         newTrackWriter->resolutionID = g_AvidMJPEG101m_ResolutionID;
                         newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG101m_PAL);
@@ -1316,6 +1402,22 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         newTrackWriter->displayYOffset = 5;
                         newTrackWriter->displayXOffset = 0;
                         newTrackWriter->frameLayout = 1; /* SeparateFields */
+                        newTrackWriter->colorSiting = 4; /* Rec601 */
+                        break;
+                    case Res41m:
+                        newTrackWriter->resolutionID = g_AvidMJPEG41m_ResolutionID;
+                        newTrackWriter->pictureEssenceCoding = MXF_CMDEF_L(AvidMJPEG41m_NTSC);
+                        newTrackWriter->videoLineMap[0] = 16;
+                        newTrackWriter->videoLineMapLen = 1;
+                        newTrackWriter->storedHeight = 248;
+                        newTrackWriter->storedWidth = 288;
+                        newTrackWriter->sampledHeight = 248;
+                        newTrackWriter->sampledWidth = 288;
+                        newTrackWriter->displayHeight = 243;
+                        newTrackWriter->displayWidth = 288;
+                        newTrackWriter->displayYOffset = 5;
+                        newTrackWriter->displayXOffset = 0;
+                        newTrackWriter->frameLayout = 2; /* SingleField */
                         newTrackWriter->colorSiting = 4; /* Rec601 */
                         break;
                     case Res101m:
@@ -1957,6 +2059,10 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     (double)(newTrackWriter->samplingRate.denominator * newTrackWriter->sampleRate.numerator);
                 newTrackWriter->editUnitByteCount = (uint32_t)(newTrackWriter->blockAlign * factor + 0.5);
             }
+            newTrackWriter->locked = filePackage->essenceInfo.locked;
+            newTrackWriter->audioRefLevel = filePackage->essenceInfo.audioRefLevel;
+            newTrackWriter->dialNorm = filePackage->essenceInfo.dialNorm;
+            newTrackWriter->sequenceOffset = filePackage->essenceInfo.sequenceOffset;
             break;
         default:
             assert(0);
@@ -1974,6 +2080,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
         newTrackWriter->soundDataDef = MXF_DDEF_L(Sound);
         newTrackWriter->timecodeDataDef = MXF_DDEF_L(Timecode);
     }
+    newTrackWriter->dmDataDef = MXF_DDEF_L(DescriptiveMetadata);
     
 
     /* create the header metadata */
@@ -1987,18 +2094,8 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     CHK_OFAIL(mxf_disk_file_open_new(newTrackWriter->filename, &newTrackWriter->mxfFile));
     
     
-    /* set the minimum llen */
-    if (filePackage->essenceType == AvidMJPEG)
-    {
-        /* Avid only accepts llen == 9 for MJPEG files */
-        mxf_file_set_min_llen(newTrackWriter->mxfFile, 9);
-    }
-    else
-    {
-        /* Avid Media Composer 3.0 emitted MXF files use LLen=9 everywhere. */
-        /* P2 emitted MXF files use LLen=4 for all KLVs except essence containers. */
-        mxf_file_set_min_llen(newTrackWriter->mxfFile, 9);
-    }
+    /* set the minimum llen - Avid uses llen=9 everywhere */
+    mxf_file_set_min_llen(newTrackWriter->mxfFile, 9);
     
     
     /* write the (incomplete) header partition pack */
@@ -2006,7 +2103,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     CHK_OFAIL(mxf_append_new_partition(newTrackWriter->partitions, &newTrackWriter->headerPartition));
     newTrackWriter->headerPartition->key = MXF_PP_K(ClosedIncomplete, Header);
     newTrackWriter->headerPartition->kagSize = 0x100;
-    newTrackWriter->headerPartition->operationalPattern = MXF_OP_L(atom, complexity02);
+    newTrackWriter->headerPartition->operationalPattern = MXF_OP_L(atom, complexity03);
     CHK_OFAIL(mxf_append_partition_esscont_label(newTrackWriter->headerPartition, 
         &newTrackWriter->essenceContainerLabel));
 
@@ -2019,27 +2116,9 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     CHK_OFAIL((newTrackWriter->headerMetadataFilePos = mxf_file_tell(newTrackWriter->mxfFile)) >= 0);
     
     CHK_OFAIL(mxf_mark_header_start(newTrackWriter->mxfFile, newTrackWriter->headerPartition));
-    CHK_OFAIL(mxf_avid_write_header_metadata(newTrackWriter->mxfFile, newTrackWriter->headerMetadata));    
-    if (newTrackWriter->essenceType == Unc1080iUYVY ||
-        newTrackWriter->essenceType == Unc720pUYVY)
-    {
-        CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncHDFixedBodyPPOffset));
-    }
-    else if (newTrackWriter->essenceType == UncUYVY)
-    {
-        if (clipWriter->projectFormat == NTSC_30i)
-        {
-            CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncNTSCFixedBodyPPOffset));
-        }
-        else
-        {
-            CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_uncFixedBodyPPOffset));
-        }
-    }
-    else
-    {
-        CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_fixedBodyPPOffset));
-    }
+    CHK_OFAIL(mxf_avid_write_header_metadata(newTrackWriter->mxfFile, newTrackWriter->headerMetadata,
+        newTrackWriter->headerPartition));    
+    CHK_ORET(mxf_fill_to_position(newTrackWriter->mxfFile, g_fixedBodyPPOffset));
     CHK_OFAIL(mxf_mark_header_end(newTrackWriter->mxfFile, newTrackWriter->headerPartition));
 
     
@@ -2049,7 +2128,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
     newTrackWriter->bodyPartition->key = MXF_PP_K(ClosedComplete, Body);
     if (newTrackWriter->essenceType == PCM) /* audio */
     {
-        newTrackWriter->bodyPartition->kagSize = 0x200;
+        newTrackWriter->bodyPartition->kagSize = 0x1000;
     }
     else /* video */
     {
@@ -2059,20 +2138,10 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
 
     CHK_OFAIL((filePos = mxf_file_tell(newTrackWriter->mxfFile)) >= 0);
     CHK_OFAIL(mxf_write_partition(newTrackWriter->mxfFile, newTrackWriter->bodyPartition));
-    if (newTrackWriter->essenceType == Unc1080iUYVY ||
-        newTrackWriter->essenceType == Unc720pUYVY)
-    {
-        /* place the first byte of the essence data at 0x8000.
-        Note: 57 = 0x20 + 16 + 9. This assumes a 9 byte llen and that the partition pack 
-        position is 0x20 beyond 0x6000 (don't know why?) */        
-        CHK_OFAIL(mxf_fill_to_position(newTrackWriter->mxfFile, filePos + newTrackWriter->bodyPartition->kagSize - 57));
-    }
-    else
-    {
-        /* TODO: it would make sense to make this filePos + newTrackWriter->bodyPartition->kagSize - 57 as well 
-        Must first check that this doesn't break other formats */
-        CHK_OFAIL(mxf_fill_to_position(newTrackWriter->mxfFile, filePos + 199));
-    }
+    /* place the first byte of the essence data at the KAG boundary taking into account that the body
+       partition offset (g_fixedBodyPPOffset) is 0x20 bytes (why?) beyond where it would be expected to be.
+       57 = 0x20 + 16 + 9. This assumes a 9 byte llen */
+    CHK_OFAIL(mxf_fill_to_position(newTrackWriter->mxfFile, filePos + newTrackWriter->bodyPartition->kagSize - 57));
     
     
     /* update the partitions */
