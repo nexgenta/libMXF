@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_partition.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_partition.c,v 1.5 2009/09/18 14:37:27 philipn Exp $
  *
  * MXF file partitions
  *
@@ -704,6 +704,8 @@ int mxf_read_header_pp_kl_with_runin(MXFFile* mxfFile, mxfKey* key, uint8_t* lle
         {
             return 0;
         }
+
+        runinCheckCount++;
         if (byte == ((const uint8_t*)(&g_PartitionPackPrefix_key))[keyCompareByte])
         {
             keyPtr[keyCompareByte++] = byte;
@@ -720,7 +722,6 @@ int mxf_read_header_pp_kl_with_runin(MXFFile* mxfFile, mxfKey* key, uint8_t* lle
             }
             keyCompareByte = 0;
         }
-        runinCheckCount++;
     }
     if (runinCheckCount >= MAX_RUNIN_LEN + 11)
     {
