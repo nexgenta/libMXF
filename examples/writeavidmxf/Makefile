@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.3 2008/05/07 15:21:45 philipn Exp $
+# $Id: Makefile,v 1.4 2009/09/18 14:35:21 philipn Exp $
 #
 # Makefile for building writeavidmxf example
 #
@@ -49,6 +49,7 @@ writeavidmxf: main.o $(LIBMXF_DIR)/libMXF.a libwriteavidmxf.a
 
 .PHONY: install
 install: all
+	mkdir -p $(MXF_INSTALL_PREFIX)/bin
 	cp writeavidmxf $(MXF_INSTALL_PREFIX)/bin/
 
 .PHONY: clean

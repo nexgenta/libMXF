@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.3 2008/05/07 15:22:11 philipn Exp $
+# $Id: Makefile,v 1.4 2009/09/18 14:35:21 philipn Exp $
 #
 # Makefile for building transfertop2
 #
@@ -23,6 +23,7 @@
 TOPLEVEL = ../..
 include $(TOPLEVEL)/vars.mk
 
+
 CPP_CC = g++ -g -Wall -Wundef -Wno-non-virtual-dtor -Werror -D_DEBUG -DOM_DEBUG -DOM_STACK_TRACE_ON_ASSERT -fsigned-char -DOM_USE_SCHEMASOFT_SS -I/usr/local/lib/include -DUSE_LIBDV -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_XOPEN_SOURCE=500 -DLITTLEENDIAN=1
 CPP_INCLUDES = -I. -I$(LIBMXF_DIR)/include -I$(AAFSDKINSTALL)/include
 CPP_OBJECTS = avidp2transfer.o
@@ -38,6 +39,10 @@ else
 endif
 
 .PHONY: all
+ifeq "$(OSNAME)" "MINGW_CC_OS"
+all:
+	@echo "*** transfertop2 not yet supported for cross-compiling using mingw"
+else
 ifndef AAFSDKINSTALL
 # The test_avidp2transfer application depends on the AAFSDK, so skip if AAFSDKINSTALL path not set
 # AAFSDKINSTALL is path to installed AAF SDK includes and libs (i.e. after an SDK make install)
@@ -47,6 +52,8 @@ all: test_avid_mxf_to_p2
 else
 all: test_avid_mxf_to_p2 test_avidp2transfer
 endif
+endif
+
 
 $(LIBMXF_DIR)/libMXF.a:
 	$(MAKE) -C $(LIBMXF_DIR)

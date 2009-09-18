@@ -1,5 +1,5 @@
 #
-# $Id: vars.mk,v 1.1 2008/05/07 15:21:35 philipn Exp $
+# $Id: vars.mk,v 1.2 2009/09/18 14:35:20 philipn Exp $
 #
 # Makefile variables used for compiling, installing etc
 #
@@ -28,14 +28,25 @@ endif
 
 LIBMXF_DIR = $(TOPLEVEL)/lib
 
+# MingW cross-compile path prefix
+ifdef MINGW_CC_PREFIX
+BIN_PREFIX=$(MINGW_CC_PREFIX)
+else
+BIN_PREFIX=
+endif
+
 # Variables for compilation of libMXF client applications
-CC = gcc
+CC = $(BIN_PREFIX)gcc
 INCLUDES = -I. -I$(LIBMXF_DIR)/include
 CFLAGS = -Wall -W -Werror -g -O2 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE $(INCLUDES)
-AR = ar crv
+AR = $(BIN_PREFIX)ar crv
 
 # Get the OS name e.g. Linux, MINGW32_NT-5.0, Darwin, SunOS
+ifdef MINGW_CC_PREFIX
+OSNAME=MINGW_CC_OS
+else
 OSNAME=$(shell uname -s)
+endif
 
 # Linux specific
 ifeq ($(OSNAME),Linux)
@@ -49,6 +60,11 @@ endif
 
 # MS Windows specific when building with msys
 ifeq (MINGW32_NT,$(findstring MINGW32_NT,$(OSNAME)))
+UUIDLIB = -lole32
+endif
+
+# MS Windows specific when cross-compiling with MingW
+ifeq ($(OSNAME),MINGW_CC_OS)
 UUIDLIB = -lole32
 endif
 

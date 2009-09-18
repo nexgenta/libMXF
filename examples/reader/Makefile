@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.3 2008/10/29 17:54:26 john_f Exp $
+# $Id: Makefile,v 1.4 2009/09/18 14:35:21 philipn Exp $
 #
 # Makefile for building MXF reader library
 #
@@ -60,6 +60,7 @@ test_mxf_reader.o: test_mxf_reader.c mxf_reader.h
 
 .PHONY: install
 install: libMXFReader.a
+	mkdir -p $(MXF_INSTALL_PREFIX)/lib
 	cp libMXFReader.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/include
 	cp *.h $(MXF_INSTALL_PREFIX)/include/

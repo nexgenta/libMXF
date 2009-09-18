@@ -1,14 +1,10 @@
+TOPLEVEL = ..
+include $(TOPLEVEL)/vars.mk
+
 INCLUDES_DIR = ./include
 MXF_DIR = ./mxf
 PRODUCTS_DIR = ./products
 UTILS_DIR = ./utils
-MXF_INSTALL_PREFIX ?= /usr/local
-
-# we turn off checking for unused parameters (-Wno-unused-parameter) because we have
-# callbacks where the parameters are not always used
-CC = gcc -Wall -W -Wno-unused-parameter -Werror -g -O2 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
-AR = ar cr
-
 
 OBJS = $(MXF_DIR)/mxf_version.o \
 	$(MXF_DIR)/mxf_labels_and_keys.o \
@@ -125,6 +121,7 @@ $(UTILS_DIR)/mxf_page_file.o: $(UTILS_DIR)/mxf_page_file.c $(INCLUDE_FILES)
 
 .PHONY: install
 install: libMXF.a
+	mkdir -p $(MXF_INSTALL_PREFIX)/lib
 	cp libMXF.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf
 	cp include/mxf/*.h $(MXF_INSTALL_PREFIX)/include/mxf/

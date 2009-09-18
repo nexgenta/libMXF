@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.2 2008/05/07 15:21:57 philipn Exp $
+# $Id: Makefile,v 1.3 2009/09/18 14:35:20 philipn Exp $
 #
 # Makefile for building archive examples
 #
@@ -51,8 +51,10 @@ clean:
 
 .PHONY: install
 install: libd3mxfinfo.a
+	mkdir -p $(MXF_INSTALL_PREFIX)/lib
 	cp libd3mxfinfo.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/include
 	cp d3_mxf_info_lib.h $(MXF_INSTALL_PREFIX)/include/
 	cp ../archive_types.h $(MXF_INSTALL_PREFIX)/include/
+	mkdir -p $(MXF_INSTALL_PREFIX)/bin
 	cp d3_mxf_info $(MXF_INSTALL_PREFIX)/bin/
