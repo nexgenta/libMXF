@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.6 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: avid_mxf_info.c,v 1.7 2009/09/18 14:36:48 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -174,7 +174,11 @@ static int get_single_track_component(MXFMetadataSet* trackSet, const mxfKey* co
         /* get first component */
         
         FCHECK(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElementValue)); 
-        FCHECK(mxf_get_strongref(trackSet->headerMetadata, arrayElementValue, &cSet));
+        if (!mxf_get_strongref(trackSet->headerMetadata, arrayElementValue, &cSet))
+        {
+            /* reference to a dark set and we assume it isn't something we're interested in */
+            return 0;
+        }
     }
     else
     {
@@ -387,9 +391,8 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     mxfUMID sourcePackageID;
     MXFArrayItemIterator iter3;
     int64_t filePackageStartPosition;
-    int64_t physicalPackageStartPosition;
+    int64_t startPosition;
     mxfRational filePackageEditRate;
-    mxfRational physicalPackageEditRate;
     int64_t startTimecode;
     uint16_t roundedTimecodeBase;
     int haveStartTimecode;
@@ -868,22 +871,19 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
                 continue;
             }
             
-            /* get the start timecode, rounded timecode base and edit rate for the timecode component */
-            DCHECK(mxf_get_rational_item(trackSet, &MXF_ITEM_K(Track, EditRate), &physicalPackageEditRate));
+            /* get the start timecode and rounded timecode base for the timecode component */
             DCHECK(mxf_get_position_item(timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, StartTimecode), &startTimecode));
             DCHECK(mxf_get_uint16_item(timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, RoundedTimecodeBase), &roundedTimecodeBase));
             
-            /* convert start position in the file source package to a start position in the physical source package */
-            physicalPackageStartPosition = (int64_t)(filePackageStartPosition * 
-                physicalPackageEditRate.numerator * filePackageEditRate.denominator /
-                    (double)(physicalPackageEditRate.denominator * filePackageEditRate.numerator) + 0.5);
+            /* convert the physical package start timecode to a start position in the file source package */
+            startPosition = filePackageStartPosition + 
+                (int64_t)(startTimecode * 
+                    filePackageEditRate.numerator / (double)(filePackageEditRate.denominator * roundedTimecodeBase) + 0.5);
             
-            
-            /* get the start timecode (start timecode in the timecode component plus the start position)
-            in material package track edit rate units */
-            info->startTimecode = (int64_t)((startTimecode + physicalPackageStartPosition) * 
-                info->editRate.numerator * physicalPackageEditRate.denominator /
-                    (double)(info->editRate.denominator * physicalPackageEditRate.numerator) + 0.5);
+            /* convert the start position to material package track edit rate units */
+            info->startTimecode = (int64_t)(startPosition * 
+                info->editRate.numerator * filePackageEditRate.denominator /
+                    (double)(info->editRate.denominator * filePackageEditRate.numerator) + 0.5);
 
             haveStartTimecode = 1;
             break;
