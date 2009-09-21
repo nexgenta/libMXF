@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_index_table.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_index_table.c,v 1.4 2009/09/21 08:12:10 philipn Exp $
  *
  * MXF index table
  *
@@ -388,7 +388,8 @@ int mxf_read_index_table_segment(MXFFile* mxfFile, uint64_t segmentLen, MXFIndex
             case 0x3f09:
                 CHK_OFAIL(mxf_read_uint32(mxfFile, &deltaEntryArrayLen));
                 CHK_OFAIL(mxf_read_uint32(mxfFile, &deltaEntryLen));
-                CHK_OFAIL(deltaEntryLen == 6);
+                if (deltaEntryArrayLen != 0)
+                    CHK_OFAIL(deltaEntryLen == 6);
                 CHK_OFAIL(localLen == 8 + deltaEntryArrayLen * 6);
                 for (; deltaEntryArrayLen > 0; deltaEntryArrayLen--)
                 {
@@ -409,7 +410,8 @@ int mxf_read_index_table_segment(MXFFile* mxfFile, uint64_t segmentLen, MXFIndex
                 }
                 CHK_OFAIL(mxf_read_uint32(mxfFile, &indexEntryArrayLen));
                 CHK_OFAIL(mxf_read_uint32(mxfFile, &indexEntryLen));
-                CHK_OFAIL(indexEntryLen == (uint32_t)11 + newSegment->sliceCount * 4 + newSegment->posTableCount * 8);
+                if (indexEntryArrayLen != 0)
+                    CHK_OFAIL(indexEntryLen == (uint32_t)11 + newSegment->sliceCount * 4 + newSegment->posTableCount * 8);
                 CHK_OFAIL(localLen == 8 + indexEntryArrayLen * (11 + newSegment->sliceCount * 4 + 
                     newSegment->posTableCount * 8));
                 for (; indexEntryArrayLen > 0; indexEntryArrayLen--)
