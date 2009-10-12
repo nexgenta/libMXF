@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.h,v 1.6 2009/09/18 14:39:15 philipn Exp $
+ * $Id: mxf_avid.h,v 1.7 2009/10/12 15:25:57 philipn Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -91,6 +91,18 @@ int mxf_avid_get_user_comment(const mxfUTF16Char* name, const MXFList* names, co
 int mxf_avid_set_product_version_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfProductVersion* value);
 
 
+int mxf_avid_read_index_table_segment(MXFFile* mxfFile, uint64_t segmentLen, MXFIndexTableSegment** segment);
+int mxf_avid_read_index_table_segment_2(MXFFile* mxfFile, uint64_t segmentLen,
+    mxf_add_delta_entry* addDeltaEntry, void* addDeltaEntryData,
+    mxf_add_index_entry* addIndexEntry, void* addIndexEntryData,
+    MXFIndexTableSegment** segment);
+
+
+int mxf_avid_is_mjpeg_essence_element(const mxfKey* key);
+int mxf_avid_is_dnxhd_essence_element(const mxfKey* key);
+int mxf_avid_is_essence_element(const mxfKey* key);
+
+    
 #ifdef __cplusplus
 }
 #endif

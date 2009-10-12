@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.8 2009/03/25 13:49:01 john_f Exp $
+ * $Id: mxf_opatom_reader.c,v 1.9 2009/10/12 15:25:57 philipn Exp $
  *
  * MXF OP-Atom reader
  *
@@ -141,14 +141,28 @@ static int get_data_def_ul(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* tr
     return 1;
 }
 
-static int is_avid_mjpeg_essence_element(const mxfKey* key)
+static int add_mjpeg_index_entry(void* data, uint32_t numEntries, MXFIndexTableSegment* segment, int8_t temporalOffset,
+    int8_t keyFrameOffset, uint8_t flags, uint64_t streamOffset, uint32_t* sliceOffset, mxfRational* posTable)
 {
-    return mxf_equals_key_prefix(key, &MXF_EE_K(AvidMJPEGClipWrapped), 13) && key->octet14 == 0x01;
-}
+    MXFReader* reader = (MXFReader*)data;
+    
+    (void)segment;
+    (void)temporalOffset;
+    (void)keyFrameOffset;
+    (void)flags;
+    (void)sliceOffset;
+    (void)posTable;
 
-static int is_avid_dnxhd_essence_element(const mxfKey* key)
-{
-    return mxf_equals_key_prefix(key, &MXF_EE_K(DNxHD), 13) && key->octet14 == 0x06;
+    if (reader->essenceReader->data->avidFrameOffsets == NULL)
+    {
+        CHK_MALLOC_ARRAY_ORET(reader->essenceReader->data->avidFrameOffsets, int64_t, numEntries);
+        reader->essenceReader->data->numAvidFrameOffsets = 0;
+    }
+
+    reader->essenceReader->data->avidFrameOffsets[reader->essenceReader->data->numAvidFrameOffsets] = streamOffset;
+    reader->essenceReader->data->numAvidFrameOffsets++;
+
+    return 1;
 }
 
 static int read_avid_mjpeg_index_segment(MXFReader* reader)
@@ -156,26 +170,7 @@ static int read_avid_mjpeg_index_segment(MXFReader* reader)
     mxfKey key;
     uint8_t llen;
     uint64_t len;
-    uint64_t segmentLen;
     MXFIndexTableSegment* newSegment = NULL;
-    mxfLocalTag localTag;
-    uint16_t localLen;
-    uint64_t totalLen;
-    uint32_t deltaEntryArrayLen;
-    uint32_t deltaEntryLen;
-    int8_t posTableIndex;
-    uint8_t slice;
-    uint32_t elementData;    
-    uint32_t indexEntryArrayLen;
-    uint32_t indexEntryLen;
-    uint8_t temporalOffset;
-    uint8_t keyFrameOffset;
-    uint8_t flags;
-    uint64_t streamOffset;
-    uint32_t* sliceOffset = NULL;
-    mxfRational* posTable = NULL; 
-    uint32_t i;
-    uint32_t k;
 
     SAFE_FREE(&reader->essenceReader->data->avidFrameOffsets);
     reader->essenceReader->data->numAvidFrameOffsets = 0;
@@ -186,137 +181,9 @@ static int read_avid_mjpeg_index_segment(MXFReader* reader)
         CHK_OFAIL(mxf_read_next_nonfiller_kl(reader->mxfFile, &key, &llen, &len));
         if (mxf_is_index_table_segment(&key))
         {
-            segmentLen = len;
-            
-            CHK_ORET(mxf_create_index_table_segment(&newSegment));
-            
-            totalLen = 0;
-            while (totalLen < segmentLen)
-            {
-                CHK_OFAIL(mxf_read_local_tag(reader->mxfFile, &localTag));
-                CHK_OFAIL(mxf_read_uint16(reader->mxfFile, &localLen));
-                totalLen += mxfLocalTag_extlen + 2;
-                
-                switch (localTag)
-                {
-                    case 0x3c0a:
-                        CHK_OFAIL(mxf_read_uuid(reader->mxfFile, &newSegment->instanceUID));
-                        CHK_OFAIL(localLen == mxfUUID_extlen);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f0b:
-                        CHK_OFAIL(mxf_read_int32(reader->mxfFile, &newSegment->indexEditRate.numerator));
-                        CHK_OFAIL(mxf_read_int32(reader->mxfFile, &newSegment->indexEditRate.denominator));
-                        CHK_OFAIL(localLen == 8);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f0c:
-                        CHK_OFAIL(mxf_read_int64(reader->mxfFile, &newSegment->indexStartPosition));
-                        CHK_OFAIL(localLen == 8);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f0d:
-                        CHK_OFAIL(mxf_read_int64(reader->mxfFile, &newSegment->indexDuration));
-                        CHK_OFAIL(localLen == 8);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f05:
-                        CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &newSegment->editUnitByteCount));
-                        CHK_OFAIL(localLen == 4);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f06:
-                        CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &newSegment->indexSID));
-                        CHK_OFAIL(localLen == 4);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f07:
-                        CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &newSegment->bodySID));
-                        CHK_OFAIL(localLen == 4);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f08:
-                        CHK_OFAIL(mxf_read_uint8(reader->mxfFile, &newSegment->sliceCount));
-                        CHK_OFAIL(localLen == 1);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f0e:
-                        CHK_OFAIL(mxf_read_uint8(reader->mxfFile, &newSegment->posTableCount));
-                        CHK_OFAIL(localLen == 1);
-                        totalLen += localLen;
-                        break;
-                    case 0x3f09:
-                        CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &deltaEntryArrayLen));
-                        CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &deltaEntryLen));
-                        CHK_OFAIL(deltaEntryLen == 6);
-                        CHK_OFAIL(localLen == 8 + deltaEntryArrayLen * 6);
-                        for (; deltaEntryArrayLen > 0; deltaEntryArrayLen--)
-                        {
-                            CHK_OFAIL(mxf_read_int8(reader->mxfFile, &posTableIndex));
-                            CHK_OFAIL(mxf_read_uint8(reader->mxfFile, &slice));
-                            CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &elementData));
-                            CHK_OFAIL(mxf_add_delta_entry(newSegment, posTableIndex, slice, elementData));
-                        }
-                        totalLen += localLen;
-                        break;
-                    case 0x3f0a:
-                        if (newSegment->sliceCount > 0)
-                        {
-                            CHK_MALLOC_ARRAY_OFAIL(sliceOffset, uint32_t, newSegment->sliceCount);
-                        }
-                        if (newSegment->posTableCount > 0)
-                        {
-                            CHK_MALLOC_ARRAY_OFAIL(posTable, mxfRational, newSegment->posTableCount);
-                        }
-                        /* NOTE: Avid ignores the local len and only looks at the index array len value
-                           so we don't check that the local len is correct and update the total len
-                           after each read */
-                        CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &indexEntryArrayLen));
-                        totalLen += 4;
-                        CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &indexEntryLen));
-                        totalLen += 4;
-                        CHK_OFAIL(indexEntryLen == (uint32_t)11 + newSegment->sliceCount * 4 + newSegment->posTableCount * 8);
-        
-                        CHK_MALLOC_ARRAY_OFAIL(reader->essenceReader->data->avidFrameOffsets, int64_t, indexEntryArrayLen);
-                        reader->essenceReader->data->numAvidFrameOffsets = indexEntryArrayLen;
-                            
-                        for (k = 0; k < indexEntryArrayLen; k++)
-                        {
-                            CHK_OFAIL(mxf_read_uint8(reader->mxfFile, &temporalOffset));
-                            totalLen += 1;
-                            CHK_OFAIL(mxf_read_uint8(reader->mxfFile, &keyFrameOffset));
-                            totalLen += 1;
-                            CHK_OFAIL(mxf_read_uint8(reader->mxfFile, &flags));
-                            totalLen += 1;
-                            CHK_OFAIL(mxf_read_uint64(reader->mxfFile, &streamOffset));
-                            totalLen += 8;
-                            for (i = 0; i < newSegment->sliceCount; i++)
-                            {
-                                CHK_OFAIL(mxf_read_uint32(reader->mxfFile, &sliceOffset[i]));
-                                totalLen += 4;
-                            }
-                            for (i = 0; i < newSegment->posTableCount; i++)
-                            {
-                                CHK_OFAIL(mxf_read_int32(reader->mxfFile, &posTable[i].numerator));
-                                totalLen += 4;
-                                CHK_OFAIL(mxf_read_int32(reader->mxfFile, &posTable[i].denominator));
-                                totalLen += 4;
-                            }
-                            
-                            reader->essenceReader->data->avidFrameOffsets[k] = streamOffset;
-                        }
-                        break;
-                    default:
-                        mxf_log_warn("Unknown local item (%u) in index table segment", localTag);
-                        CHK_OFAIL(mxf_skip(reader->mxfFile, localLen));
-                        totalLen += localLen;
-                }
-                
-            }
-            CHK_ORET(totalLen == segmentLen);
-            
-            SAFE_FREE(&sliceOffset);
-            SAFE_FREE(&posTable);
+            CHK_OFAIL(mxf_avid_read_index_table_segment_2(reader->mxfFile, len, mxf_default_add_delta_entry, NULL,
+                add_mjpeg_index_entry, (void*)reader, &newSegment));
+
             mxf_free_index_table_segment(&newSegment);
             return 1;
         }
@@ -329,8 +196,6 @@ static int read_avid_mjpeg_index_segment(MXFReader* reader)
 fail:
     SAFE_FREE(&reader->essenceReader->data->avidFrameOffsets);
     reader->essenceReader->data->numAvidFrameOffsets = 0;
-    SAFE_FREE(&sliceOffset);
-    SAFE_FREE(&posTable);
     mxf_free_index_table_segment(&newSegment);
     return 0;
 }
@@ -1036,9 +901,7 @@ int opa_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
     CHK_OFAIL(mxf_is_body_partition_pack(&key));
     CHK_OFAIL(mxf_skip(mxfFile, len));
     CHK_OFAIL(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
-    CHK_OFAIL(mxf_is_gc_essence_element(&key) || 
-        is_avid_mjpeg_essence_element(&key) ||
-        is_avid_dnxhd_essence_element(&key));
+    CHK_OFAIL(mxf_is_gc_essence_element(&key) || mxf_avid_is_essence_element(&key));
 
     data->essenceDataSize = len;
         

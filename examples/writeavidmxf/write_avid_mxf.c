@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.17 2009/09/18 14:39:15 philipn Exp $
+ * $Id: write_avid_mxf.c,v 1.18 2009/10/12 15:25:57 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -88,6 +88,7 @@ typedef struct
     mxfUL cdciEssenceContainerLabel;
     uint32_t frameSize;
     int32_t resolutionID;
+    mxfRational imageAspectRatio;
     mxfUL pictureEssenceCoding;
     uint32_t storedHeight;
     uint32_t storedWidth;
@@ -180,7 +181,6 @@ struct _AvidClipWriter
 
     mxfUTF16Char* wProjectName;
     ProjectFormat projectFormat;
-    mxfRational imageAspectRatio;
     int dropFrameFlag;
     int useLegacy;
     mxfRational projectEditRate;
@@ -786,7 +786,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, HorizontalSubsampling), writer->horizSubsampling));
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, VerticalSubsampling), writer->vertSubsampling));
         CHK_ORET(mxf_set_uint8_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameLayout), writer->frameLayout));
-        CHK_ORET(mxf_set_rational_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, AspectRatio), &clipWriter->imageAspectRatio));
+        CHK_ORET(mxf_set_rational_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, AspectRatio), &writer->imageAspectRatio));
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageAlignmentOffset), 1));
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), writer->componentDepth));
         CHK_ORET(mxf_set_uint8_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ColorSiting), writer->colorSiting));
@@ -1457,6 +1457,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                         return 0;
                 }
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->horizSubsampling = 2;        /* All JPEG formats are 4:2:2 */
             newTrackWriter->vertSubsampling = 1;
             newTrackWriter->essenceElementKey = MXF_EE_K(AvidMJPEGClipWrapped);
@@ -1523,6 +1524,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     newTrackWriter->frameLayout = 1; /* SeparateFields */
                 }
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->displayHeight = 0;
             newTrackWriter->displayWidth = 0;
             newTrackWriter->essenceElementKey = MXF_EE_K(DVClipWrapped);
@@ -1589,6 +1591,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     newTrackWriter->frameLayout = 1; /* SeparateFields */
                 }
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->displayHeight = 0;
             newTrackWriter->displayWidth = 0;
             newTrackWriter->essenceElementKey = MXF_EE_K(DVClipWrapped);
@@ -1638,6 +1641,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 newTrackWriter->frameLayout = 1;
                 newTrackWriter->colorSiting = 4; /* Rec601 */
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->displayHeight = 0;
             newTrackWriter->displayWidth = 0;
             newTrackWriter->essenceElementKey = MXF_EE_K(DVClipWrapped);
@@ -1666,6 +1670,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->horizSubsampling = 2;
             newTrackWriter->vertSubsampling = 1;
             newTrackWriter->frameSize = 576000;
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
 
             switch (filePackage->essenceType)
             {
@@ -1776,6 +1781,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 newTrackWriter->colorSiting = 4; /* Rec601 */
                 newTrackWriter->frameLayout = 1; /* SeparateFields */
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->essenceElementKey = MXF_EE_K(IMX);
             newTrackWriter->sourceTrackNumber = MXF_D10_PICTURE_TRACK_NUM(0x01);
             newTrackWriter->essenceElementLLen = 9;
@@ -1914,6 +1920,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                     assert(0);
                     return 0;
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->sourceTrackNumber = g_DNxHDTrackNumber;
             newTrackWriter->essenceElementLLen = 9;
             CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
@@ -1987,6 +1994,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 CHK_MALLOC_ARRAY_OFAIL(newTrackWriter->startOffsetData, uint8_t, g_uncNTSCStartOffsetSize);
                 memset(newTrackWriter->startOffsetData, 0, g_uncNTSCStartOffsetSize);
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->essenceElementKey = MXF_EE_K(UncClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_UNC_TRACK_NUM(0x01, MXF_UNC_CLIP_WRAPPED_EE_TYPE, 0x01);
             newTrackWriter->essenceElementLLen = 9;
@@ -2028,6 +2036,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 assert(0);
                 return 0;
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->essenceElementKey = MXF_EE_K(UncClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_UNC_TRACK_NUM(0x01, MXF_UNC_CLIP_WRAPPED_EE_TYPE, 0x01);
             newTrackWriter->essenceElementLLen = 9;
@@ -2174,7 +2183,7 @@ fail:
 
 
 int create_clip_writer(const char* projectName, ProjectFormat projectFormat,
-    mxfRational imageAspectRatio, mxfRational projectEditRate, int dropFrameFlag, int useLegacy, 
+    mxfRational projectEditRate, int dropFrameFlag, int useLegacy, 
     PackageDefinitions* packageDefinitions, AvidClipWriter** clipWriter)
 {
     AvidClipWriter* newClipWriter = NULL;
@@ -2193,8 +2202,6 @@ int create_clip_writer(const char* projectName, ProjectFormat projectFormat,
         newClipWriter->wTmpString = NULL;
     }
     newClipWriter->projectFormat = projectFormat;
-    newClipWriter->imageAspectRatio.numerator = imageAspectRatio.numerator;
-    newClipWriter->imageAspectRatio.denominator = imageAspectRatio.denominator;
     newClipWriter->dropFrameFlag = dropFrameFlag;
     newClipWriter->useLegacy = useLegacy;
 
@@ -2388,6 +2395,15 @@ int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
     return 1;
 }
 
+
+int get_num_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, int64_t* num_samples)
+{
+    TrackWriter* writer;
+    CHK_ORET(get_track_writer(clipWriter, materialTrackID, &writer));
+    
+    *num_samples = writer->duration;
+    return 1;
+}
 
 void abort_writing(AvidClipWriter** clipWriter, int deleteFile)
 {

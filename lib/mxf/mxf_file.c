@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_file.c,v 1.6 2009/10/12 15:25:57 philipn Exp $
  *
  * Wraps a files, buffers etc. in an MXF file and provides low-level functions
  *
@@ -278,6 +278,10 @@ static uint32_t stdin_file_read(MXFFileSysData* sysData, uint8_t* data, uint32_t
 
 static uint32_t stdin_file_write(MXFFileSysData* sysData, const uint8_t* data, uint32_t count)
 {
+    (void)sysData;
+    (void)data;
+    (void)count;
+    
     /* stdin is not writeable */
     return 0;
 }
@@ -315,6 +319,9 @@ static int stdin_file_getchar(MXFFileSysData* sysData)
 
 static int stdin_file_putchar(MXFFileSysData* sysData, int c)
 {
+    (void)sysData;
+    (void)c;
+    
     /* stdin is not writeable */
     return EOF;
 }
@@ -330,6 +337,10 @@ static int stdin_file_eof(MXFFileSysData* sysData)
 
 static int stdin_file_seek(MXFFileSysData* sysData, int64_t offset, int whence)
 {
+    (void)sysData;
+    (void)offset;
+    (void)whence;
+    
     /* stdin is not seekable */
     return 0;
 }
@@ -351,11 +362,15 @@ static void free_stdin_file(MXFFileSysData* sysData)
 
 static int stdin_file_is_seekable(MXFFileSysData* sysData)
 {
+    (void)sysData;
+    
     return 0;
 }
 
 static int64_t stdin_file_size(MXFFileSysData* sysData)
 {
+    (void)sysData;
+    
     return -1;
 }
 
@@ -392,6 +407,10 @@ static uint32_t byte_array_file_read(MXFFileSysData* sysData, uint8_t *data, uin
 
 static uint32_t byte_array_file_write(MXFFileSysData* sysData, const uint8_t* data, uint32_t count)
 {
+    (void)sysData;
+    (void)data;
+    (void)count;
+    
     /* not allowed for read-only byte array */
     return 0;
 }
@@ -408,6 +427,9 @@ static int byte_array_file_getchar(MXFFileSysData* sysData)
 
 static int byte_array_file_putchar(MXFFileSysData* sysData, int c)
 {
+    (void)sysData;
+    (void)c;
+    
     /* not allowed for read-only byte array */
     return 0;
 }
@@ -459,6 +481,8 @@ static int64_t byte_array_file_tell(MXFFileSysData* sysData)
 
 static int byte_array_file_is_seekable(MXFFileSysData* sysData)
 {
+    (void)sysData;
+    
     return 1;
 }
 

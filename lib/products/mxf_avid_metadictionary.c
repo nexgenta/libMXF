@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_metadictionary.c,v 1.1 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_avid_metadictionary.c,v 1.2 2009/10/12 15:25:57 philipn Exp $
  *
  * Avid (AAF) Meta-dictionary
  *
@@ -113,6 +113,10 @@ static int find_weakref_target_instance_uid(MXFList* mapList, const mxfUL* targe
 static int metadict_before_set_read(void* privateData, MXFHeaderMetadata* headerMetadata, 
         const mxfKey* key, uint8_t llen, uint64_t len, int* skip)
 {
+    (void)privateData;
+    (void)llen;
+    (void)len;
+    
     if (mxf_avid_is_metadictionary(headerMetadata->dataModel, key) ||
         mxf_avid_is_metadef(headerMetadata->dataModel, key))
     {

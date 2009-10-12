@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_dictionary.c,v 1.1 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_avid_dictionary.c,v 1.2 2009/10/12 15:25:57 philipn Exp $
  *
  * Avid dictionary
  *
@@ -39,6 +39,9 @@ typedef struct
 static int dict_before_set_read(void* privateData, MXFHeaderMetadata* headerMetadata, 
         const mxfKey* key, uint8_t llen, uint64_t len, int* skip)
 {
+    (void)llen;
+    (void)len;
+    
     MXFDictReadFilterData* filterData = (MXFDictReadFilterData*)privateData;
     
     if (mxf_avid_is_dictionary(headerMetadata->dataModel, key))

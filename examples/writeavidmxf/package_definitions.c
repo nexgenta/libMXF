@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.c,v 1.6 2009/09/18 14:39:15 philipn Exp $
+ * $Id: package_definitions.c,v 1.7 2009/10/12 15:25:57 philipn Exp $
  *
  * Functions to create package definitions
  *
@@ -413,5 +413,26 @@ int create_track(Package* package, uint32_t id, uint32_t number, const char* nam
 fail:
     free_track(&newTrack);
     return 0;
+}
+
+void get_image_aspect_ratio(PackageDefinitions* definitions, const mxfRational* defaultImageAspectRatio,
+    mxfRational* imageAspectRatio)
+{
+    Package* filePackage;
+    MXFListIterator iter;
+    
+    mxf_initialise_list_iter(&iter, &definitions->fileSourcePackages);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        filePackage = (Package*)mxf_get_iter_element(&iter);
+        
+        if (filePackage->essenceType != PCM && filePackage->essenceInfo.imageAspectRatio.numerator != 0)
+        {
+            *imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
+            return;
+        }
+    }
+    
+    *imageAspectRatio = *defaultImageAspectRatio;
 }
 

@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.h,v 1.4 2008/05/07 15:21:48 philipn Exp $
+ * $Id: write_avid_mxf.h,v 1.5 2009/10/12 15:25:57 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -44,7 +44,7 @@ typedef enum
 
 /* create the writer */
 int create_clip_writer(const char* projectName, ProjectFormat projectFormat,
-    mxfRational imageAspectRatio, mxfRational projectEditRate, int dropFrameFlag, int useLegacy, 
+    mxfRational projectEditRate, int dropFrameFlag, int useLegacy, 
     PackageDefinitions* packageDefinitions, AvidClipWriter** clipWriter);
     
 
@@ -65,6 +65,9 @@ int start_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID);
 int write_sample_data(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint8_t* data, uint32_t size);     
 int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t numSamples);     
 
+
+/* returns num_samples written as a multiple of the file package track edit rate */
+int get_num_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, int64_t* num_samples);
 
 /* delete the output files and free the writer */
 void abort_writing(AvidClipWriter** clipWriter, int deleteFile);

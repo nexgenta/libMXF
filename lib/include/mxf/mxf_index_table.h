@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_index_table.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_index_table.h,v 1.3 2009/10/12 15:25:57 philipn Exp $
  *
  * MXF index table
  *
@@ -67,21 +67,33 @@ typedef struct
 } MXFIndexTableSegment;
 
 
+typedef int (mxf_add_delta_entry)(void* data, uint32_t numEntries, MXFIndexTableSegment* segment, int8_t posTableIndex,
+    uint8_t slice, uint32_t elementData);
+typedef int (mxf_add_index_entry)(void* data, uint32_t numEntries, MXFIndexTableSegment* segment, int8_t temporalOffset,
+    int8_t keyFrameOffset, uint8_t flags, uint64_t streamOffset, 
+    uint32_t* sliceOffset /* assumes sliceCount set in segment */,
+    mxfRational* posTable /* assumes posTableCount set in segment */);
+
+
 int mxf_is_index_table_segment(const mxfKey* key);
 
 int mxf_create_index_table_segment(MXFIndexTableSegment** segment);
 void mxf_free_index_table_segment(MXFIndexTableSegment** segment);
 
-int mxf_add_delta_entry(MXFIndexTableSegment* segment, int8_t posTableIndex,
-    uint8_t slice, uint32_t elementData);
+int mxf_default_add_delta_entry(void* data/*ignored*/, uint32_t numEntries/*ignored*/, MXFIndexTableSegment* segment,
+    int8_t posTableIndex, uint8_t slice, uint32_t elementData);
 
-int mxf_add_index_entry(MXFIndexTableSegment* segment, int8_t temporalOffset,
-    int8_t keyFrameOffset, uint8_t flags, uint64_t streamOffset, 
-    uint32_t* sliceOffset /* assumes sliceCount set in segment */,
-    mxfRational* posTable /* assumes posTableCount set in segment */);
+int mxf_default_add_index_entry(void* data/*ignored*/, uint32_t numEntries/*ignored*/, MXFIndexTableSegment* segment,
+    int8_t temporalOffset, int8_t keyFrameOffset, uint8_t flags, uint64_t streamOffset, uint32_t* sliceOffset,
+    mxfRational* posTable);
 
 int mxf_write_index_table_segment(MXFFile* mxfFile, const MXFIndexTableSegment* segment);
+
 int mxf_read_index_table_segment(MXFFile* mxfFile, uint64_t segmentLen, MXFIndexTableSegment** segment);
+int mxf_read_index_table_segment_2(MXFFile* mxfFile, uint64_t segmentLen,
+    mxf_add_delta_entry* addDeltaEntry, void* addDeltaEntryData,
+    mxf_add_index_entry* addIndexEntry, void* addIndexEntryData,
+    MXFIndexTableSegment** segment);
 
 int mxf_write_index_table_segment_header(MXFFile* mxfFile, const MXFIndexTableSegment* segment, 
     uint32_t numDeltaEntries, uint32_t numIndexEntries);

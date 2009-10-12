@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.10 2009/09/18 14:39:15 philipn Exp $
+ * $Id: package_definitions.h,v 1.11 2009/10/12 15:25:57 philipn Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -94,6 +94,7 @@ typedef enum
 
 typedef struct
 {
+    mxfRational imageAspectRatio;
     AvidMJPEGResolution mjpegResolution;
     int imxFrameSize;
     
@@ -187,6 +188,10 @@ int create_track(Package* package, uint32_t id, uint32_t number, const char* nam
     int64_t startPosition, int64_t length, int64_t origin, Track** track);
 
 
+void get_image_aspect_ratio(PackageDefinitions* definitions, const mxfRational* defaultImageAspectRatio,
+    mxfRational* imageAspectRatio);
+
+    
 #ifdef __cplusplus
 }
 #endif

@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.6 2008/11/07 14:12:59 philipn Exp $
+ * $Id: write_archive_mxf.c,v 1.7 2009/10/12 15:25:56 philipn Exp $
  *
  * 
  *
@@ -1173,13 +1173,13 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     newOutput->indexSegment->indexSID = g_indexSID;
     newOutput->indexSegment->bodySID = g_bodySID;
     deltaOffset = 0;
-    CHK_OFAIL(mxf_add_delta_entry(newOutput->indexSegment, 0, 0, deltaOffset));
+    CHK_OFAIL(mxf_default_add_delta_entry(NULL, 0, newOutput->indexSegment, 0, 0, deltaOffset));
     deltaOffset += mxfKey_extlen + 4 + SYSTEM_ITEM_SIZE;
-    CHK_OFAIL(mxf_add_delta_entry(newOutput->indexSegment, 0, 0, deltaOffset));
+    CHK_OFAIL(mxf_default_add_delta_entry(NULL, 0, newOutput->indexSegment, 0, 0, deltaOffset));
     deltaOffset += mxfKey_extlen + 4 + g_videoFrameSize;
     for (i = 0; i < newOutput->numAudioTracks; i++)
     {
-        CHK_OFAIL(mxf_add_delta_entry(newOutput->indexSegment, 0, 0, deltaOffset));
+        CHK_OFAIL(mxf_default_add_delta_entry(NULL, 0, newOutput->indexSegment, 0, 0, deltaOffset));
         deltaOffset += mxfKey_extlen + 4 + g_audioFrameSize;
     }
 

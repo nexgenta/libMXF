@@ -61,60 +61,60 @@ libMXF.a: $(OBJS)
 
 
 $(MXF_DIR)/mxf_essence_container.o: $(MXF_DIR)/mxf_essence_container.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_essence_container.c -o $(MXF_DIR)/mxf_essence_container.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_essence_container.c -o $(MXF_DIR)/mxf_essence_container.o
 
 $(MXF_DIR)/mxf_index_table.o: $(MXF_DIR)/mxf_index_table.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_index_table.c -o $(MXF_DIR)/mxf_index_table.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_index_table.c -o $(MXF_DIR)/mxf_index_table.o
 
 $(MXF_DIR)/mxf_partition.o: $(MXF_DIR)/mxf_partition.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_partition.c -o $(MXF_DIR)/mxf_partition.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_partition.c -o $(MXF_DIR)/mxf_partition.o
 
 $(MXF_DIR)/mxf_primer.o: $(MXF_DIR)/mxf_primer.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_primer.c -o $(MXF_DIR)/mxf_primer.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_primer.c -o $(MXF_DIR)/mxf_primer.o
 
 $(MXF_DIR)/mxf_header_metadata.o: $(MXF_DIR)/mxf_header_metadata.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_header_metadata.c -o $(MXF_DIR)/mxf_header_metadata.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_header_metadata.c -o $(MXF_DIR)/mxf_header_metadata.o
 
 $(MXF_DIR)/mxf_data_model.o: $(MXF_DIR)/mxf_data_model.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_data_model.c -o $(MXF_DIR)/mxf_data_model.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_data_model.c -o $(MXF_DIR)/mxf_data_model.o
 
 $(MXF_DIR)/mxf_labels_and_keys.o: $(MXF_DIR)/mxf_labels_and_keys.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_labels_and_keys.c -o $(MXF_DIR)/mxf_labels_and_keys.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_labels_and_keys.c -o $(MXF_DIR)/mxf_labels_and_keys.o
 
 $(MXF_DIR)/mxf_utils.o: $(MXF_DIR)/mxf_utils.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_utils.c -o $(MXF_DIR)/mxf_utils.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_utils.c -o $(MXF_DIR)/mxf_utils.o
 
 $(MXF_DIR)/mxf_list.o: $(MXF_DIR)/mxf_list.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_list.c -o $(MXF_DIR)/mxf_list.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_list.c -o $(MXF_DIR)/mxf_list.o
 
 $(MXF_DIR)/mxf_file.o: $(MXF_DIR)/mxf_file.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_file.c -o $(MXF_DIR)/mxf_file.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_file.c -o $(MXF_DIR)/mxf_file.o
 
 $(MXF_DIR)/mxf_logging.o: $(MXF_DIR)/mxf_logging.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_logging.c -o $(MXF_DIR)/mxf_logging.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_logging.c -o $(MXF_DIR)/mxf_logging.o
 
 $(MXF_DIR)/mxf_version.o: $(MXF_DIR)/mxf_version.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(MXF_DIR)/mxf_version.c -o $(MXF_DIR)/mxf_version.o
+	$(CC) -c $(CFLAGS) $(MXF_DIR)/mxf_version.c -o $(MXF_DIR)/mxf_version.o
 
 
 $(PRODUCTS_DIR)/mxf_avid_dictionary.o: $(PRODUCTS_DIR)/mxf_avid_dictionary.c $(INCLUDE_FILES) $(PRODUCTS_DIR)/mxf_avid_dictionary_data.h
-	$(CC) -c -I$(INCLUDES_DIR) $(PRODUCTS_DIR)/mxf_avid_dictionary.c -o $(PRODUCTS_DIR)/mxf_avid_dictionary.o
+	$(CC) -c $(CFLAGS) $(PRODUCTS_DIR)/mxf_avid_dictionary.c -o $(PRODUCTS_DIR)/mxf_avid_dictionary.o
 
 $(PRODUCTS_DIR)/mxf_avid_metadictionary.o: $(PRODUCTS_DIR)/mxf_avid_metadictionary.c $(INCLUDE_FILES) $(PRODUCTS_DIR)/mxf_avid_metadictionary_data.h
-	$(CC) -c -I$(INCLUDES_DIR) $(PRODUCTS_DIR)/mxf_avid_metadictionary.c -o $(PRODUCTS_DIR)/mxf_avid_metadictionary.o
+	$(CC) -c $(CFLAGS) $(PRODUCTS_DIR)/mxf_avid_metadictionary.c -o $(PRODUCTS_DIR)/mxf_avid_metadictionary.o
 
 $(PRODUCTS_DIR)/mxf_avid.o: $(PRODUCTS_DIR)/mxf_avid.c $(INCLUDE_FILES) $(AVID_INTERNAL_INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(PRODUCTS_DIR)/mxf_avid.c -o $(PRODUCTS_DIR)/mxf_avid.o 
+	$(CC) -c $(CFLAGS) $(PRODUCTS_DIR)/mxf_avid.c -o $(PRODUCTS_DIR)/mxf_avid.o 
 
 $(PRODUCTS_DIR)/mxf_p2.o: $(PRODUCTS_DIR)/mxf_p2.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(PRODUCTS_DIR)/mxf_p2.c -o $(PRODUCTS_DIR)/mxf_p2.o 
+	$(CC) -c $(CFLAGS) $(PRODUCTS_DIR)/mxf_p2.c -o $(PRODUCTS_DIR)/mxf_p2.o 
 
 
 $(UTILS_DIR)/mxf_uu_metadata.o: $(UTILS_DIR)/mxf_uu_metadata.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(UTILS_DIR)/mxf_uu_metadata.c -o $(UTILS_DIR)/mxf_uu_metadata.o 
+	$(CC) -c $(CFLAGS) $(UTILS_DIR)/mxf_uu_metadata.c -o $(UTILS_DIR)/mxf_uu_metadata.o 
 
 $(UTILS_DIR)/mxf_page_file.o: $(UTILS_DIR)/mxf_page_file.c $(INCLUDE_FILES)
-	$(CC) -c -I$(INCLUDES_DIR) $(UTILS_DIR)/mxf_page_file.c -o $(UTILS_DIR)/mxf_page_file.o 
+	$(CC) -c $(CFLAGS) $(UTILS_DIR)/mxf_page_file.c -o $(UTILS_DIR)/mxf_page_file.o 
 
 
 

@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.17 2009/09/18 14:39:15 philipn Exp $
+ * $Id: main.c,v 1.18 2009/10/12 15:25:57 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -127,7 +127,6 @@ typedef struct
 
     /* DV input parameters */
     int isPAL;
-    mxfRational imageAspectRatio;
 
     /* used when writing MJPEG */    
     MJPEGState mjpegState;
@@ -228,14 +227,14 @@ static int get_dv_stream_info(const char* filename, Input* input)
     byte = buffer[3 * DV_DIF_BLOCK_SIZE + 2 * DV_DIF_BLOCK_SIZE + 3 + 10 * 5 + 2];
     if ((byte & 0x07) == 0x02)
     {
-        input->imageAspectRatio.numerator = 16;
-        input->imageAspectRatio.denominator = 9;
+        input->essenceInfo.imageAspectRatio.numerator = 16;
+        input->essenceInfo.imageAspectRatio.denominator = 9;
     }
     else
     {
         /* either byte & 0x07 == 0x00 or we default to 4:3 */
-        input->imageAspectRatio.numerator = 4;
-        input->imageAspectRatio.denominator = 3;
+        input->essenceInfo.imageAspectRatio.numerator = 4;
+        input->essenceInfo.imageAspectRatio.denominator = 3;
     }
     
     
@@ -1419,10 +1418,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD720p120;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1437,10 +1436,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD720p185;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1455,10 +1454,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD1080i120;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1473,10 +1472,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD1080i185;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1491,10 +1490,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD1080i185X;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1509,10 +1508,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD1080p36;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1528,10 +1527,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD1080p120;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1549,10 +1548,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD1080p185;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1570,10 +1569,10 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
                 return 1;
             }
-            imageAspectRatio.numerator = 16;
-            imageAspectRatio.denominator = 9;
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].essenceType = DNxHD1080p185X;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
@@ -1922,21 +1921,21 @@ int main(int argc, const char* argv[])
         videoSampleRate.denominator = 1001;
     }
 
-    /* set the imageAspectRatio */
-    if (imageAspectRatio.numerator == 0 || imageAspectRatio.denominator == 0)
+    /* set the image aspect ratio */
+    for (i = 0; i < inputIndex; i++)
     {
-        for (i = 0; i < inputIndex; i++)
+        if (inputs[i].isVideo && inputs[i].essenceInfo.imageAspectRatio.numerator == 0)
         {
-            if (inputs[i].isDV)
+            if (imageAspectRatio.numerator == 0)
             {
-                imageAspectRatio = inputs[i].imageAspectRatio;
-                break;
+                /* default to 4:3 */
+                imageAspectRatio.numerator = 4;
+                imageAspectRatio.denominator = 3;
             }
-        }
-        if (imageAspectRatio.numerator == 0 || imageAspectRatio.denominator == 0)
-        {
-            imageAspectRatio.numerator = 4;
-            imageAspectRatio.denominator = 3;
+            else
+            {
+                inputs[i].essenceInfo.imageAspectRatio = imageAspectRatio;
+            }
         }
     }
 
@@ -2293,8 +2292,8 @@ int main(int argc, const char* argv[])
     
     /* create the clip writer */
     
-    if (!create_clip_writer(projectName, isPAL ? PAL_25i : NTSC_30i,
-        imageAspectRatio, videoSampleRate, 0, useLegacy, packageDefinitions, &clipWriter))
+    if (!create_clip_writer(projectName, isPAL ? PAL_25i : NTSC_30i, videoSampleRate, 0, useLegacy, packageDefinitions,
+        &clipWriter))
     {
         fprintf(stderr, "Failed to create Avid MXF clip writer\n");
         goto fail;

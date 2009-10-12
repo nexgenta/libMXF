@@ -65,6 +65,7 @@ int test_read(const char* filename)
         deltaEntry = deltaEntry->next;
     }
 
+    mxf_free_index_table_segment(&indexSegment);
     
     /* read index table segment */
      
@@ -159,7 +160,7 @@ int test_create_and_write(const char* filename)
     indexSegment->bodySID = 2;
     for (i = 0; i < 4; i++)
     {
-        CHK_OFAIL(mxf_add_delta_entry(indexSegment, i, i, i));
+        CHK_OFAIL(mxf_default_add_delta_entry(NULL, 0, indexSegment, i, i, i));
     }
     CHK_OFAIL(mxf_write_index_table_segment(mxfFile, indexSegment));
     
@@ -167,6 +168,8 @@ int test_create_and_write(const char* filename)
 
     CHK_OFAIL(mxf_mark_index_end(mxfFile, headerPartition));
 
+    mxf_free_index_table_segment(&indexSegment);
+    
     
     /* write index table segment */  
     CHK_OFAIL(mxf_mark_index_start(mxfFile, headerPartition));
@@ -191,7 +194,8 @@ int test_create_and_write(const char* filename)
             posTable[k].numerator = i;
             posTable[k].denominator = i + 1;
         }
-        CHK_OFAIL(mxf_add_index_entry(indexSegment, i, i, i, i, sliceOffset, posTable));
+        CHK_OFAIL(mxf_default_add_index_entry(NULL, 0, indexSegment, i, i, i, i,
+            sliceOffset, posTable));
     }
     CHK_OFAIL(mxf_write_index_table_segment(mxfFile, indexSegment));
     
