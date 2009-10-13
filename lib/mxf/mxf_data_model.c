@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.c,v 1.4 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_data_model.c,v 1.5 2009/10/13 09:21:52 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -220,6 +220,36 @@ fail:
     return 0;
 }
 
+
+#define MXF_BASIC_TYPE_DEF(id, name, size) \
+    CHK_ORET(mxf_register_basic_type(dataModel, name, id, size));    
+
+#define MXF_ARRAY_TYPE_DEF(id, name, elementTypeId, fixedSize) \
+    CHK_ORET(mxf_register_array_type(dataModel, name, id, elementTypeId, fixedSize));    
+
+#define MXF_COMPOUND_TYPE_DEF(id, name) \
+    CHK_ORET(itemType = mxf_register_compound_type(dataModel, name, id));    
+
+#define MXF_COMPOUND_TYPE_MEMBER(name, typeId) \
+    CHK_ORET(mxf_register_compound_type_member(itemType, name, typeId));    
+
+#define MXF_INTERPRETED_TYPE_DEF(id, name, typeId, fixedSize) \
+    CHK_ORET(mxf_register_interpret_type(dataModel, name, id, typeId, fixedSize));    
+
+    
+#define MXF_SET_DEFINITION(parentName, name, label) \
+    CHK_ORET(mxf_register_set_def(dataModel, #name, &MXF_SET_K(parentName), &MXF_SET_K(name)));
+    
+#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
+    CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
+    
+
+int mxf_load_extensions_data_model(MXFDataModel* dataModel)
+{
+#include <mxf/mxf_extensions_data_model.h>
+
+    return 1;
+}
 
 void mxf_free_data_model(MXFDataModel** dataModel)
 {

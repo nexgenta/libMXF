@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_p2.c,v 1.3 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_p2.c,v 1.4 2009/10/13 09:21:53 philipn Exp $
  *
  * P2 data model extensions
  *
@@ -39,6 +39,8 @@
     
 int mxf_p2_load_extensions(MXFDataModel* dataModel)
 {
+    (void)dataModel;
+
 #include <mxf/mxf_p2_extensions_data_model.h>
 
     return 1;

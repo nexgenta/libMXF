@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_p2_extensions_data_model.h,v 1.3 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_p2_extensions_data_model.h,v 1.4 2009/10/13 09:21:52 philipn Exp $
  *
  * P2 data model extension definitions
  *
@@ -51,11 +51,6 @@
 #define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired)
 #endif
 
-
-
-MXF_SET_DEFINITION(StructuralComponent, Filler, 
-    MXF_LABEL(0x06,0x0e,0x2b,0x34,0x02,0x53,0x01,0x01,0x0d,0x01,0x01,0x01,0x01,0x01,0x09,0x00)
-);
 
 
 

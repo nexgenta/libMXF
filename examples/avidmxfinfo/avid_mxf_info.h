@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.h,v 1.2 2008/10/10 16:50:49 john_f Exp $
+ * $Id: avid_mxf_info.h,v 1.3 2009/10/13 09:21:51 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -103,7 +103,9 @@ typedef struct
     uint32_t trackNumber;
     int isVideo;
     mxfRational editRate;
-    int64_t duration;
+    int64_t trackDuration;
+    int64_t segmentDuration;
+    int64_t segmentOffset;
     int64_t startTimecode;
 
     /* file essence info */

@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.7 2009/09/18 14:36:48 philipn Exp $
+ * $Id: avid_mxf_info.c,v 1.8 2009/10/13 09:21:51 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -361,6 +361,8 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     mxfKey key;
     uint8_t llen;
     uint64_t len;
+    uint32_t sequenceComponentCount;
+    uint8_t* arrayElement;
     MXFList* list = NULL;
     MXFListIterator listIter;
     MXFListIterator namesIter;
@@ -379,10 +381,10 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     MXFMetadataSet* materialPackageTrackSet = NULL;
     MXFMetadataSet* trackSet = NULL;
     MXFMetadataSet* sourceClipSet = NULL;
+    MXFMetadataSet* sequenceSet = NULL;
     MXFMetadataSet* timecodeComponentSet = NULL;
     MXFMetadataSet* refSourcePackageSet = NULL;
     mxfUMID packageUID;
-    uint32_t trackID;
     MXFList* taggedValueNames = NULL;
     MXFList* taggedValueValues = NULL;
     const mxfUTF16Char* taggedValue;
@@ -397,7 +399,9 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     uint16_t roundedTimecodeBase;
     int haveStartTimecode;
     mxfRational editRate;
-    int64_t duration;
+    int64_t trackDuration;
+    int64_t segmentDuration;
+    int64_t segmentOffset;
     mxfRational maxEditRate = {25, 1};
     int64_t maxDuration = 0;
     int32_t avidResolutionID = 0x00;
@@ -436,7 +440,9 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     /* read the header metadata (filter out meta-dictionary and dictionary except data defs) */
     
     DCHECK(mxf_load_data_model(&dataModel));
+    DCHECK(mxf_load_extensions_data_model(dataModel));
     DCHECK(mxf_avid_load_extensions(dataModel));
+    
     DCHECK(mxf_finalise_data_model(dataModel));
     
     DCHECK(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
@@ -624,82 +630,122 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     DCHECK(mxf_uu_get_package_tracks(materialPackageSet, &arrayIter));
     while (mxf_uu_next_track(headerMetadata, &arrayIter, &materialPackageTrackSet))
     {
-        if (mxf_uu_get_track_reference(materialPackageTrackSet, &packageUID, &trackID))
+        DCHECK(mxf_uu_get_track_datadef(materialPackageTrackSet, &dataDef));
+        
+        /* some Avid files have a weak reference to a DataDefinition instead of a UL */ 
+        if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef) && !mxf_is_timecode(&dataDef))
         {
-            DCHECK(mxf_uu_get_track_datadef(materialPackageTrackSet, &dataDef));
-            
-            /* some Avid files have a weak reference to a DataDefinition instead of a UL */ 
-            if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef) && !mxf_is_timecode(&dataDef))
-            {
-                if (!mxf_avid_get_data_def(headerMetadata, (mxfUUID*)&dataDef, &dataDef))
-                {
-                    continue;
-                }
-            }
-            
-            /* skip non-video and audio tracks */
-            if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef))
+            if (!mxf_avid_get_data_def(headerMetadata, (mxfUUID*)&dataDef, &dataDef))
             {
                 continue;
             }
-            
-            /* track counts */
+        }
+        
+        /* skip non-video and audio tracks */
+        if (!mxf_is_picture(&dataDef) && !mxf_is_sound(&dataDef))
+        {
+            continue;
+        }
+        
+        /* track counts */
+        if (mxf_is_picture(&dataDef))
+        {
+            info->numVideoTracks++;
+        }
+        else
+        {
+            info->numAudioTracks++;
+        }
+        
+        /* track number */
+        if (mxf_have_item(materialPackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber)))
+        {
+            DCHECK(mxf_get_uint32_item(materialPackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), &trackNumber));
             if (mxf_is_picture(&dataDef))
             {
-                info->numVideoTracks++;
+                insert_track_number(videoTrackNumberRanges, trackNumber, &numVideoTrackNumberRanges);
             }
             else
             {
-                info->numAudioTracks++;
-            }
-            
-            /* track number */
-            if (mxf_have_item(materialPackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber)))
-            {
-                DCHECK(mxf_get_uint32_item(materialPackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), &trackNumber));
-                if (mxf_is_picture(&dataDef))
-                {
-                    insert_track_number(videoTrackNumberRanges, trackNumber, &numVideoTrackNumberRanges);
-                }
-                else
-                {
-                    insert_track_number(audioTrackNumberRanges, trackNumber, &numAudioTrackNumberRanges);
-                }
-            }
-            else
-            {
-                trackNumber = 0;
-            }
-            
-            /* edit rate */
-            DCHECK(mxf_get_rational_item(materialPackageTrackSet, &MXF_ITEM_K(Track, EditRate), &editRate));
-            
-            /* duration */
-            DCHECK(mxf_uu_get_track_duration(materialPackageTrackSet, &duration));
-
-            /* get max duration for the clip duration */            
-            if (compare_length(&maxEditRate, maxDuration, &editRate, duration) <= 0)
-            {
-                maxEditRate = editRate;
-                maxDuration = duration;
-            }
-
-            /* assume the project edit rate equals the video edit rate if not set */
-            if (memcmp(&info->projectEditRate, &g_Null_Rational, sizeof(g_Null_Rational)) == 0 && mxf_is_picture(&dataDef))
-            {
-                info->projectEditRate = editRate;
-            }
-
-            /* track referencing file source package */
-            if (mxf_equals_umid(&info->fileSourcePackageUID, &packageUID))
-            {
-                info->isVideo = mxf_is_picture(&dataDef);
-                info->editRate = editRate;
-                info->duration = duration;
-                info->trackNumber = trackNumber;
+                insert_track_number(audioTrackNumberRanges, trackNumber, &numAudioTrackNumberRanges);
             }
         }
+        else
+        {
+            trackNumber = 0;
+        }
+        
+        /* edit rate */
+        DCHECK(mxf_get_rational_item(materialPackageTrackSet, &MXF_ITEM_K(Track, EditRate), &editRate));
+        
+        /* track duration */
+        DCHECK(mxf_uu_get_track_duration(materialPackageTrackSet, &trackDuration));
+    
+        /* get max duration for the clip duration */            
+        if (compare_length(&maxEditRate, maxDuration, &editRate, trackDuration) <= 0)
+        {
+            maxEditRate = editRate;
+            maxDuration = trackDuration;
+        }
+    
+        /* assume the project edit rate equals the video edit rate if not set */
+        if (memcmp(&info->projectEditRate, &g_Null_Rational, sizeof(g_Null_Rational)) == 0 &&
+            mxf_is_picture(&dataDef))
+        {
+            info->projectEditRate = editRate;
+        }
+    
+        /* get the file source package if this track references it through a child source clip */
+        packageUID = g_Null_UMID;
+        segmentOffset = 0;
+        CHK_ORET(mxf_get_strongref_item(materialPackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+        if (!mxf_is_subclass_of(sequenceSet->headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(SourceClip)))
+        {
+            /* iterate through sequence components */
+            CHK_ORET(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &sequenceComponentCount));
+            for (i = 0; i < (int)sequenceComponentCount; i++)
+            {
+                CHK_ORET(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), i, &arrayElement));
+                if (!mxf_get_strongref(sequenceSet->headerMetadata, arrayElement, &sourceClipSet))
+                {
+                    /* dark set not registered in the dictionary */
+                    continue;
+                }
+
+                CHK_ORET(mxf_get_length_item(sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), &segmentDuration));
+                
+                if (mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(SourceClip)))
+                {
+                    CHK_ORET(mxf_get_umid_item(sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &packageUID));
+                    if (mxf_equals_umid(&info->fileSourcePackageUID, &packageUID))
+                    {
+                        break;
+                    }
+                }
+                
+                segmentOffset += segmentDuration;
+            }
+        }
+        else
+        {
+            /* track sequence is a source clip */
+            sourceClipSet = sequenceSet;
+            CHK_ORET(mxf_get_umid_item(sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &packageUID));
+            CHK_ORET(mxf_get_length_item(sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), &segmentDuration));
+            segmentOffset = 0;
+        }
+
+        if (mxf_equals_umid(&info->fileSourcePackageUID, &packageUID))
+        {
+            info->isVideo = mxf_is_picture(&dataDef);
+            info->editRate = editRate;
+            info->trackDuration = trackDuration;
+            info->trackNumber = trackNumber;
+            info->segmentDuration = segmentDuration;
+            info->segmentOffset = segmentOffset;
+        }
     }
+
     
     info->clipDuration = convert_length(&info->projectEditRate, &maxEditRate, maxDuration);
 
@@ -1141,8 +1187,14 @@ void ami_print_info(AvidMXFInfo* info)
     printf("\n");
     printf("Track number = %d\n", info->trackNumber);
     printf("Edit rate = %d/%d\n", info->editRate.numerator, info->editRate.denominator);
-    printf("Duration = %"PFi64" samples (", info->duration);
-    print_timecode(convert_length(&info->projectEditRate, &info->editRate, info->duration), &info->projectEditRate);
+    printf("Track duration = %"PFi64" samples (", info->trackDuration);
+    print_timecode(convert_length(&info->projectEditRate, &info->editRate, info->trackDuration), &info->projectEditRate);
+    printf(")\n");
+    printf("Track segment duration = %"PFi64" samples (", info->segmentDuration);
+    print_timecode(convert_length(&info->projectEditRate, &info->editRate, info->segmentDuration), &info->projectEditRate);
+    printf(")\n");
+    printf("Track segment offset = %"PFi64" samples (", info->segmentOffset);
+    print_timecode(convert_length(&info->projectEditRate, &info->editRate, info->segmentOffset), &info->projectEditRate);
     printf(")\n");
     printf("Start timecode = %"PFi64" samples (", info->startTimecode);
     print_timecode(convert_length(&info->projectEditRate, &info->editRate, info->startTimecode), &info->projectEditRate);
