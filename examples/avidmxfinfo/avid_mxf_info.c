@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.8 2009/10/13 09:21:51 philipn Exp $
+ * $Id: avid_mxf_info.c,v 1.9 2009/10/21 10:10:30 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -232,8 +232,9 @@ static const char* essence_type_string(AvidEssenceType essenceType)
         "not recognized", 
         "MPEG 30", "MPEG 40", "MPEG 50", 
         "DV 25 411", "DV 25 420", "DV 50", "DV 100",
-        "20:1", "15:1s", "10:1", "10:1m", "4:1m", "3:1", "2:1",
-        "1:1",
+        "20:1", "2:1s", "4:1s", "15:1s", "10:1", "10:1m", "4:1m", "3:1", "2:1",
+        "1:1", "1:1 NTSC", "1:1 10b NTSC",
+        "35:1p", "28:1p", "14:1p", "3:1p", "2:1p", "3:1m", "8:1m",
         "DNxHD 185", "DNxHD 120", "DNxHD 36",
         "PCM"
     };
@@ -1023,11 +1024,44 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
                 case 0x6e:
                     info->essenceType = MJPEG_10_1_M_ESSENCE_TYPE;
                     break;
+                case 0x50:
+                    info->essenceType = MJPEG_2_1_S_ESSENCE_TYPE;
+                    break;
+                case 0x4f:
+                    info->essenceType = MJPEG_4_1_S_ESSENCE_TYPE;
+                    break;
                 case 0x4e:
                     info->essenceType = MJPEG_15_1_S_ESSENCE_TYPE;
                     break;
                 case 0x52:
                     info->essenceType = MJPEG_20_1_ESSENCE_TYPE;
+                    break;
+                case 0xaa:
+                    info->essenceType = MJPEG_1_1_8b_ESSENCE_TYPE;
+                    break;
+                case 0x7e5:
+                    info->essenceType = MJPEG_1_1_10b_ESSENCE_TYPE;
+                    break;
+                case 0x66:
+                    info->essenceType = MJPEG_35_1_P_ESSENCE_TYPE;
+                    break;
+                case 0x68:
+                    info->essenceType = MJPEG_28_1_P_ESSENCE_TYPE;
+                    break;
+                case 0x67:
+                    info->essenceType = MJPEG_14_1_P_ESSENCE_TYPE;
+                    break;
+                case 0x61:
+                    info->essenceType = MJPEG_3_1_P_ESSENCE_TYPE;
+                    break;
+                case 0x62:
+                    info->essenceType = MJPEG_2_1_P_ESSENCE_TYPE;
+                    break;
+                case 0x71:
+                    info->essenceType = MJPEG_3_1_M_ESSENCE_TYPE;
+                    break;
+                case 0x70:
+                    info->essenceType = MJPEG_8_1_M_ESSENCE_TYPE;
                     break;
                 default:
                     info->essenceType = UNKNOWN_ESSENCE_TYPE;
@@ -1041,30 +1075,79 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
             {
                 info->essenceType = MJPEG_2_1_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31_PAL)) ||
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31_PAL)) ||
                 mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31_NTSC)))
             {
                 info->essenceType = MJPEG_3_1_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101_PAL)) ||
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101_PAL)) ||
                 mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101_NTSC)))
             {
                 info->essenceType = MJPEG_10_1_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101m_PAL)) ||
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101m_PAL)) ||
                 mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG101m_NTSC)))
             {
                 info->essenceType = MJPEG_10_1_M_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG151s_PAL)) ||
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG21s_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG21s_NTSC)))
+            {
+                info->essenceType = MJPEG_2_1_S_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG41s_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG41s_NTSC)))
+            {
+                info->essenceType = MJPEG_4_1_S_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG151s_PAL)) ||
                 mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG151s_NTSC)))
             {
                 info->essenceType = MJPEG_15_1_S_ESSENCE_TYPE;
             }
-            if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG201_PAL)) ||
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG201_PAL)) ||
                 mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG201_NTSC)))
             {
                 info->essenceType = MJPEG_20_1_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG1110B_NTSC)))
+            {
+                info->essenceType = MJPEG_1_1_10b_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG351p_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG351p_NTSC)))
+            {
+                info->essenceType = MJPEG_35_1_P_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG281p_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG281p_NTSC)))
+            {
+                info->essenceType = MJPEG_28_1_P_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG141p_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG141p_NTSC)))
+            {
+                info->essenceType = MJPEG_14_1_P_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31p_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31p_NTSC)))
+            {
+                info->essenceType = MJPEG_3_1_P_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG21p_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG21p_NTSC)))
+            {
+                info->essenceType = MJPEG_2_1_P_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31m_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG31m_NTSC)))
+            {
+                info->essenceType = MJPEG_3_1_M_ESSENCE_TYPE;
+            }
+            else if (mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG81m_PAL)) ||
+                mxf_equals_ul(&pictureEssenceCoding, &MXF_CMDEF_L(AvidMJPEG81m_NTSC)))
+            {
+                info->essenceType = MJPEG_8_1_M_ESSENCE_TYPE;
             }
             else
             {
