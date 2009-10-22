@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.7 2009/10/12 15:25:57 philipn Exp $
+ * $Id: mxf_avid.c,v 1.8 2009/10/22 14:24:53 john_f Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -374,7 +374,7 @@ static int get_indirect_string(MXFMetadataSet* set, const mxfKey* itemKey, mxfUT
     memset(newValue, 0, sizeof(mxfUTF16Char) * (strSize + 1));
 
     itemValuePtr = &item->value[sizeof(prefix_BE)];
-    for (i = 0; i < strSize - 1; i++)
+    for (i = 0; i < strSize; i++)
     {
         if (isBigEndian)
         {
