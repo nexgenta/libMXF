@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_container.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_essence_container.c,v 1.3 2009/10/22 14:22:34 john_f Exp $
  *
  * MXF file body essence container functions
  *
@@ -112,7 +112,7 @@ fail:
 }
 
 int mxf_write_essence_element_data(MXFFile* mxfFile, MXFEssenceElement* essenceElement,
-    uint8_t* data, uint32_t len)
+    const uint8_t* data, uint32_t len)
 {
     uint64_t numWritten = mxf_file_write(mxfFile, data, len);
     essenceElement->totalLen += numWritten;

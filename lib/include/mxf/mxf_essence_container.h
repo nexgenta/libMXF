@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_container.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_essence_container.h,v 1.3 2009/10/22 14:22:34 john_f Exp $
  *
  * MXF file body essence container functions
  *
@@ -45,7 +45,7 @@ int mxf_is_gc_essence_element(const mxfKey* key);
 int mxf_open_essence_element_write(MXFFile* mxfFile, const mxfKey* key, uint8_t llen, 
     uint64_t len, MXFEssenceElement** essenceElement);
 int mxf_write_essence_element_data(MXFFile* mxfFile, MXFEssenceElement* essenceElement,
-    uint8_t* data, uint32_t len);
+    const uint8_t* data, uint32_t len);
 int mxf_finalize_essence_element_write(MXFFile* mxfFile, MXFEssenceElement* essenceElement);
 
 int mxf_open_essence_element_read(MXFFile* mxfFile, const mxfKey* key, uint8_t llen, uint64_t len, 
