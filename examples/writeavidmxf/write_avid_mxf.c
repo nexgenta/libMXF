@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.18 2009/10/12 15:25:57 philipn Exp $
+ * $Id: write_avid_mxf.c,v 1.19 2009/10/22 14:17:51 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -1107,7 +1107,11 @@ static int complete_track(AvidClipWriter* clipWriter, TrackWriter* writer, Packa
     for (i = 0; i < writer->numDurationItems; i++)
     {
         TrackWriter* trackWriter;
-        CHK_ORET(get_track_writer(clipWriter, writer->durationItems[i].materialTrackID, &trackWriter));
+        if (!get_track_writer(clipWriter, writer->durationItems[i].materialTrackID, &trackWriter))
+        {
+            /* the material package track doesn't have a corresponding track writer */
+            continue;
+        }
         
         if (memcmp(&writer->durationItems[i].editRate, &trackWriter->sampleRate, sizeof(mxfRational)) == 0)
         {
@@ -2224,7 +2228,7 @@ fail:
 }
     
 int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t numSamples,
-    uint8_t* data, uint32_t size)
+    const uint8_t* data, uint32_t size)
 {
     TrackWriter* writer;
     CHK_ORET(get_track_writer(clipWriter, materialTrackID, &writer));
@@ -2266,29 +2270,54 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
             CHK_ORET(numSamples == 1);
             if (clipWriter->projectFormat == PAL_25i)
             {
-                CHK_ORET((size + g_uncPALStartOffsetSize + g_uncPALVBISize) == numSamples * writer->editUnitByteCount);
-                /* write start offset for alignment */
-                CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, g_uncPALStartOffsetSize));
-                /* write VBI */
-                CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->vbiData, g_uncPALVBISize));
+                if (size != numSamples * writer->editUnitByteCount)
+                {
+                    if (size + g_uncPALStartOffsetSize == numSamples * writer->editUnitByteCount)
+                    {
+                        /* sample includes VBI - write start offset for alignment */
+                        CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, g_uncPALStartOffsetSize));
+                    }
+                    else
+                    {
+                        CHK_ORET((size + g_uncPALStartOffsetSize + g_uncPALVBISize) == numSamples * writer->editUnitByteCount);
+                        /* write start offset for alignment */
+                        CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, g_uncPALStartOffsetSize));
+                        /* write VBI */
+                        CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->vbiData, g_uncPALVBISize));
+                    }
+                }
             }
             else
             {
-                CHK_ORET((size + g_uncNTSCStartOffsetSize + g_uncNTSCVBISize) == numSamples * writer->editUnitByteCount);
-                /* write start offset for alignment */
-                CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, g_uncNTSCStartOffsetSize));
-                /* write VBI */
-                CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->vbiData, g_uncNTSCVBISize));
+                if (size != numSamples * writer->editUnitByteCount)
+                {
+                    if (size + g_uncNTSCStartOffsetSize == numSamples * writer->editUnitByteCount)
+                    {
+                        /* sample includes VBI - write start offset for alignment */
+                        CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, g_uncNTSCStartOffsetSize));
+                    }
+                    else
+                    {
+                        CHK_ORET((size + g_uncNTSCStartOffsetSize + g_uncNTSCVBISize) == numSamples * writer->editUnitByteCount);
+                        /* write start offset for alignment */
+                        CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, g_uncNTSCStartOffsetSize));
+                        /* write VBI */
+                        CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->vbiData, g_uncNTSCVBISize));
+                    }
+                }
             }
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
             writer->duration += numSamples;
             break;
         case Unc1080iUYVY:
             CHK_ORET(numSamples == 1);
-            CHK_ORET((size + g_unc1080i50StartOffsetSize) == numSamples * writer->editUnitByteCount);
-            /* write start offset for alignment */
-            CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, 
-                g_unc1080i50StartOffsetSize));
+            if (size != numSamples * writer->editUnitByteCount)
+            {
+                CHK_ORET((size + g_unc1080i50StartOffsetSize) == numSamples * writer->editUnitByteCount);
+                /* write start offset for alignment */
+                CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, 
+                    g_unc1080i50StartOffsetSize));
+            }
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
             writer->duration += numSamples;
             break;
@@ -2310,7 +2339,7 @@ int start_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID)
     return 1;
 }
 
-int write_sample_data(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint8_t* data, uint32_t size)
+int write_sample_data(AvidClipWriter* clipWriter, uint32_t materialTrackID, const uint8_t* data, uint32_t size)
 {
     TrackWriter* writer;
     CHK_ORET(get_track_writer(clipWriter, materialTrackID, &writer));

@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.h,v 1.5 2009/10/12 15:25:57 philipn Exp $
+ * $Id: write_avid_mxf.h,v 1.6 2009/10/22 14:17:51 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -58,11 +58,11 @@ int create_clip_writer(const char* projectName, ProjectFormat projectFormat,
     Note: numSamples must equal 1 for uncompressed video
 */
 int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t numSamples,
-    uint8_t* data, uint32_t size);     
+    const uint8_t* data, uint32_t size);     
 
 /* same as write_samples, but data is written in multiple calls */
 int start_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID);     
-int write_sample_data(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint8_t* data, uint32_t size);     
+int write_sample_data(AvidClipWriter* clipWriter, uint32_t materialTrackID, const uint8_t* data, uint32_t size);     
 int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t numSamples);     
 
 
