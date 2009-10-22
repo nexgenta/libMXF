@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.9 2009/03/25 13:49:01 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.10 2009/10/22 14:19:51 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -436,8 +436,8 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         }
         else
         {
-            essenceTrack->frameSize = (uint32_t)(2 * fieldWidth * fieldHeight * 
-                (1.0 / track->video.horizSubsampling + 2 * 1.0 / track->video.vertSubsampling));
+            essenceTrack->frameSize = (uint32_t)(fieldWidth * fieldHeight * 
+                (1 + 2.0 / (track->video.horizSubsampling * track->video.vertSubsampling)) + 0.5);
         }
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped)))
@@ -509,8 +509,8 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         }
         else
         {
-            essenceTrack->frameSize = (uint32_t)(2 * fieldWidth * fieldHeight * 
-                (1.0 / track->video.horizSubsampling + 2 * 1.0 / track->video.vertSubsampling));
+            essenceTrack->frameSize = (uint32_t)(fieldWidth * fieldHeight * 
+                (1 + 2.0 / (track->video.horizSubsampling * track->video.vertSubsampling)) + 0.5);
         }
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(AvidMJPEGClipWrapped)))
