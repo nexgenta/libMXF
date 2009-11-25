@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.18 2009/10/12 15:25:57 philipn Exp $
+ * $Id: main.c,v 1.19 2009/11/25 17:16:20 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -1932,10 +1932,8 @@ int main(int argc, const char* argv[])
                 imageAspectRatio.numerator = 4;
                 imageAspectRatio.denominator = 3;
             }
-            else
-            {
-                inputs[i].essenceInfo.imageAspectRatio = imageAspectRatio;
-            }
+
+            inputs[i].essenceInfo.imageAspectRatio = imageAspectRatio;
         }
     }
 
