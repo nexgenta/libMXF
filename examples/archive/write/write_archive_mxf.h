@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.h,v 1.3 2008/05/07 15:22:08 philipn Exp $
+ * $Id: write_archive_mxf.h,v 1.4 2009/12/17 16:19:00 john_f Exp $
  *
  * 
  *
@@ -40,12 +40,14 @@ extern "C"
 typedef struct _ArchiveMXFWriter ArchiveMXFWriter;
 
 
-/* create a new D3 MXF file and prepare for writing the essence */
-int prepare_archive_mxf_file(const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
+/* create a new Archive MXF file and prepare for writing the essence */
+int prepare_archive_mxf_file(const char* filename, int componentDepth8Bit, const mxfRational* aspectRatio,
+    int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
 
-/* use the D3 MXF file (the filename is only used as metadata) and prepare for writing the essence */
+/* use the Archive MXF file (the filename is only used as metadata) and prepare for writing the essence */
 /* note: if this function returns 0 then check whether *mxfFile is not NULL and needs to be closed */
-int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
+int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int componentDepth8Bit,
+    const mxfRational* aspectRatio, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
 
     
 /* write the essence, in order, starting with the timecode, followed by video and then 0 or more audio */
@@ -57,7 +59,7 @@ int write_audio_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size);
 int abort_archive_mxf_file(ArchiveMXFWriter** output);
 
 /* write the header metadata, do misc. fixups, close the file and free output */
-int complete_archive_mxf_file(ArchiveMXFWriter** output, InfaxData* d3InfaxData,
+int complete_archive_mxf_file(ArchiveMXFWriter** output, InfaxData* sourceInfaxData,
     const PSEFailure* pseFailures, long numPSEFailures,
     const VTRError* vtrErrors, long numVTRErrors);
 
@@ -71,13 +73,13 @@ mxfUMID get_tape_package_uid(ArchiveMXFWriter* writer);
 /* update the file source package in the header metadata with the infax data */
 int update_archive_mxf_file(const char* filePath, const char* newFilename, InfaxData* ltoInfaxData);
 
-/* use the D3 MXF file, update the file source package in the header metadata with the infax data */
+/* use the Archive MXF file, update the file source package in the header metadata with the infax data */
 /* note: if this function returns 0 then check whether *mxfFile is not NULL and needs to be closed */
 int update_archive_mxf_file_2(MXFFile** mxfFile, const char* newFilename, InfaxData* ltoInfaxData);
 
 
 /* returns the content package (system, video + x audio elements) size */
-int64_t get_archive_mxf_content_package_size(int numAudioTracks);
+int64_t get_archive_mxf_content_package_size(int componentDepth8Bit, int numAudioTracks);
 
 
 int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, int beStrict);

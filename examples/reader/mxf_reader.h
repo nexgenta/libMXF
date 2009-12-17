@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.h,v 1.2 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: mxf_reader.h,v 1.3 2009/12/17 16:19:24 john_f Exp $
  *
  * Main functions for reading MXF files
  *
@@ -94,6 +94,7 @@ typedef struct _MXFTrack
     struct _MXFTrack* next;
     
     mxfUL essenceContainerLabel;
+    mxfUL codecLabel;
     
     uint32_t materialTrackID;
     uint32_t materialTrackNumber;

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.10 2009/10/22 14:19:51 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.11 2009/12/17 16:19:24 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -114,6 +114,11 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), &track->video.componentDepth));
     CHK_ORET(track->video.componentDepth != 0);
 
+    if (mxf_have_item(descriptorSet, &MXF_ITEM_K(FileDescriptor, Codec)))
+    {
+        CHK_ORET(mxf_get_ul_item(descriptorSet, &MXF_ITEM_K(FileDescriptor, Codec), &track->codecLabel));
+    }
+    
     if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(IECDV_25_525_60_ClipWrapped)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(IECDV_25_525_60_FrameWrapped)))
     {
@@ -363,10 +368,6 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)) ||
         mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped)))
     {
-        /* only 8-bit supported */
-        CHK_ORET(track->video.componentDepth == 8);
-
-
         CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, StoredHeight), &fieldHeight));
         if (fieldHeight == 0) /* best effort distinguished value */
         {
@@ -424,6 +425,9 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         /* check for Avid uncompressed data */
         if (mxf_have_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ResolutionID)))
         {
+            /* Only support 8-bit */
+            CHK_ORET(track->video.componentDepth == 8);
+            
             CHK_ORET(mxf_get_int32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ResolutionID), &avidResolutionID));
             if (avidResolutionID == 0xaa) /* Avid 8-bit uncompressed UYVY */
             {
@@ -436,8 +440,20 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         }
         else
         {
-            essenceTrack->frameSize = (uint32_t)(fieldWidth * fieldHeight * 
-                (1 + 2.0 / (track->video.horizSubsampling * track->video.vertSubsampling)) + 0.5);
+            if (track->video.componentDepth == 8)
+            {
+                essenceTrack->frameSize = (uint32_t)(fieldWidth * fieldHeight * 
+                    (1 + 2.0 / (track->video.horizSubsampling * track->video.vertSubsampling)) + 0.5);
+            }
+            else
+            {
+                /* Only support 10-bit UYVY 4:2:2 */
+                CHK_ORET(mxf_equals_ul(&track->codecLabel, &MXF_CMDEF_L(UNC_10B_422_INTERLEAVED)));
+                /* SMPTE 377M-2009 states in G.2.25 that "Stored width shall be a multiple of 6" */
+                CHK_ORET((fieldWidth / 6) * 6 == fieldWidth);
+                
+                essenceTrack->frameSize = (uint32_t)(fieldWidth / 6 * 16 * fieldHeight);
+            }
         }
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped)))

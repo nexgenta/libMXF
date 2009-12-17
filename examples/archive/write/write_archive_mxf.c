@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.7 2009/10/12 15:25:56 philipn Exp $
+ * $Id: write_archive_mxf.c,v 1.8 2009/12/17 16:19:00 john_f Exp $
  *
  * 
  *
@@ -85,6 +85,7 @@ struct _ArchiveMXFWriter
 {
     int numAudioTracks;
     int beStrict;
+    uint32_t videoFrameSize;
     
     MXFFile* mxfFile;
     
@@ -159,7 +160,7 @@ static const mxfUUID g_mxfIdentProductUID =
     {0x9e, 0x26, 0x08, 0xb1, 0xc9, 0xfe, 0x44, 0x48, 0x88, 0xdf, 0x26, 0x94, 0xcf, 0x77, 0x59, 0x9a};
 static const mxfUTF16Char* g_mxfIdentCompanyName = L"BBC";
 static const mxfUTF16Char* g_mxfIdentProductName = L"BBC Archive MXF Writer";
-static const mxfUTF16Char* g_mxfIdentVersionString = L"Version Feb 2008";
+static const mxfUTF16Char* g_mxfIdentVersionString = L"Version Dec 2009";
 
 
 static const mxfUL MXF_DM_L(D3P_D3PreservationDescriptiveScheme) = 
@@ -186,18 +187,18 @@ static const uint8_t g_videoFrameLayout = 0x03;
 static const uint32_t g_videoStoredHeight = 576; /* for mixed fields this is the frame height */
 static const uint32_t g_videoStoredWidth = 720;
 static const int32_t g_videoLineMap[2] = {23, 336};
-static const mxfRational g_videoAspectRatio = {4, 3};
-static const uint32_t g_videoComponentDepth = 8;
 static const uint32_t g_videoHorizontalSubSampling = 2;
 static const uint32_t g_videoVerticalSubSampling = 1;
-static const uint32_t g_videoFrameSize = 720 * 576 * 2; /* W x H x (Y + Cr/2 + Cb/2) */
+static const uint32_t g_videoFrameSize8Bit = 720 * 576 * 2;
+static const uint32_t g_videoFrameSize10Bit = (720 + 5) / 6 * 16 * 576;
 
 static const int64_t g_tapeLen = 120 * 25 * 60 * 60;
 
 static const mxfUTF16Char* g_vtrErrorsTrackName = L"D3 VTR Errors";
 static const mxfUTF16Char* g_pseFailuresTrackName = L"PSE Failures";
 
-static const mxfUTF16Char* g_D3FormatString = L"D3";
+static const char* g_LTOFormatString = "LTO";
+static const mxfUTF16Char* g_LTOFormatString_w = L"LTO";
 
 static const int g_infaxDataStringSeparator = '|';
 
@@ -244,7 +245,7 @@ static int convert_string(const char* input, mxfUTF16Char** tempString)
     return 1;
 }
 
-static void free_d3_mxf_file(ArchiveMXFWriter** output)
+static void free_archive_mxf_file(ArchiveMXFWriter** output)
 {
     if (*output == NULL)
     {
@@ -562,14 +563,16 @@ fail:
 }
 
 
-int prepare_archive_mxf_file(const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output)
+int prepare_archive_mxf_file(const char* filename, int componentDepth8Bit, const mxfRational* aspectRatio,
+    int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output)
 {
     MXFFile* mxfFile = NULL;
     int result;
     
     CHK_ORET(mxf_disk_file_open_new(filename, &mxfFile));
     
-    result = prepare_archive_mxf_file_2(&mxfFile, filename, numAudioTracks, startPosition, beStrict, output);
+    result = prepare_archive_mxf_file_2(&mxfFile, filename, componentDepth8Bit, aspectRatio, numAudioTracks,
+        startPosition, beStrict, output);
     if (!result)
     {
         if (mxfFile != NULL)
@@ -581,7 +584,8 @@ int prepare_archive_mxf_file(const char* filename, int numAudioTracks, int64_t s
     return result;
 }
 
-int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output)
+int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int componentDepth8Bit,
+    const mxfRational* aspectRatio, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output)
 {
     ArchiveMXFWriter* newOutput;
     int64_t filePos;
@@ -596,6 +600,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     uint8_t* arrayElement;
     InfaxData nullInfaxData;
     mxfLocalTag assignedTag;
+    uint32_t videoComponentDepth;
 
     CHK_ORET(numAudioTracks <= MAX_ARCHIVE_AUDIO_TRACKS);
     
@@ -619,6 +624,17 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     newOutput->numAudioTracks = numAudioTracks;
     newOutput->beStrict = beStrict;
     mxf_get_timestamp_now(&newOutput->now);
+    
+    if (componentDepth8Bit)
+    {
+        videoComponentDepth = 8;
+        newOutput->videoFrameSize = g_videoFrameSize8Bit;
+    }
+    else
+    {
+        videoComponentDepth = 10;
+        newOutput->videoFrameSize = g_videoFrameSize10Bit;
+    }
 
 
     CHK_OFAIL(mxf_create_file_partitions(&newOutput->partitions));
@@ -963,6 +979,10 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     CHK_OFAIL(mxf_add_array_item_strongref(newOutput->multipleDescriptorSet, &MXF_ITEM_K(MultipleDescriptor, SubDescriptorUIDs), newOutput->cdciDescriptorSet));
     CHK_OFAIL(mxf_set_uint32_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, LinkedTrackID), 1));
     CHK_OFAIL(mxf_set_rational_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, SampleRate), &g_videoSampleRate));
+    if (!componentDepth8Bit)
+    {
+        CHK_OFAIL(mxf_set_ul_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, Codec), &MXF_CMDEF_L(UNC_10B_422_INTERLEAVED)));
+    }
     CHK_OFAIL(mxf_set_ul_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, EssenceContainer), &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)));
     CHK_OFAIL(mxf_set_uint8_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameLayout), g_videoFrameLayout));
     CHK_OFAIL(mxf_set_uint32_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, StoredHeight), g_videoStoredHeight));
@@ -970,8 +990,8 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     CHK_OFAIL(mxf_alloc_array_item_elements(newOutput->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, VideoLineMap), 4, 2, &arrayElement));
     mxf_set_int32(g_videoLineMap[0], arrayElement);
     mxf_set_int32(g_videoLineMap[1], &arrayElement[4]);
-    CHK_OFAIL(mxf_set_rational_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, AspectRatio), &g_videoAspectRatio));
-    CHK_OFAIL(mxf_set_uint32_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), g_videoComponentDepth));
+    CHK_OFAIL(mxf_set_rational_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, AspectRatio), aspectRatio));
+    CHK_OFAIL(mxf_set_uint32_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), videoComponentDepth));
     CHK_OFAIL(mxf_set_uint32_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, HorizontalSubsampling), g_videoHorizontalSubSampling));
     CHK_OFAIL(mxf_set_uint32_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, VerticalSubsampling), g_videoVerticalSubSampling));
 
@@ -1168,7 +1188,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     newOutput->indexSegment->indexEditRate = g_videoEditRate;
     newOutput->indexSegment->indexDuration = 0; /* although valid, will be updated when writing completed */
     newOutput->indexSegment->editUnitByteCount = mxfKey_extlen + 4 + SYSTEM_ITEM_SIZE +
-        mxfKey_extlen + 4 + g_videoFrameSize +  
+        mxfKey_extlen + 4 + newOutput->videoFrameSize +  
         newOutput->numAudioTracks * (mxfKey_extlen + 4 + g_audioFrameSize);
     newOutput->indexSegment->indexSID = g_indexSID;
     newOutput->indexSegment->bodySID = g_bodySID;
@@ -1176,7 +1196,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     CHK_OFAIL(mxf_default_add_delta_entry(NULL, 0, newOutput->indexSegment, 0, 0, deltaOffset));
     deltaOffset += mxfKey_extlen + 4 + SYSTEM_ITEM_SIZE;
     CHK_OFAIL(mxf_default_add_delta_entry(NULL, 0, newOutput->indexSegment, 0, 0, deltaOffset));
-    deltaOffset += mxfKey_extlen + 4 + g_videoFrameSize;
+    deltaOffset += mxfKey_extlen + 4 + newOutput->videoFrameSize;
     for (i = 0; i < newOutput->numAudioTracks; i++)
     {
         CHK_OFAIL(mxf_default_add_delta_entry(NULL, 0, newOutput->indexSegment, 0, 0, deltaOffset));
@@ -1204,7 +1224,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int numA
     return 1;
     
 fail:
-    free_d3_mxf_file(&newOutput);
+    free_archive_mxf_file(&newOutput);
     return 0;
 }
 
@@ -1238,9 +1258,9 @@ int write_video_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size)
 {
     mxfKey eeKey = g_UncBaseElementKey;
 
-    if (size != g_videoFrameSize)
+    if (size != output->videoFrameSize)
     {
-        mxf_log_error("Invalid video frame size %ld; expecting %ld" LOG_LOC_FORMAT, size, g_videoFrameSize, LOG_LOC_PARAMS);
+        mxf_log_error("Invalid video frame size %ld; expecting %ld" LOG_LOC_FORMAT, size, output->videoFrameSize, LOG_LOC_PARAMS);
         return 0;
     }
     
@@ -1282,11 +1302,11 @@ int write_audio_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size)
 
 int abort_archive_mxf_file(ArchiveMXFWriter** output)
 {
-    free_d3_mxf_file(output);
+    free_archive_mxf_file(output);
     return 1;
 }
 
-int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* d3InfaxData,
+int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* sourceInfaxData,
     const PSEFailure* pseFailures, long numPSEFailures,
     const VTRError* vtrErrors, long numVTRErrors)
 {
@@ -1327,16 +1347,16 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* d3InfaxDa
     
     /* add the D3 tape Infax items to the set */
 
-    CHK_ORET(set_infax_data(output->tapeDMFrameworkSet, d3InfaxData));
+    CHK_ORET(set_infax_data(output->tapeDMFrameworkSet, sourceInfaxData));
 
     
     /* update the header metadata MaterialPackage and tape SourcePackage Names */
 
-    CHK_ORET(convert_string(d3InfaxData->spoolNo, &output->tempString));
+    CHK_ORET(convert_string(sourceInfaxData->spoolNo, &output->tempString));
     CHK_ORET(mxf_set_utf16string_item(output->tapeSourcePackageSet, &MXF_ITEM_K(GenericPackage, Name), output->tempString));
 
     strcpy(mpName, "D3 preservation ");
-    strcat(mpName, d3InfaxData->spoolNo);
+    strcat(mpName, sourceInfaxData->spoolNo);
     CHK_ORET(convert_string(mpName, &output->tempString));
     CHK_ORET(mxf_set_utf16string_item(output->materialPackageSet, &MXF_ITEM_K(GenericPackage, Name), output->tempString));
     
@@ -1635,7 +1655,7 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* d3InfaxDa
      
     
     
-    free_d3_mxf_file(outputRef);
+    free_archive_mxf_file(outputRef);
     return 1;
 }
 
@@ -1692,7 +1712,7 @@ static int update_header_metadata(MXFFile* mxfFile, uint64_t headerByteCount, In
         {
             /* the LTO Infax set is identifiable by a missing format string, or
                if the file has already been updated for some reason, then the 
-               format string != g_D3FormatString */
+               format string == g_LTOFormatString_w */
             if (mxf_equals_key(&key, &MXF_SET_K(D3P_InfaxFramework)))
             {
                 ltoInfaxSetFound = 0;
@@ -1700,7 +1720,7 @@ static int update_header_metadata(MXFFile* mxfFile, uint64_t headerByteCount, In
                 if (mxf_have_item(frameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_Format)))
                 {
                     CHK_OFAIL(mxf_get_utf16string_item(frameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, D3P_Format), formatString));
-                    if (wcslen(formatString) == 0 || wcscmp(formatString, g_D3FormatString) != 0)
+                    if (wcslen(formatString) == 0 || wcscmp(formatString, g_LTOFormatString_w) == 0)
                     {
                         ltoInfaxSetFound = 1;
                     }
@@ -1795,6 +1815,7 @@ int update_archive_mxf_file_2(MXFFile** mxfFileIn, const char* newFilename, Infa
     MXFFile* mxfFile = NULL;
     
     CHK_ORET(*mxfFileIn != NULL && newFilename != NULL);
+    CHK_ORET(strcmp(ltoInfaxData->format, g_LTOFormatString) == 0);
     
     /* take ownership */
     mxfFile = *mxfFileIn;
@@ -1877,10 +1898,12 @@ mxfUMID get_tape_package_uid(ArchiveMXFWriter* writer)
     return writer->tapeSourcePackageUID;
 }
 
-int64_t get_archive_mxf_content_package_size(int numAudioTracks)
+int64_t get_archive_mxf_content_package_size(int componentDepth8Bit, int numAudioTracks)
 {
+    uint32_t videoFrameSize = (componentDepth8Bit ? g_videoFrameSize8Bit : g_videoFrameSize10Bit);
+    
     return mxfKey_extlen + 4 + SYSTEM_ITEM_SIZE +
-        mxfKey_extlen + 4 + g_videoFrameSize +  
+        mxfKey_extlen + 4 + videoFrameSize +  
         numAudioTracks * (mxfKey_extlen + 4 + g_audioFrameSize);  
 }
 

@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.5 2008/09/24 17:29:57 philipn Exp $
+ * $Id: test_write_archive_mxf.c,v 1.6 2009/12/17 16:19:00 john_f Exp $
  *
  * 
  *
@@ -30,64 +30,112 @@
 #include <mxf/mxf_page_file.h>
 
 
-#define VIDEO_FRAME_WIDTH       720
-#define VIDEO_FRAME_HEIGHT      576
-#define VIDEO_FRAME_SIZE        (VIDEO_FRAME_WIDTH * VIDEO_FRAME_HEIGHT * 2)
-#define AUDIO_FRAME_SIZE        5760
+#define VIDEO_FRAME_WIDTH           720
+#define VIDEO_FRAME_HEIGHT          576
+#define VIDEO_FRAME_SIZE_8BIT       (VIDEO_FRAME_WIDTH * VIDEO_FRAME_HEIGHT * 2)
+#define VIDEO_FRAME_SIZE_10BIT      ((VIDEO_FRAME_WIDTH + 5) / 6 * 16 * VIDEO_FRAME_HEIGHT)
+#define AUDIO_FRAME_SIZE            5760
 
-#define MXF_PAGE_SIZE           (2 * 60 * 25 * 852628LL)
+#define MXF_PAGE_SIZE               (2 * 60 * 25 * 852628LL)
 
 
 // Represent the colour and position of a colour bar
 typedef struct {
-	double			position;
-	unsigned char	colour[4];
+    double          position;
+    unsigned short  colour[4];
 } bar_colour_t;
 
-// Generate a video buffer containing uncompressed UYVY video representing
-// the familiar colour bars test signal (or YUY2 video if specified).
-static void create_colour_bars(unsigned char *video_buffer, int width, int height, int convert_to_YUY2)
+// Routine to pack 12 unsigned shorts into 16 bytes of 10-bit output
+static void pack4(unsigned short *pIn, unsigned char *pOut)
 {
-	int				i,j,b;
-	bar_colour_t	UYVY_table[] = {
-				{52/720.0,	{0x80,0xEB,0x80,0xEB}},	// white
-				{140/720.0,	{0x10,0xD2,0x92,0xD2}},	// yellow
-				{228/720.0,	{0xA5,0xA9,0x10,0xA9}},	// cyan
-				{316/720.0,	{0x35,0x90,0x22,0x90}},	// green
-				{404/720.0,	{0xCA,0x6A,0xDD,0x6A}},	// magenta
-				{492/720.0,	{0x5A,0x51,0xF0,0x51}},	// red
-				{580/720.0,	{0xf0,0x29,0x6d,0x29}},	// blue
-				{668/720.0,	{0x80,0x10,0x80,0x10}},	// black
-				{720/720.0,	{0x80,0xEB,0x80,0xEB}}	// white
-			};
+    int     i;
 
-	for (j = 0; j < height; j++)
-	{
-		for (i = 0; i < width; i+=2)
-		{
-			for (b = 0; b < 9; b++)
-			{
-				if ((i / ((double)width)) < UYVY_table[b].position)
-				{
-					if (convert_to_YUY2) {
-						// YUY2 packing
-						video_buffer[j*width*2 + i*2 + 1] = UYVY_table[b].colour[0];
-						video_buffer[j*width*2 + i*2 + 0] = UYVY_table[b].colour[1];
-						video_buffer[j*width*2 + i*2 + 3] = UYVY_table[b].colour[2];
-						video_buffer[j*width*2 + i*2 + 2] = UYVY_table[b].colour[3];
-					}
-					else {
-						// UYVY packing
-						video_buffer[j*width*2 + i*2 + 0] = UYVY_table[b].colour[0];
-						video_buffer[j*width*2 + i*2 + 1] = UYVY_table[b].colour[1];
-						video_buffer[j*width*2 + i*2 + 2] = UYVY_table[b].colour[2];
-						video_buffer[j*width*2 + i*2 + 3] = UYVY_table[b].colour[3];
-					}
-					break;
-				}
-			}
-		}
-	}
+    for (i = 0; i < 4; i++)
+    {
+        *pOut++ = *pIn & 0xff;
+        *pOut = (*pIn++ >> 8) & 0x03;
+        *pOut++ += (*pIn & 0x3f) << 2;
+        *pOut = (*pIn++ >> 6) & 0x0f;
+        *pOut++ += (*pIn & 0x0f) << 4;
+        *pOut++ = (*pIn++ >> 4) & 0x3f;
+    }
+}
+
+// Generate a video buffer containing uncompressed UYVY video representing
+// the familiar colour bars test signal
+static void create_colour_bars(unsigned char *video_buffer, int depth_8Bit, int width, int height)
+{
+    int i,j,b;
+
+    if (depth_8Bit)
+    {
+        bar_colour_t UYVY_table[] = {
+            {52/720.0,  {0x80,0xEB,0x80,0xEB}}, // white
+            {140/720.0, {0x10,0xD2,0x92,0xD2}}, // yellow
+            {228/720.0, {0xA5,0xA9,0x10,0xA9}}, // cyan
+            {316/720.0, {0x35,0x90,0x22,0x90}}, // green
+            {404/720.0, {0xCA,0x6A,0xDD,0x6A}}, // magenta
+            {492/720.0, {0x5A,0x51,0xF0,0x51}}, // red
+            {580/720.0, {0xf0,0x29,0x6d,0x29}}, // blue
+            {668/720.0, {0x80,0x10,0x80,0x10}}, // black
+            {720/720.0, {0x80,0xEB,0x80,0xEB}}  // white
+        };
+                
+        for (j = 0; j < height; j++)
+        {
+            for (i = 0; i < width; i+=2)
+            {
+                for (b = 0; b < 9; b++)
+                {
+                    if ((i / ((double)width)) < UYVY_table[b].position)
+                    {
+                        video_buffer[j*width*2 + i*2 + 0] = UYVY_table[b].colour[0];
+                        video_buffer[j*width*2 + i*2 + 1] = UYVY_table[b].colour[1];
+                        video_buffer[j*width*2 + i*2 + 2] = UYVY_table[b].colour[2];
+                        video_buffer[j*width*2 + i*2 + 3] = UYVY_table[b].colour[3];
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        bar_colour_t UYVY_table[] = {
+            {52/720.0,  {0x0200,0x03ac,0x0200,0x03ac}}, // white
+            {140/720.0, {0x0040,0x0348,0x0248,0x0348}}, // yellow
+            {228/720.0, {0x0294,0x02a4,0x0040,0x02a4}}, // cyan
+            {316/720.0, {0x00d4,0x0240,0x0088,0x0240}}, // green
+            {404/720.0, {0x0328,0x01a8,0x0374,0x01a8}}, // magenta
+            {492/720.0, {0x0168,0x0144,0x03c0,0x0144}}, // red
+            {580/720.0, {0x03c0,0x00a4,0x01b4,0x00a4}}, // blue
+            {668/720.0, {0x0200,0x0040,0x0200,0x0040}}, // black
+            {720/720.0, {0x0200,0x03ac,0x0200,0x03ac}}  // white
+        };
+                
+        unsigned short uyvy_group[12];
+        int line_stride = (width + 5) / 6 * 16;
+        
+        for (j = 0; j < height; j++)
+        {
+            for (i = 0; i < width; i+=6)
+            {
+                for (b = 0; b < 9; b++)
+                {
+                    if ((i / ((double)width)) < UYVY_table[b].position)
+                    {
+                        memcpy(uyvy_group, UYVY_table[b].colour, sizeof(unsigned short) * 4);
+                        memcpy(&uyvy_group[4], UYVY_table[b].colour, sizeof(unsigned short) * 4);
+                        memcpy(&uyvy_group[8], UYVY_table[b].colour, sizeof(unsigned short) * 4);
+                        
+                        pack4(uyvy_group, &video_buffer[j*line_stride + i/6*16]);
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 static void create_tone(unsigned char* pcmBuffer, int bufferSize)
@@ -130,7 +178,7 @@ static void increment_timecode(ArchiveTimecode* timecode)
 
 static void usage(const char* cmd)
 {
-    fprintf(stderr, "Usage: %s [--num-audio <val> --no-lto-update] <num frames> <filename> \n", cmd);
+    fprintf(stderr, "Usage: %s [--num-audio <val> --10bit --16by9 --no-lto-update] <num frames> <filename> \n", cmd);
 }
 
 int main(int argc, const char* argv[])
@@ -138,7 +186,7 @@ int main(int argc, const char* argv[])
     const char* mxfFilename;
     long numFrames;
     ArchiveMXFWriter* output;
-    unsigned char uncData[VIDEO_FRAME_SIZE];
+    unsigned char uncData[VIDEO_FRAME_SIZE_10BIT];
     unsigned char pcmData[AUDIO_FRAME_SIZE];
     long i;
     int j;
@@ -151,6 +199,9 @@ int main(int argc, const char* argv[])
     long numPSEFailures = 0;
     int numAudioTracks = 4;
     int ltoUpdate = 1;
+    int depth8Bit = 1;
+    uint32_t videoFrameSize = VIDEO_FRAME_SIZE_8BIT;
+    mxfRational aspectRatio = {4, 3};
     int cmdlnIndex = 1;
     
 
@@ -176,6 +227,18 @@ int main(int argc, const char* argv[])
         else if (strcmp(argv[cmdlnIndex], "--no-lto-update") == 0)
         {
             ltoUpdate = 0;
+            cmdlnIndex++;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--10bit") == 0)
+        {
+            depth8Bit = 0;
+            videoFrameSize = VIDEO_FRAME_SIZE_10BIT;
+            cmdlnIndex++;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--16by9") == 0)
+        {
+            aspectRatio.numerator = 16;
+            aspectRatio.denominator = 9;
             cmdlnIndex++;
         }
         else
@@ -209,7 +272,7 @@ int main(int argc, const char* argv[])
             return 1;
         }
         mxfFile = mxf_page_file_get_file(mxfPageFile);
-        if (!prepare_archive_mxf_file_2(&mxfFile, mxfFilename, numAudioTracks, 0, 1, &output))
+        if (!prepare_archive_mxf_file_2(&mxfFile, mxfFilename, depth8Bit, &aspectRatio, numAudioTracks, 0, 1, &output))
         {
             fprintf(stderr, "Failed to prepare file\n");
             if (mxfFile != NULL)
@@ -221,14 +284,14 @@ int main(int argc, const char* argv[])
     }
     else
     {
-        if (!prepare_archive_mxf_file(mxfFilename, numAudioTracks, 0, 1, &output))
+        if (!prepare_archive_mxf_file(mxfFilename, depth8Bit, &aspectRatio, numAudioTracks, 0, 1, &output))
         {
             fprintf(stderr, "Failed to prepare file\n");
             return 1;
         }
     }
 
-    create_colour_bars(uncData, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT, 0);
+    create_colour_bars(uncData, depth8Bit, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT);
     create_tone(pcmData, AUDIO_FRAME_SIZE);
     
     
@@ -247,7 +310,7 @@ int main(int argc, const char* argv[])
             fprintf(stderr, "Failed to write timecode\n");
             break;
         }
-        if (!write_video_frame(output, uncData, VIDEO_FRAME_SIZE))
+        if (!write_video_frame(output, uncData, videoFrameSize))
         {
             passed = 0;
             fprintf(stderr, "Failed to write video\n");
@@ -423,7 +486,7 @@ int main(int argc, const char* argv[])
                 }
             }
 
-#if 0            
+#if 1            
             {            
                 const char* ltoInfaxDataString = 
                     "LTO|"
