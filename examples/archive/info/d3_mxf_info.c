@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: d3_mxf_info.c,v 1.6 2009/12/17 16:17:55 john_f Exp $
  *
  * 
  *
@@ -64,6 +64,8 @@ typedef struct
     uint32_t d3VTRErrorCount;
     
     int numVideoTracks;
+    uint32_t componentDepth;
+    mxfRational aspectRatio;
     int numAudioTracks;
     mxfLength duration;
     int64_t contentPackageLen;
@@ -723,9 +725,25 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     mxf_free_list(&reader->list);
     
     
-    /* file SourcePackage */    
+    /* process file SourcePackage CDCIDescriptor for aspect ratio and component depth */
     
     CHK_ORET(mxf_uu_get_top_file_package(reader->headerMetadata, &reader->fileSourcePackageSet));
+
+    CHK_ORET(mxf_get_strongref_item(reader->fileSourcePackageSet, &MXF_ITEM_K(SourcePackage, Descriptor), &reader->descriptorSet));
+    CHK_ORET(mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->descriptorSet->key, &MXF_SET_K(MultipleDescriptor)));
+    mxf_initialise_array_item_iterator(reader->descriptorSet, &MXF_ITEM_K(MultipleDescriptor, SubDescriptorUIDs), &arrayIter);
+    while (mxf_next_array_item_element(&arrayIter, &arrayElement, &arrayElementLen))
+    {
+        CHK_ORET(mxf_get_strongref(reader->headerMetadata, arrayElement, &reader->cdciDescriptorSet));
+        if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->cdciDescriptorSet->key, &MXF_SET_K(CDCIEssenceDescriptor)))
+        {
+            CHK_ORET(mxf_get_rational_item(reader->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, AspectRatio), &reader->aspectRatio));
+            CHK_ORET(mxf_get_uint32_item(reader->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), &reader->componentDepth));
+        }
+    }
+    
+    /* process file SourcePackage tracks */
+    
     CHK_ORET(mxf_uu_get_package_tracks(reader->fileSourcePackageSet, &arrayIter));
     while (mxf_uu_next_track(reader->headerMetadata, &arrayIter, &reader->sourcePackageTrackSet))
     {
@@ -1069,7 +1087,9 @@ static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, in
 
     
     printf("\nAV contents:\n");
-    printf("    %d video tracks (8-bit uncompressed UYVY 4:2:2 at 25 fps), %d audio tracks (20-bit PCM at 48kHz) \n", reader->numVideoTracks, reader->numAudioTracks);
+    printf("    %d video tracks (%d-bit uncompressed UYVY 4:2:2, aspect ratio %d:%d, 25 fps), %d audio tracks (20-bit PCM at 48kHz) \n",
+        reader->numVideoTracks, reader->componentDepth, reader->aspectRatio.numerator, reader->aspectRatio.denominator,
+        reader->numAudioTracks);
     printf("    duration is %"PFi64" frames at 25 fps (%02u:%02u:%02u:%02u)\n", 
         reader->duration,
         (uint8_t)(reader->duration / (25 * 60 * 60)), 
