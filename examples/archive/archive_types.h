@@ -1,5 +1,5 @@
 /*
- * $Id: archive_types.h,v 1.3 2008/05/07 15:21:53 philipn Exp $
+ * $Id: archive_types.h,v 1.4 2010/01/12 17:37:38 john_f Exp $
  *
  * 
  *
@@ -89,6 +89,12 @@ typedef struct
     int64_t position;
     uint8_t errorCode;
 } VTRErrorAtPos;
+
+typedef struct
+{
+    int64_t position;
+    int32_t strength;
+} DigiBetaDropout;
 
 typedef struct
 {
