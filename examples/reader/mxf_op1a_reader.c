@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_op1a_reader.c,v 1.3 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: mxf_op1a_reader.c,v 1.4 2010/01/12 16:25:07 john_f Exp $
  *
  * MXF OP-1A reader
  *
@@ -694,9 +694,9 @@ static int read_content_package(MXFReader* reader, int skip, MXFReaderListener* 
                 }
                 cpCount += len;
             }
-            else if (element_contains_timecode(&key))
+            else if (element_is_known_system_item(&key))
             {
-                CHK_ORET(extract_timecode(reader, &key, len,
+                CHK_ORET(extract_system_item_info(reader, &key, len,
                     get_current_position(reader->essenceReader->data->index)));
                 cpCount += len;
             }
@@ -778,9 +778,9 @@ static int ns_read_content_package(MXFReader* reader, int skip, MXFReaderListene
                 
                 cpCount += len;
             }
-            else if (element_contains_timecode(&key))
+            else if (element_is_known_system_item(&key))
             {
-                CHK_ORET(extract_timecode(reader, &key, len, 
+                CHK_ORET(extract_system_item_info(reader, &key, len, 
                     reader->essenceReader->data->nsIndex.currentPosition));
                 cpCount += len;
             }

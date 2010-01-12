@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.h,v 1.1 2007/09/11 13:24:47 stuart_hc Exp $
+ * $Id: mxf_essence_helper.h,v 1.2 2010/01/12 16:25:04 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -39,8 +39,8 @@ int read_frame(MXFReader* reader, MXFReaderListener* listener, int trackIndex,
 int send_frame(MXFReader* reader, MXFReaderListener* listener, int trackIndex, 
     uint8_t* buffer, uint64_t dataLen);
     
-int element_contains_timecode(const mxfKey* key);
-int extract_timecode(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosition position);
+int element_is_known_system_item(const mxfKey* key);
+int extract_system_item_info(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosition position);
 
 
 #endif

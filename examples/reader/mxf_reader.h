@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.h,v 1.3 2009/12/17 16:19:24 john_f Exp $
+ * $Id: mxf_reader.h,v 1.4 2010/01/12 16:25:07 john_f Exp $
  *
  * Main functions for reading MXF files
  *
@@ -166,6 +166,9 @@ int get_source_timecode_type(MXFReader* reader, int index);
    A timecode is unavailable if it is a timecode in the essence container that is not present
    or the frame needs to be read to extract it (eg. after a position or skip) */
 int get_source_timecode(MXFReader* reader, int index, MXFTimecode* timecode, int* type, int* count);
+
+int get_num_archive_crc32(MXFReader* reader);
+int get_archive_crc32(MXFReader* reader, int index, uint32_t* crc32);
 
 
 /* returns the last frame that can be read from the file */

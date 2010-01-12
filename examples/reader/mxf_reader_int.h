@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader_int.h,v 1.2 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: mxf_reader_int.h,v 1.3 2010/01/12 16:25:07 john_f Exp $
  *
  * Internal functions for reading MXF files
  *
@@ -104,6 +104,10 @@ struct _MXFReader
     TimecodeIndex playoutTimecodeIndex;
     MXFList sourceTimecodeIndexes;
     
+    uint32_t* archiveCRC32;
+    uint32_t numArchiveCRC32Alloc;
+    uint32_t numArchiveCRC32;
+    
     EssenceReader* essenceReader;
     
     MXFDataModel* dataModel;
@@ -137,6 +141,9 @@ int initialise_default_playout_timecode(MXFReader* reader);
 int initialise_source_timecodes(MXFReader* reader, MXFMetadataSet* sourcePackageSet);
 int set_essence_container_timecode(MXFReader* reader, mxfPosition position, 
     int type, int count, int isDropFrame, uint8_t hour, uint8_t min, uint8_t sec, uint8_t frame);
+
+int allocate_archive_crc32(MXFReader* reader, uint32_t num);
+int set_archive_crc32(MXFReader* reader, uint32_t index, uint32_t crc32);
 
 int64_t mxfr_convert_length(const mxfRational* frameRateIn, int64_t lengthIn, const mxfRational* frameRateOut);
 

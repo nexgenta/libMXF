@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.11 2009/12/17 16:19:24 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.12 2010/01/12 16:25:01 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -785,13 +785,13 @@ int send_frame(MXFReader* reader, MXFReaderListener* listener, int trackIndex,
 }
     
 
-int element_contains_timecode(const mxfKey* key)
+int element_is_known_system_item(const mxfKey* key)
 {
     return mxf_equals_key(key, &g_SysItemElementKey1) ||
         mxf_equals_key(key, &MXF_EE_K(SDTI_CP_System_Pack));
 }
 
-int extract_timecode(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosition position)
+int extract_system_item_info(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosition position)
 {
     MXFFile* mxfFile = reader->mxfFile;
     uint16_t localTag;
@@ -800,6 +800,7 @@ int extract_timecode(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosi
     uint32_t arrayLen;
     uint32_t arrayItemLen;
     uint8_t t12m[8];
+    uint32_t crc32;
     uint64_t lenRemaining;
     uint32_t i;
     int isDropFrame;
@@ -811,8 +812,11 @@ int extract_timecode(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosi
     
 
     /* Read the array of SMPTE 12M timecodes in local set item 0x0102 
-       This timecode representation is used for the BBC D3 preservation project, 
+       This timecode representation is used for the BBC Archive preservation project, 
        where the first timecode in the array is the VITC and the second timecode is the LTC */    
+    /* Read the array of CRC-32 in local set item 0xffff 
+       This item contains an array of CRC-32s for BBC Archive preservation project,
+       where each CRC-32 was calculated from the video element and audio elements */
     if (mxf_equals_key(key, &g_SysItemElementKey1))
     {
         lenRemaining = len;
@@ -827,6 +831,8 @@ int extract_timecode(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosi
                 
                 if (localTag == 0x0102)
                 {
+                    /* Archive MXF Timecode array */
+                    
                     CHK_ORET(mxf_file_read(mxfFile, arrayHeader, 8) == 8);
                     lenRemaining -= 8;
                     mxf_get_array_header(arrayHeader, &arrayLen, &arrayItemLen);
@@ -840,9 +846,24 @@ int extract_timecode(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosi
                         CHK_ORET(set_essence_container_timecode(reader, position, 
                                 SYSTEM_ITEM_TC_ARRAY_TIMECODE, i, isDropFrame, hour, min, sec, frame));
                     }
-                    CHK_ORET(mxf_skip(mxfFile, lenRemaining));
-                    lenRemaining = 0;
-                    break;
+                }
+                else if (localTag == 0xffff)
+                {
+                    /* Archive MXF CRC-32 array */
+                    
+                    CHK_ORET(mxf_file_read(mxfFile, arrayHeader, 8) == 8);
+                    lenRemaining -= 8;
+                    mxf_get_array_header(arrayHeader, &arrayLen, &arrayItemLen);
+                    CHK_ORET(arrayItemLen == 4);
+                    
+                    CHK_ORET(allocate_archive_crc32(reader, arrayLen));
+                
+                    for (i = 0; i < arrayLen; i++)
+                    {
+                        CHK_ORET(mxf_read_uint32(mxfFile, &crc32));
+                        lenRemaining -= 4;
+                        CHK_ORET(set_archive_crc32(reader, i, crc32));
+                    }
                 }
                 else
                 {
@@ -900,7 +921,7 @@ int extract_timecode(MXFReader* reader, const mxfKey* key, uint64_t len, mxfPosi
     }
     else
     {
-        /* shouldn't be here if result of element_contains_timecode() is checked */
+        /* shouldn't be here if result of element_is_known_system_item() is checked */
         CHK_ORET(mxf_skip(mxfFile, len));
     }
     

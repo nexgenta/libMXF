@@ -1,5 +1,5 @@
 /*
- * $Id: test_mxf_reader.c,v 1.2 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: test_mxf_reader.c,v 1.3 2010/01/12 16:25:07 john_f Exp $
  *
  * Test the MXF Reader 
  *
@@ -163,6 +163,7 @@ static int test1(const char* mxfFilename, MXFTimecode* startTimecode, int source
     int type;
     int count;
     int result;
+    uint32_t archiveCRC32;
     
     memset(&data, 0, sizeof(MXFReaderListenerData));
     listener.data = &data;
@@ -247,6 +248,17 @@ static int test1(const char* mxfFilename, MXFTimecode* startTimecode, int source
             {
                 printf("source timecode (type = %d, count = %d) unavailable", type, count);
                 printf("\n");
+            }
+        }
+        for (i = 0; i < get_num_archive_crc32(input); i++)
+        {
+            if (get_archive_crc32(input, i, &archiveCRC32))
+            {
+                printf("crc32 %d = 0x%08x\n", i, archiveCRC32);
+            }
+            else
+            {
+                printf("Failed to get archive crc-32\n");
             }
         }
         frameCount++;

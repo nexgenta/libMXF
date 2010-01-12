@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.c,v 1.4 2009/01/29 07:21:42 stuart_hc Exp $
+ * $Id: mxf_reader.c,v 1.5 2010/01/12 16:25:07 john_f Exp $
  *
  * Main functions for reading MXF files
  *
@@ -405,6 +405,7 @@ void close_mxf_reader(MXFReader** reader)
         mxf_free_data_model(&(*reader)->dataModel);
     }
     SAFE_FREE(&(*reader)->buffer);
+    SAFE_FREE(&(*reader)->archiveCRC32);
     
     SAFE_FREE(reader);
 }
@@ -718,6 +719,40 @@ int get_source_timecode(MXFReader* reader, int index, MXFTimecode* timecode, int
     *count = timecodeIndex->count;
     
     return result;
+}
+
+int get_num_archive_crc32(MXFReader* reader)
+{
+    if (!reader->haveReadAFrame)
+    {
+        if (mxf_file_is_seekable(reader->mxfFile))
+        {
+            /* read the first frame, which will extract the crc32's as a side-effect */
+            if (!read_next_frame(reader, NULL))
+            {
+                mxf_log_error("Failed to read first frame to update the number of archive crc32" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            }
+            if (!position_at_frame(reader, 0))
+            {
+                mxf_log_error("Failed to position reader back to frame 0" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            }
+        }
+        else
+        {
+            mxf_log_warn("Result of get_num_archive_crc32 could be incorrect because "
+                "MXF file is not seekable and first frame has not been read" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+        }
+    }
+    
+    return reader->numArchiveCRC32;
+}
+
+int get_archive_crc32(MXFReader* reader, int index, uint32_t* crc32)
+{
+    CHK_ORET(index >= 0 && index < (int)reader->numArchiveCRC32);
+    
+    *crc32 = reader->archiveCRC32[index];
+    return 1;
 }
 
 int position_at_playout_timecode(MXFReader* reader, MXFTimecode* timecode)
@@ -1344,6 +1379,30 @@ int set_essence_container_timecode(MXFReader* reader, mxfPosition position,
 fail:
     SAFE_FREE(&timecodeIndex);
     return 0;
+}
+
+int allocate_archive_crc32(MXFReader* reader, uint32_t num)
+{
+    if (reader->numArchiveCRC32Alloc < num)
+    {
+        SAFE_FREE(&reader->archiveCRC32);
+        CHK_MALLOC_ARRAY_ORET(reader->archiveCRC32, uint32_t, num);
+        reader->numArchiveCRC32Alloc = num;
+    }
+
+    reader->numArchiveCRC32 = num;
+    memset(reader->archiveCRC32, 0, sizeof(uint32_t) * num);
+    
+    return 1;
+}
+
+int set_archive_crc32(MXFReader* reader, uint32_t index, uint32_t crc32)
+{
+    CHK_ORET(index < reader->numArchiveCRC32);
+    
+    reader->archiveCRC32[index] = crc32;
+    
+    return 1;
 }
 
 int64_t mxfr_convert_length(const mxfRational* frameRateIn, int64_t lengthIn, const mxfRational* frameRateOut)
