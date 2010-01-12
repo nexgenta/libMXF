@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.6 2009/12/17 16:19:00 john_f Exp $
+ * $Id: test_write_archive_mxf.c,v 1.7 2010/01/12 17:17:50 john_f Exp $
  *
  * 
  *
@@ -178,7 +178,7 @@ static void increment_timecode(ArchiveTimecode* timecode)
 
 static void usage(const char* cmd)
 {
-    fprintf(stderr, "Usage: %s [--num-audio <val> --10bit --16by9 --no-lto-update] <num frames> <filename> \n", cmd);
+    fprintf(stderr, "Usage: %s [--num-audio <val> --10bit --16by9 --no-lto-update --crc32] <num frames> <filename> \n", cmd);
 }
 
 int main(int argc, const char* argv[])
@@ -197,11 +197,16 @@ int main(int argc, const char* argv[])
     long numVTRErrors = 0;
     PSEFailure* pseFailures = NULL;
     long numPSEFailures = 0;
+    DigiBetaDropout* digiBetaDropouts = NULL;
+    long numDigiBetaDropouts = 0;
     int numAudioTracks = 4;
     int ltoUpdate = 1;
     int depth8Bit = 1;
     uint32_t videoFrameSize = VIDEO_FRAME_SIZE_8BIT;
     mxfRational aspectRatio = {4, 3};
+    uint32_t crc32[17];
+    int numCRC32 = 0;
+    int includeCRC32 = 0;
     int cmdlnIndex = 1;
     
 
@@ -241,6 +246,11 @@ int main(int argc, const char* argv[])
             aspectRatio.denominator = 9;
             cmdlnIndex++;
         }
+        else if (strcmp(argv[cmdlnIndex], "--crc32") == 0)
+        {
+            includeCRC32 = 1;
+            cmdlnIndex++;
+        }
         else
         {
             usage(argv[0]);
@@ -272,7 +282,8 @@ int main(int argc, const char* argv[])
             return 1;
         }
         mxfFile = mxf_page_file_get_file(mxfPageFile);
-        if (!prepare_archive_mxf_file_2(&mxfFile, mxfFilename, depth8Bit, &aspectRatio, numAudioTracks, 0, 1, &output))
+        if (!prepare_archive_mxf_file_2(&mxfFile, mxfFilename, depth8Bit, &aspectRatio,
+            numAudioTracks, includeCRC32, 0, 1, &output))
         {
             fprintf(stderr, "Failed to prepare file\n");
             if (mxfFile != NULL)
@@ -284,7 +295,8 @@ int main(int argc, const char* argv[])
     }
     else
     {
-        if (!prepare_archive_mxf_file(mxfFilename, depth8Bit, &aspectRatio, numAudioTracks, 0, 1, &output))
+        if (!prepare_archive_mxf_file(mxfFilename, depth8Bit, &aspectRatio, numAudioTracks,
+            includeCRC32, 0, 1, &output))
         {
             fprintf(stderr, "Failed to prepare file\n");
             return 1;
@@ -294,9 +306,14 @@ int main(int argc, const char* argv[])
     create_colour_bars(uncData, depth8Bit, VIDEO_FRAME_WIDTH, VIDEO_FRAME_HEIGHT);
     create_tone(pcmData, AUDIO_FRAME_SIZE);
     
+    if (includeCRC32)
+    {
+        numCRC32 = 1 + numAudioTracks;
+    }
     
     vtrErrors = (VTRError*)malloc(sizeof(VTRError) * numFrames);
     pseFailures = (PSEFailure*)malloc(sizeof(PSEFailure) * numFrames);
+    digiBetaDropouts = (DigiBetaDropout*)malloc(sizeof(DigiBetaDropout) * numFrames);
     memset(&vitc, 0, sizeof(ArchiveTimecode));
     memset(&ltc, 0, sizeof(ArchiveTimecode));
     vitc.hour = 10;
@@ -304,10 +321,19 @@ int main(int argc, const char* argv[])
     passed = 1;
     for (i = 0; i < numFrames; i++)
     {
-        if (!write_timecode(output, vitc, ltc))
+        if (includeCRC32)
+        {
+            crc32[0] = calc_crc32(uncData, videoFrameSize);
+            for (j = 0; j < numAudioTracks; j++)
+            {
+                crc32[j + 1] = calc_crc32(pcmData, AUDIO_FRAME_SIZE);
+            }
+        }
+        
+        if (!write_system_item(output, vitc, ltc, crc32, numCRC32))
         {
             passed = 0;
-            fprintf(stderr, "Failed to write timecode\n");
+            fprintf(stderr, "Failed to write system item\n");
             break;
         }
         if (!write_video_frame(output, uncData, videoFrameSize))
@@ -393,6 +419,14 @@ int main(int argc, const char* argv[])
             pseFailures[numPSEFailures].spatialPattern = 1000;
             numPSEFailures++;
         }
+        
+        if (i % 15 == 0)
+        {
+            memset(&digiBetaDropouts[numDigiBetaDropouts], 0, sizeof(DigiBetaDropout));
+            digiBetaDropouts[numDigiBetaDropouts].position = i;
+            digiBetaDropouts[numDigiBetaDropouts].strength = 160;
+            numDigiBetaDropouts++;
+        }
     }
     
     if (!passed)
@@ -423,9 +457,12 @@ int main(int argc, const char* argv[])
         parse_infax_data(d3InfaxDataString, &d3InfaxData, 1);
         
         printf("Completing\n");
-        if (!complete_archive_mxf_file(&output, &d3InfaxData, pseFailures, numPSEFailures, vtrErrors, numVTRErrors))
+        if (!complete_archive_mxf_file(&output, &d3InfaxData,
+            pseFailures, numPSEFailures,
+            vtrErrors, numVTRErrors,
+            digiBetaDropouts, numDigiBetaDropouts))
         {
-            fprintf(stderr, "Failed to complete writing D3 MXF file\n");
+            fprintf(stderr, "Failed to complete writing archive MXF file\n");
             abort_archive_mxf_file(&output);
             passed = 0;
         }
