@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.3 2009/09/18 14:35:20 philipn Exp $
+# $Id: Makefile,v 1.4 2010/01/12 17:41:39 john_f Exp $
 #
 # Makefile for building archive examples
 #
@@ -25,36 +25,36 @@ include $(TOPLEVEL)/vars.mk
 
 
 .PHONY: all
-all: d3_mxf_info libd3mxfinfo.a
+all: archive_mxf_info libarchivemxfinfo.a
 
 CFLAGS += -I..
 
 $(LIBMXF_DIR)/libMXF.a:
 	$(MAKE) -C $(LIBMXF_DIR)
 
-d3_mxf_info: $(LIBMXF_DIR)/libMXF.a d3_mxf_info.o
-	$(CC) d3_mxf_info.o -L$(LIBMXF_DIR) -lMXF $(UUIDLIB) -o $@
+archive_mxf_info: $(LIBMXF_DIR)/libMXF.a archive_mxf_info.o
+	$(CC) archive_mxf_info.o -L$(LIBMXF_DIR) -lMXF $(UUIDLIB) -o $@
 
-d3_mxf_info.o: d3_mxf_info.c ../archive_types.h
-	$(CC) $(CFLAGS) -c d3_mxf_info.c
+archive_mxf_info.o: archive_mxf_info.c ../archive_types.h
+	$(CC) $(CFLAGS) -c archive_mxf_info.c
 
-libd3mxfinfo.a: d3_mxf_info_lib.o
-	$(AR) libd3mxfinfo.a d3_mxf_info_lib.o
+libarchivemxfinfo.a: archive_mxf_info_lib.o
+	$(AR) libarchivemxfinfo.a archive_mxf_info_lib.o
 
-d3_mxf_info_lib.o: d3_mxf_info_lib.c ../archive_types.h
-	$(CC) $(CFLAGS) -c d3_mxf_info_lib.c
+archive_mxf_info_lib.o: archive_mxf_info_lib.c ../archive_types.h
+	$(CC) $(CFLAGS) -c archive_mxf_info_lib.c
 
 
 .PHONY: clean
 clean:
-	@rm -f *~ *.o d3_mxf_info libd3mxfinfo.a
+	@rm -f *~ *.o archive_mxf_info libarchivemxfinfo.a
 
 .PHONY: install
-install: libd3mxfinfo.a
+install: libarchivemxfinfo.a
 	mkdir -p $(MXF_INSTALL_PREFIX)/lib
-	cp libd3mxfinfo.a $(MXF_INSTALL_PREFIX)/lib
+	cp libarchivemxfinfo.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/include
-	cp d3_mxf_info_lib.h $(MXF_INSTALL_PREFIX)/include/
+	cp archive_mxf_info_lib.h $(MXF_INSTALL_PREFIX)/include/
 	cp ../archive_types.h $(MXF_INSTALL_PREFIX)/include/
 	mkdir -p $(MXF_INSTALL_PREFIX)/bin
-	cp d3_mxf_info $(MXF_INSTALL_PREFIX)/bin/
+	cp archive_mxf_info $(MXF_INSTALL_PREFIX)/bin/
