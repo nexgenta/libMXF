@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.h,v 1.4 2009/12/17 16:19:00 john_f Exp $
+ * $Id: write_archive_mxf.h,v 1.5 2010/01/12 17:18:48 john_f Exp $
  *
  * 
  *
@@ -42,18 +42,20 @@ typedef struct _ArchiveMXFWriter ArchiveMXFWriter;
 
 /* create a new Archive MXF file and prepare for writing the essence */
 int prepare_archive_mxf_file(const char* filename, int componentDepth8Bit, const mxfRational* aspectRatio,
-    int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
+    int numAudioTracks, int includeCRC32, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
 
 /* use the Archive MXF file (the filename is only used as metadata) and prepare for writing the essence */
 /* note: if this function returns 0 then check whether *mxfFile is not NULL and needs to be closed */
 int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int componentDepth8Bit,
-    const mxfRational* aspectRatio, int numAudioTracks, int64_t startPosition, int beStrict, ArchiveMXFWriter** output);
+    const mxfRational* aspectRatio, int numAudioTracks, int includeCRC32, int64_t startPosition, int beStrict,
+    ArchiveMXFWriter** output);
 
     
-/* write the essence, in order, starting with the timecode, followed by video and then 0 or more audio */
-int write_timecode(ArchiveMXFWriter* output, ArchiveTimecode vitc, ArchiveTimecode ltc);     
-int write_video_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size);     
-int write_audio_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size);     
+/* write the essence, in order, starting with the system item, followed by video and then 0 or more audio */
+int write_system_item(ArchiveMXFWriter* output, ArchiveTimecode vitc, ArchiveTimecode ltc,
+    const uint32_t* crc32, int numCRC32);
+int write_video_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size);
+int write_audio_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size);
 
 /* close and delete the file and free output */
 int abort_archive_mxf_file(ArchiveMXFWriter** output);
@@ -61,7 +63,8 @@ int abort_archive_mxf_file(ArchiveMXFWriter** output);
 /* write the header metadata, do misc. fixups, close the file and free output */
 int complete_archive_mxf_file(ArchiveMXFWriter** output, InfaxData* sourceInfaxData,
     const PSEFailure* pseFailures, long numPSEFailures,
-    const VTRError* vtrErrors, long numVTRErrors);
+    const VTRError* vtrErrors, long numVTRErrors,
+    const DigiBetaDropout* digiBetaDropouts, long numDigiBetaDropouts);
 
 int64_t get_archive_mxf_file_size(ArchiveMXFWriter* writer);
 
@@ -79,11 +82,12 @@ int update_archive_mxf_file_2(MXFFile** mxfFile, const char* newFilename, InfaxD
 
 
 /* returns the content package (system, video + x audio elements) size */
-int64_t get_archive_mxf_content_package_size(int componentDepth8Bit, int numAudioTracks);
+int64_t get_archive_mxf_content_package_size(int componentDepth8Bit, int numAudioTracks, int includeCRC32);
 
 
 int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, int beStrict);
 
+uint32_t calc_crc32(uint8_t* data, uint32_t size);
 
 
 #ifdef __cplusplus
