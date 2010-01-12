@@ -1,5 +1,5 @@
 /*
- * $Id: timecode_index.c,v 1.2 2008/09/24 17:29:57 philipn Exp $
+ * $Id: timecode_index.c,v 1.3 2010/01/12 17:43:08 john_f Exp $
  *
  * 
  *
@@ -73,11 +73,53 @@ static void position_to_timecode(int64_t position, ArchiveTimecode* timecode)
     timecode->frame = (uint8_t)(((position % (60 * 60 * 25)) % (60 * 25)) % 25);
 }
 
+static int move_timecode_index_searcher_to_next_element(TimecodeIndexSearcher* searcher)
+{
+    TimecodeIndexArray* indexArray;
+    TimecodeIndexElement* arrayElement;
+    TimecodeIndexSearcher searcherCopy = *searcher;
+    
+    if (searcher->atEnd)
+    {
+        return 0;
+    }
+    
+    
+    indexArray = (TimecodeIndexArray*)mxf_get_iter_element(&searcher->indexArrayIter);
+    arrayElement = &indexArray->elements[searcher->elementNum];
+    
+    if (searcher->elementNum + 1 < indexArray->numElements)
+    {
+        /* move to next element in array */
+        searcher->position += arrayElement->duration - searcher->elementOffset;
+        searcher->elementOffset = 0;
+        searcher->elementNum++;
+        return 1;
+    }
+    else if (indexArray->numElements == searcher->index->arraySize)
+    {
+        /* move to next array in list */
+        searcher->position += arrayElement->duration - searcher->elementOffset;
+        searcher->elementOffset = 0;
+        searcher->elementNum = 0;
+        searcher->atEnd = !mxf_next_list_iter_element(&searcher->indexArrayIter);
+        if (!searcher->atEnd)
+        {
+            return 1;
+        }
+        /* else at end of index */
+    }
+    /* else at end of index */
+    
+    *searcher = searcherCopy;
+    return 0;
+}
+
 static int move_timecode_index_searcher(TimecodeIndexSearcher* searcher, int64_t position)
 {
     TimecodeIndexArray* indexArray;
     TimecodeIndexElement* arrayElement;
-    MXFListIterator searcherCopy = searcher->indexArrayIter;
+    TimecodeIndexSearcher searcherCopy = *searcher;
     
     if (position == searcher->position)
     {
@@ -132,7 +174,31 @@ static int move_timecode_index_searcher(TimecodeIndexSearcher* searcher, int64_t
     }
     
     
-    searcher->indexArrayIter = searcherCopy;
+    *searcher = searcherCopy;
+    return 0;
+}
+
+static int find_frozen_timecode_at_offset(TimecodeIndexSearcher* searcher, int64_t offset)
+{
+    TimecodeIndexArray* indexArray;
+    TimecodeIndexElement* arrayElement;
+    
+    if (searcher->atEnd)
+    {
+        return 0;
+    }
+    
+    
+    indexArray = (TimecodeIndexArray*)mxf_get_iter_element(&searcher->indexArrayIter);
+    arrayElement = &indexArray->elements[searcher->elementNum];
+    
+    if (arrayElement->frozen && searcher->elementOffset + offset < arrayElement->duration)
+    {
+        searcher->elementOffset += offset;
+        searcher->position += offset;
+        return 1;
+    }
+    
     return 0;
 }
 
@@ -155,6 +221,7 @@ int add_timecode(TimecodeIndex* index, ArchiveTimecode* timecode)
     TimecodeIndexArray* lastArray;
     int64_t timecodePos = timecode_to_position(timecode);
     
+    
     if (mxf_get_list_length(&index->indexArrays) == 0)
     {
         CHK_MALLOC_OFAIL(newArray, TimecodeIndexArray);
@@ -174,9 +241,17 @@ int add_timecode(TimecodeIndex* index, ArchiveTimecode* timecode)
             /* timecode is previous + 1 */
             lastArray->elements[lastArray->numElements - 1].duration++;
         }
+        else if (lastArray->elements[lastArray->numElements - 1].timecodePos == timecodePos &&
+            (lastArray->elements[lastArray->numElements - 1].frozen ||
+                lastArray->elements[lastArray->numElements - 1].duration == 1))
+        {
+            /* timecode is frozen with the previous timecode value */
+            lastArray->elements[lastArray->numElements - 1].frozen = 1;
+            lastArray->elements[lastArray->numElements - 1].duration++;
+        }
         else
         {
-            /* timecode is not previous + 1 */
+            /* timecode is not frozen or previous + 1 */
             
             if (lastArray->numElements == index->arraySize)
             {
@@ -190,6 +265,7 @@ int add_timecode(TimecodeIndex* index, ArchiveTimecode* timecode)
             }
             
             lastArray->numElements++;
+            lastArray->elements[lastArray->numElements - 1].frozen = 0;
             lastArray->elements[lastArray->numElements - 1].timecodePos = timecodePos;
             lastArray->elements[lastArray->numElements - 1].duration = 1;
         }
@@ -197,6 +273,7 @@ int add_timecode(TimecodeIndex* index, ArchiveTimecode* timecode)
     else
     {
         lastArray->numElements++;
+        lastArray->elements[lastArray->numElements - 1].frozen = 0;
         lastArray->elements[lastArray->numElements - 1].timecodePos = timecodePos;
         lastArray->elements[lastArray->numElements - 1].duration = 1;
     }
@@ -206,6 +283,32 @@ int add_timecode(TimecodeIndex* index, ArchiveTimecode* timecode)
     
 fail:
     free_index_array(&newArray);
+    return 0;
+}
+
+int is_null_timecode_index(TimecodeIndex* index)
+{
+    TimecodeIndexArray* indexArray;
+    long listLen;
+    
+    /* index is null if the index is empty or has a duration > 1 with timecode frozen at 00:00:00:00 */
+    
+    listLen = mxf_get_list_length(&index->indexArrays);
+    if (listLen == 0)
+    {
+        return 1;
+    }
+    else if (listLen == 1)
+    {
+        indexArray = (TimecodeIndexArray*)mxf_get_first_list_element(&index->indexArrays);
+        if (indexArray->numElements == 0 ||
+            (indexArray->numElements == 1 && indexArray->elements[0].frozen &&
+                indexArray->elements[0].timecodePos == 0 && indexArray->elements[0].duration > 1))
+        {
+            return 1;
+        }
+    }
+    
     return 0;
 }
 
@@ -233,7 +336,14 @@ int find_timecode(TimecodeIndexSearcher* searcher, int64_t position, ArchiveTime
     
     indexArray = (TimecodeIndexArray*)mxf_get_iter_element(&searcher->indexArrayIter);
     arrayElement = &indexArray->elements[searcher->elementNum];
-    timecodePos = arrayElement->timecodePos + searcher->elementOffset;
+    if (arrayElement->frozen)
+    {
+        timecodePos = arrayElement->timecodePos;
+    }
+    else
+    {
+        timecodePos = arrayElement->timecodePos + searcher->elementOffset;
+    }
     position_to_timecode(timecodePos, timecode);
     
     return 1;
@@ -245,8 +355,12 @@ int find_position(TimecodeIndexSearcher* searcher, const ArchiveTimecode* timeco
     TimecodeIndexElement* arrayElement;
     int64_t timecodePos = timecode_to_position(timecode);
     int doneFirst = 0;
-    MXFListIterator searcherCopy = searcher->indexArrayIter;
+    TimecodeIndexSearcher searcherCopy = *searcher;
 
+    if (timecode->hour == INVALID_TIMECODE_HOUR)
+    {
+        return 0;
+    }
     if (searcher->atEnd)
     {
         return 0;
@@ -261,9 +375,16 @@ int find_position(TimecodeIndexSearcher* searcher, const ArchiveTimecode* timeco
             timecodePos >= arrayElement->timecodePos + searcher->elementOffset &&
             timecodePos < arrayElement->timecodePos + arrayElement->duration)
         {
-            /* found it */
+            /* found it in incrementing timecode element */
             searcher->position += timecodePos - (arrayElement->timecodePos + searcher->elementOffset);
             searcher->elementOffset = timecodePos - arrayElement->timecodePos;
+            *position = searcher->position;
+            searcher->beforeStart = 0;
+            return 1;
+        }
+        else if (arrayElement->frozen && timecodePos == arrayElement->timecodePos)
+        {
+            /* found it in frozen timecode element - position is the searcher position */
             *position = searcher->position;
             searcher->beforeStart = 0;
             return 1;
@@ -300,7 +421,7 @@ int find_position(TimecodeIndexSearcher* searcher, const ArchiveTimecode* timeco
     }
     
     
-    searcher->indexArrayIter = searcherCopy;
+    *searcher = searcherCopy;
     return 0;
 }
 
@@ -310,8 +431,8 @@ int find_position_at_dual_timecode(TimecodeIndexSearcher* vitcSearcher, const Ar
 {
     TimecodeIndexSearcher vitcSearcherCopy = *vitcSearcher;
     TimecodeIndexSearcher ltcSearcherCopy = *ltcSearcher;
-    int64_t vitcPosition;
-    int64_t ltcPosition;
+    int64_t prevVITCPosition, vitcPosition;
+    int64_t prevLTCPosition, ltcPosition;
 
     if (vitcTimecode->hour == INVALID_TIMECODE_HOUR &&
         ltcTimecode->hour == INVALID_TIMECODE_HOUR)
@@ -355,14 +476,38 @@ int find_position_at_dual_timecode(TimecodeIndexSearcher* vitcSearcher, const Ar
         {
             if (vitcPosition < ltcPosition)
             {
+                if (find_frozen_timecode_at_offset(vitcSearcher, ltcPosition - vitcPosition))
+                {
+                    vitcPosition = ltcPosition;
+                    break;
+                }
+                
+                prevVITCPosition = vitcPosition;
                 if (!find_position(vitcSearcher, vitcTimecode, &vitcPosition))
+                {
+                    goto fail;
+                }
+                if (prevVITCPosition == vitcPosition &&
+                    !move_timecode_index_searcher_to_next_element(vitcSearcher))
                 {
                     goto fail;
                 }
             }
             else
             {
+                if (find_frozen_timecode_at_offset(ltcSearcher, vitcPosition - ltcPosition))
+                {
+                    ltcPosition = vitcPosition;
+                    break;
+                }
+                
+                prevLTCPosition = ltcPosition;
                 if (!find_position(ltcSearcher, ltcTimecode, &ltcPosition))
+                {
+                    goto fail;
+                }
+                if (prevLTCPosition == ltcPosition &&
+                    !move_timecode_index_searcher_to_next_element(ltcSearcher))
                 {
                     goto fail;
                 }

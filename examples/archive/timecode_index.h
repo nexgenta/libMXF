@@ -1,5 +1,5 @@
 /*
- * $Id: timecode_index.h,v 1.1 2007/09/11 13:24:46 stuart_hc Exp $
+ * $Id: timecode_index.h,v 1.2 2010/01/12 17:43:08 john_f Exp $
  *
  * 
  *
@@ -36,6 +36,7 @@ extern "C"
 
 typedef struct
 {
+    uint8_t frozen;
     int64_t timecodePos;
     int64_t duration;
 } TimecodeIndexElement;
@@ -69,6 +70,8 @@ void initialise_timecode_index(TimecodeIndex* index, int arraySize);
 void clear_timecode_index(TimecodeIndex* index);
 
 int add_timecode(TimecodeIndex* index, ArchiveTimecode* timecode);
+
+int is_null_timecode_index(TimecodeIndex* index);
 
 
 void initialise_timecode_index_searcher(TimecodeIndex* index, TimecodeIndexSearcher* searcher);
