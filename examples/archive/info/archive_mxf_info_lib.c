@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info_lib.c,v 1.3 2008/05/07 15:21:57 philipn Exp $
+ * $Id: archive_mxf_info_lib.c,v 1.1 2010/01/12 17:40:26 john_f Exp $
  *
  * 
  *
@@ -26,7 +26,7 @@
 #include <wchar.h>
 #include <assert.h>
 
-#include <d3_mxf_info_lib.h>
+#include <archive_mxf_info_lib.h>
 #include <mxf/mxf_uu_metadata.h>
 #include <mxf/mxf_page_file.h>
 
@@ -38,7 +38,7 @@
     }
 
     
-/* declare the BBC D3 extensions */
+/* declare the BBC archive extensions */
 
 #define MXF_LABEL(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15) \
     {d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15}
@@ -49,10 +49,10 @@
 #define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired) \
     static const mxfUL MXF_ITEM_K(setName, name) = label;
 
-#include <bbc_d3_extensions_data_model.h>
+#include <bbc_archive_extensions_data_model.h>
 
 /* TODO: move this somewhere shared */
-static const mxfUL MXF_DM_L(D3P_D3PreservationDescriptiveScheme) = 
+static const mxfUL MXF_DM_L(APP_PreservationDescriptiveScheme) = 
     {0x06, 0x0E, 0x2B, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0D, 0x04, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00};
 
 
@@ -66,27 +66,27 @@ static const mxfUL MXF_DM_L(D3P_D3PreservationDescriptiveScheme) =
 #define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
     CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
     
-int d3_mxf_load_extensions(MXFDataModel* dataModel)
+int archive_mxf_load_extensions(MXFDataModel* dataModel)
 {
-#include <bbc_d3_extensions_data_model.h>
+#include <bbc_archive_extensions_data_model.h>
 
     return 1;
 }
 
 
 #define GET_STRING_ITEM(name, cName) \
-    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name))) \
     { \
-        CHK_OFAIL(mxf_uu_get_utf16string_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &tempWString)); \
+        CHK_OFAIL(mxf_uu_get_utf16string_item(dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name), &tempWString)); \
         CHK_OFAIL(wcstombs(infaxData->cName, tempWString, sizeof(infaxData->cName)) != (size_t)(-1)); \
         infaxData->cName[sizeof(infaxData->cName) - 1] = '\0'; \
         SAFE_FREE(&tempWString); \
     } 
 
 #define GET_DATE_ITEM(name, cName) \
-    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name))) \
     { \
-        CHK_OFAIL(mxf_get_timestamp_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+        CHK_OFAIL(mxf_get_timestamp_item(dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name), &infaxData->cName)); \
         infaxData->cName.hour = 0; \
         infaxData->cName.min = 0; \
         infaxData->cName.sec = 0; \
@@ -94,37 +94,37 @@ int d3_mxf_load_extensions(MXFDataModel* dataModel)
     } 
 
 #define GET_INT64_ITEM(name, cName) \
-    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name))) \
     { \
-        CHK_OFAIL(mxf_get_int64_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+        CHK_OFAIL(mxf_get_int64_item(dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name), &infaxData->cName)); \
     } 
 
 #define GET_UINT32_ITEM(name, cName) \
-    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    if (mxf_have_item(dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name))) \
     { \
-        CHK_OFAIL(mxf_get_uint32_item(dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+        CHK_OFAIL(mxf_get_uint32_item(dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name), &infaxData->cName)); \
     } 
 
 static int get_infax_data(MXFMetadataSet* dmFrameworkSet, InfaxData* infaxData)
 {
     mxfUTF16Char* tempWString = NULL;
     
-    GET_STRING_ITEM(D3P_Format, format);
-    GET_STRING_ITEM(D3P_ProgrammeTitle, progTitle);
-    GET_STRING_ITEM(D3P_EpisodeTitle, epTitle);
-    GET_DATE_ITEM(D3P_TransmissionDate, txDate);
-    GET_STRING_ITEM(D3P_MagazinePrefix, magPrefix);
-    GET_STRING_ITEM(D3P_ProgrammeNumber, progNo);
-    GET_STRING_ITEM(D3P_ProductionCode, prodCode);
-    GET_STRING_ITEM(D3P_SpoolStatus, spoolStatus);
-    GET_DATE_ITEM(D3P_StockDate, stockDate);
-    GET_STRING_ITEM(D3P_SpoolDescriptor, spoolDesc);
-    GET_STRING_ITEM(D3P_Memo, memo);
-    GET_INT64_ITEM(D3P_Duration, duration);
-    GET_STRING_ITEM(D3P_SpoolNumber, spoolNo);
-    GET_STRING_ITEM(D3P_AccessionNumber, accNo);
-    GET_STRING_ITEM(D3P_CatalogueDetail, catDetail);
-    GET_UINT32_ITEM(D3P_ItemNumber, itemNo);
+    GET_STRING_ITEM(APP_Format, format);
+    GET_STRING_ITEM(APP_ProgrammeTitle, progTitle);
+    GET_STRING_ITEM(APP_EpisodeTitle, epTitle);
+    GET_DATE_ITEM(APP_TransmissionDate, txDate);
+    GET_STRING_ITEM(APP_MagazinePrefix, magPrefix);
+    GET_STRING_ITEM(APP_ProgrammeNumber, progNo);
+    GET_STRING_ITEM(APP_ProductionCode, prodCode);
+    GET_STRING_ITEM(APP_SpoolStatus, spoolStatus);
+    GET_DATE_ITEM(APP_StockDate, stockDate);
+    GET_STRING_ITEM(APP_SpoolDescriptor, spoolDesc);
+    GET_STRING_ITEM(APP_Memo, memo);
+    GET_INT64_ITEM(APP_Duration, duration);
+    GET_STRING_ITEM(APP_SpoolNumber, spoolNo);
+    GET_STRING_ITEM(APP_AccessionNumber, accNo);
+    GET_STRING_ITEM(APP_CatalogueDetail, catDetail);
+    GET_UINT32_ITEM(APP_ItemNumber, itemNo);
     
     SAFE_FREE(&tempWString);
     return 1;
@@ -135,13 +135,13 @@ fail:
 }
 
 
-int is_d3_mxf(MXFHeaderMetadata* headerMetadata)
+int is_archive_mxf(MXFHeaderMetadata* headerMetadata)
 {
     MXFMetadataSet* prefaceSet;
     MXFArrayItemIterator arrayIter;
     uint8_t* arrayElement;
     uint32_t arrayElementLen;
-    int haveBBCD3Scheme = 0;
+    int haveBBCScheme = 0;
     int haveSDUncompressed = 0;
     int havePCM = 0;
     mxfUL ul;
@@ -156,18 +156,18 @@ int is_d3_mxf(MXFHeaderMetadata* headerMetadata)
     }
 
     
-    /* check BBC D3 descriptive metadata scheme */
+    /* check BBC descriptive metadata scheme */
     CHK_OFAIL(mxf_initialise_array_item_iterator(prefaceSet, &MXF_ITEM_K(Preface, DMSchemes), &arrayIter));
     while (mxf_next_array_item_element(&arrayIter, &arrayElement, &arrayElementLen))
     {
         mxf_get_ul(arrayElement, &ul);
-        if (mxf_equals_ul(&ul, &MXF_DM_L(D3P_D3PreservationDescriptiveScheme)))
+        if (mxf_equals_ul(&ul, &MXF_DM_L(APP_PreservationDescriptiveScheme)))
         {
-            haveBBCD3Scheme = 1;
+            haveBBCScheme = 1;
             break;
         }
     }
-    if (!haveBBCD3Scheme)
+    if (!haveBBCScheme)
     {
         return 0;
     }
@@ -207,7 +207,7 @@ fail:
     return 0;    
 }
 
-int d3_mxf_get_info(MXFHeaderMetadata* headerMetadata, D3MXFInfo* info)
+int archive_mxf_get_info(MXFHeaderMetadata* headerMetadata, ArchiveMXFInfo* info)
 {
     MXFList* list = NULL;
     MXFListIterator iter;
@@ -217,7 +217,7 @@ int d3_mxf_get_info(MXFHeaderMetadata* headerMetadata, D3MXFInfo* info)
     mxfUL dataDef;
     uint32_t count;
     mxfUTF16Char* tempWString = NULL;
-    int haveD3InfaxData = 0;
+    int haveSourceInfaxData = 0;
     MXFMetadataSet* identSet;
     MXFMetadataSet* fileSourcePackageSet;
     MXFMetadataSet* sourcePackageSet;
@@ -277,8 +277,8 @@ int d3_mxf_get_info(MXFHeaderMetadata* headerMetadata, D3MXFInfo* info)
                 {
                     CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
                     
-                    /* if it is a D3P_InfaxFramework then it is the Infax data */
-                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(D3P_InfaxFramework)))
+                    /* if it is a APP_InfaxFramework then it is the Infax data */
+                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_InfaxFramework)))
                     {
                         CHK_OFAIL(get_infax_data(dmFrameworkSet, &info->ltoInfaxData));
                         break;
@@ -311,7 +311,7 @@ int d3_mxf_get_info(MXFHeaderMetadata* headerMetadata, D3MXFInfo* info)
     }    
     
     
-    /* D3 Infax data */
+    /* source Infax data */
     
     CHK_OFAIL(mxf_find_set_by_key(headerMetadata, &MXF_SET_K(SourcePackage), &list));
     mxf_initialise_list_iter(&iter, list);
@@ -357,11 +357,11 @@ int d3_mxf_get_info(MXFHeaderMetadata* headerMetadata, D3MXFInfo* info)
                         {
                             CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
                             
-                            /* if it is a D3P_InfaxFramework then it is the Infax data */
-                            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(D3P_InfaxFramework)))
+                            /* if it is a APP_InfaxFramework then it is the Infax data */
+                            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_InfaxFramework)))
                             {
-                                CHK_OFAIL(get_infax_data(dmFrameworkSet, &info->d3InfaxData));
-                                haveD3InfaxData = 1;
+                                CHK_OFAIL(get_infax_data(dmFrameworkSet, &info->sourceInfaxData));
+                                haveSourceInfaxData = 1;
                                 break;
                             }
                         }
@@ -375,7 +375,7 @@ int d3_mxf_get_info(MXFHeaderMetadata* headerMetadata, D3MXFInfo* info)
     mxf_free_list(&list);
 
     
-    return haveD3InfaxData;
+    return haveSourceInfaxData;
     
 fail:
     SAFE_FREE(&tempWString);
@@ -384,7 +384,7 @@ fail:
 }
 
 
-int d3_mxf_get_pse_failures(MXFHeaderMetadata* headerMetadata, PSEFailure** failures, long* numFailures)
+int archive_mxf_get_pse_failures(MXFHeaderMetadata* headerMetadata, PSEFailure** failures, long* numFailures)
 {
     MXFArrayItemIterator arrayIter;
     MXFArrayItemIterator arrayIter2;
@@ -436,8 +436,8 @@ int d3_mxf_get_pse_failures(MXFHeaderMetadata* headerMetadata, PSEFailure** fail
                 {
                     CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
 
-                    /* check whether the DMFrameworkSet is a D3P_PSEAnalysisFramework */                   
-                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(D3P_PSEAnalysisFramework)))
+                    /* check whether the DMFrameworkSet is a APP_PSEAnalysisFramework */                   
+                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_PSEAnalysisFramework)))
                     {
                         /* go back to the sequence and extract the PSE failures */
                         
@@ -465,10 +465,10 @@ int d3_mxf_get_pse_failures(MXFHeaderMetadata* headerMetadata, PSEFailure** fail
                             CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
                             CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &pseFailure->position));
                             CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
-                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_RedFlash), &pseFailure->redFlash));
-                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_SpatialPattern), &pseFailure->spatialPattern));
-                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_LuminanceFlash), &pseFailure->luminanceFlash));
-                            CHK_OFAIL(mxf_get_boolean_item(dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_ExtendedFailure), &pseFailure->extendedFailure));
+                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_RedFlash), &pseFailure->redFlash));
+                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_SpatialPattern), &pseFailure->spatialPattern));
+                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_LuminanceFlash), &pseFailure->luminanceFlash));
+                            CHK_OFAIL(mxf_get_boolean_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_ExtendedFailure), &pseFailure->extendedFailure));
                             i++;
                         }
                         break;
@@ -487,7 +487,7 @@ fail:
     return 0;
 }
 
-int d3_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** errors, long* numErrors)
+int archive_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** errors, long* numErrors)
 {
     MXFArrayItemIterator arrayIter;
     MXFArrayItemIterator arrayIter2;
@@ -538,8 +538,8 @@ int d3_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** err
                 {
                     CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
 
-                    /* check whether the DMFrameworkSet is a D3P_D3ReplayErrorFramework */                   
-                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(D3P_D3ReplayErrorFramework)))
+                    /* check whether the DMFrameworkSet is a APP_VTRReplayErrorFramework */                   
+                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_VTRReplayErrorFramework)))
                     {
                         /* go back to the sequence and extract the VTR errors */
                         
@@ -565,7 +565,7 @@ int d3_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** err
                             CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
                             CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &vtrError->position));
                             CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
-                            CHK_OFAIL(mxf_get_uint8_item(dmFrameworkSet, &MXF_ITEM_K(D3P_D3ReplayErrorFramework, D3P_D3ErrorCode), &vtrError->errorCode));
+                            CHK_OFAIL(mxf_get_uint8_item(dmFrameworkSet, &MXF_ITEM_K(APP_VTRReplayErrorFramework, APP_VTRErrorCode), &vtrError->errorCode));
                             
                             totalErrors++;
                         }
@@ -584,8 +584,105 @@ fail:
     return 0;
 }
 
+int archive_mxf_get_digibeta_dropouts(MXFHeaderMetadata* headerMetadata, DigiBetaDropout** digiBetaDropouts, long* numDigiBetaDropouts)
+{
+    MXFArrayItemIterator arrayIter;
+    MXFArrayItemIterator arrayIter2;
+    uint8_t* arrayElement;
+    uint32_t arrayElementLen;
+    mxfUL dataDef;
+    uint32_t count;
+    MXFMetadataSet* fileSourcePackageSet;
+    MXFMetadataSet* sourcePackageTrackSet;
+    MXFMetadataSet* sequenceSet;
+    MXFMetadataSet* dmSet;
+    MXFMetadataSet* dmFrameworkSet;
+    MXFListIterator setsIter;
+    DigiBetaDropout* newDigiBetaDropouts = NULL;
+    long totalDropouts = 0;
+    DigiBetaDropout* tmp;
+    
 
-int d3_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata)
+    CHK_OFAIL(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
+    CHK_OFAIL(mxf_uu_get_package_tracks(fileSourcePackageSet, &arrayIter));
+    while (mxf_uu_next_track(headerMetadata, &arrayIter, &sourcePackageTrackSet))
+    {
+        CHK_OFAIL(mxf_uu_get_track_datadef(sourcePackageTrackSet, &dataDef));
+        if (mxf_is_descriptive_metadata(&dataDef))
+        {
+            /* get to the sequence */
+            CHK_OFAIL(mxf_get_strongref_item(sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(Sequence)))
+            {
+                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                if (count == 0)
+                {
+                    continue;
+                }
+                
+                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
+                CHK_OFAIL(mxf_get_strongref(headerMetadata, arrayElement, &dmSet));
+            }
+            else
+            {
+                dmSet = sequenceSet;
+            }
+            
+            /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmSet->key, &MXF_SET_K(DMSegment)))
+            {
+                if (mxf_have_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
+                {
+                    CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+
+                    /* check whether the DMFrameworkSet is a APP_DigiBetaDropoutFramework */
+                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_DigiBetaDropoutFramework)))
+                    {
+                        /* go back to the sequence and extract the digibeta dropouts */
+                        
+                        CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                        if (newDigiBetaDropouts == NULL)
+                        {
+                            CHK_OFAIL((tmp = malloc(sizeof(DigiBetaDropout) * (totalDropouts + count))) != NULL);
+                        }
+                        else
+                        {
+                            /* multiple tracks with digibeta dropouts - reallocate the array */
+                            CHK_OFAIL((tmp = realloc(newDigiBetaDropouts, sizeof(DigiBetaDropout) * (totalDropouts + count))) != NULL);
+                        }
+                        newDigiBetaDropouts = tmp;
+                        
+                        /* extract the digibeta dropouts */
+                        initialise_sets_iter(headerMetadata, &setsIter);
+                        mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                        while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                        {
+                            DigiBetaDropout* digiBetaDropout = &newDigiBetaDropouts[totalDropouts];
+                            
+                            CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
+                            CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &digiBetaDropout->position));
+                            CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+                            CHK_OFAIL(mxf_get_int32_item(dmFrameworkSet, &MXF_ITEM_K(APP_DigiBetaDropoutFramework, APP_Strength), &digiBetaDropout->strength));
+                            
+                            totalDropouts++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    *digiBetaDropouts = newDigiBetaDropouts;
+    *numDigiBetaDropouts = totalDropouts;
+    return 1;
+
+fail:
+    SAFE_FREE(&newDigiBetaDropouts);
+    return 0;
+}
+
+
+int archive_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata)
 {
     MXFPageFile* mxfPageFile = NULL;
     MXFFile* mxfFile = NULL;

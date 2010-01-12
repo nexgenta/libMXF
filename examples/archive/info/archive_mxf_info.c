@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info.c,v 1.6 2009/12/17 16:17:55 john_f Exp $
+ * $Id: archive_mxf_info.c,v 1.1 2010/01/12 17:40:26 john_f Exp $
  *
  * 
  *
@@ -34,7 +34,7 @@
 #include <mxf/mxf_uu_metadata.h>
 #include <mxf/mxf_page_file.h>
 
-/* declare the BBC D3 extensions */
+/* declare the BBC archive extensions */
 
 #define MXF_LABEL(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15) \
     {d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15}
@@ -45,7 +45,7 @@
 #define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired) \
     static const mxfUL MXF_ITEM_K(setName, name) = label;
 
-#include <../bbc_d3_extensions_data_model.h>
+#include <../bbc_archive_extensions_data_model.h>
 
 
 typedef struct
@@ -61,7 +61,8 @@ typedef struct
     /* info */
     MXFList writerIdents;
     uint32_t pseFailureCount;
-    uint32_t d3VTRErrorCount;
+    uint32_t vtrErrorCount;
+    uint32_t digiBetaDropoutCount;
     
     int numVideoTracks;
     uint32_t componentDepth;
@@ -72,8 +73,9 @@ typedef struct
     
     MXFList pseFailures;
     MXFList vtrErrors;
+    MXFList digiBetaDropouts;
     
-    InfaxData d3InfaxData;
+    InfaxData sourceInfaxData;
     InfaxData ltoInfaxData;
     
     mxfUTF16Char* tempWString;
@@ -117,13 +119,13 @@ typedef struct
 } Reader;
 
 
-static const mxfKey g_TimecodeSysItemElementKey = MXF_SS1_ELEMENT_KEY(0x01, 0x00);
+static const mxfKey g_SysItemElementKey = MXF_SS1_ELEMENT_KEY(0x01, 0x00);
 
 static const uint32_t g_timecodeElementLen = 28;
 
 
 
-/* functions for loading the BBC D3 extensions */
+/* functions for loading the BBC archive extensions */
 
 #define MXF_LABEL(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15) \
     {d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15}
@@ -134,9 +136,9 @@ static const uint32_t g_timecodeElementLen = 28;
 #define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
     CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
     
-static int load_bbc_d3_extensions(MXFDataModel* dataModel)
+static int load_bbc_archive_extensions(MXFDataModel* dataModel)
 {
-#include <../bbc_d3_extensions_data_model.h>
+#include <../bbc_archive_extensions_data_model.h>
 
     return 1;
 }
@@ -159,7 +161,7 @@ static void get_content_package_len(Reader* reader)
     {
         CHK_OFAIL(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
 
-        if (mxf_equals_key(&key, &g_TimecodeSysItemElementKey))
+        if (mxf_equals_key(&key, &g_SysItemElementKey))
         {
             break;
         }
@@ -186,7 +188,7 @@ static void get_content_package_len(Reader* reader)
         reader->contentPackageLen += len;
 
         CHK_OFAIL(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
-        if (mxf_equals_key(&key, &g_TimecodeSysItemElementKey) || mxf_is_partition_pack(&key))
+        if (mxf_equals_key(&key, &g_SysItemElementKey) || mxf_is_partition_pack(&key))
         {
             break;
         }
@@ -228,7 +230,7 @@ static void report_actual_frame_count(Reader* reader)
     {
         CHK_OFAIL(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
 
-        if (mxf_equals_key(&key, &g_TimecodeSysItemElementKey))
+        if (mxf_equals_key(&key, &g_SysItemElementKey))
         {
             break;
         }
@@ -319,7 +321,7 @@ static int initialise_timecode_reader(Reader* reader)
     {
         CHK_ORET(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
 
-        if (mxf_equals_key(&key, &g_TimecodeSysItemElementKey))
+        if (mxf_equals_key(&key, &g_SysItemElementKey))
         {
             break;
         }
@@ -347,6 +349,7 @@ static int read_timecode_at_position(Reader* reader, mxfPosition position,
     uint8_t t12m[8];
     uint16_t localTag;
     uint16_t localItemLen;
+    int haveTimecodeItem = 0;
     
     CHK_ORET(reader->timecodeReadingInitialised);
     
@@ -357,23 +360,46 @@ static int read_timecode_at_position(Reader* reader, mxfPosition position,
         
     /* read and check the kl */
     CHK_ORET(mxf_read_kl(reader->mxfFile, &key, &llen, &len));
-    CHK_ORET(mxf_equals_key(&key, &g_TimecodeSysItemElementKey));
-    CHK_ORET(len == g_timecodeElementLen);
+    CHK_ORET(mxf_equals_key(&key, &g_SysItemElementKey));
     
-    /* read and check the local item tag and length */
-    CHK_ORET(mxf_read_uint16(reader->mxfFile, &localTag));
-    CHK_ORET(localTag == 0x0102);
-    CHK_ORET(mxf_read_uint16(reader->mxfFile, &localItemLen));
-    CHK_ORET(localItemLen == g_timecodeElementLen - 4);
+    /* read the timecode local item */
+    while (len > 0)
+    {
+        CHK_ORET(mxf_read_uint16(reader->mxfFile, &localTag));
+        CHK_ORET(mxf_read_uint16(reader->mxfFile, &localItemLen));
+        len -= 4;
+        
+        if (localTag == 0x0102)
+        {
+            CHK_ORET(localItemLen == 24);
+            
+            /* skip the array header */
+            CHK_ORET(mxf_skip(reader->mxfFile, 8));
+            
+            /* read the timecode */
+            CHK_ORET(mxf_file_read(reader->mxfFile, t12m, 8) == 8);
+            convert_12m_to_timecode(t12m, vitc);
+            CHK_ORET(mxf_file_read(reader->mxfFile, t12m, 8) == 8);
+            convert_12m_to_timecode(t12m, ltc);
+            
+            len -= localItemLen;
+            
+            haveTimecodeItem = 1;
+            break;
+        }
+        else
+        {
+            CHK_ORET(mxf_skip(reader->mxfFile, localItemLen));
+            
+            len -= localItemLen;
+        }
+    }
+    CHK_ORET(haveTimecodeItem);
     
-    /* skip the array header */
-    CHK_ORET(mxf_skip(reader->mxfFile, 8));
-    
-    /* read the timecode */
-    CHK_ORET(mxf_file_read(reader->mxfFile, t12m, 8) == 8);
-    convert_12m_to_timecode(t12m, vitc);
-    CHK_ORET(mxf_file_read(reader->mxfFile, t12m, 8) == 8);
-    convert_12m_to_timecode(t12m, ltc);
+    if (len > 0)
+    {
+        CHK_ORET(mxf_skip(reader->mxfFile, len));
+    }
 
     return 1;
 }
@@ -415,20 +441,6 @@ static void free_writer_ident_in_list(void* data)
     free(data);
 }
 
-static void free_vtr_error_in_list(void* data)
-{
-    VTRError* error;
-    
-    if (data == NULL)
-    {
-        return;
-    }
-    
-    error = (VTRError*)data;
-    
-    free(data);
-}
-
 static int create_pse_failure(Reader* reader, PSEFailure** failure)
 {
     PSEFailure* newFailure = NULL;
@@ -461,6 +473,22 @@ fail:
     return 0;
 }
 
+static int create_digibeta_dropout(Reader* reader, DigiBetaDropout** digiBetaDropout)
+{
+    DigiBetaDropout* newDigiBetaDropout = NULL;
+    
+    CHK_MALLOC_ORET(newDigiBetaDropout, DigiBetaDropout);
+    memset(newDigiBetaDropout, 0, sizeof(DigiBetaDropout));
+    CHK_OFAIL(mxf_append_list_element(&reader->digiBetaDropouts, newDigiBetaDropout));
+    
+    *digiBetaDropout = newDigiBetaDropout;
+    return 1;
+    
+fail:
+    SAFE_FREE(&newDigiBetaDropout);
+    return 0;
+}
+
 static int create_writer_ident(Reader* reader, WriterIdentification** ident)
 {
     WriterIdentification* newIdent = NULL;
@@ -485,7 +513,8 @@ static int create_reader(Reader** reader)
     memset(newReader, 0, sizeof(Reader));
     mxf_initialise_list(&newReader->writerIdents, free_writer_ident_in_list);
     mxf_initialise_list(&newReader->pseFailures, free);
-    mxf_initialise_list(&newReader->vtrErrors, free_vtr_error_in_list);
+    mxf_initialise_list(&newReader->vtrErrors, free);
+    mxf_initialise_list(&newReader->digiBetaDropouts, free);
     
     *reader = newReader;
     return 1;
@@ -503,6 +532,7 @@ static void free_reader(Reader** reader)
     mxf_clear_list(&(*reader)->writerIdents);
     mxf_clear_list(&(*reader)->pseFailures);
     mxf_clear_list(&(*reader)->vtrErrors);
+    mxf_clear_list(&(*reader)->digiBetaDropouts);
     
     mxf_free_list(&(*reader)->list);
     mxf_free_partition(&(*reader)->headerPartition);
@@ -517,17 +547,17 @@ static void free_reader(Reader** reader)
 
 
 #define GET_STRING_ITEM(name, cName) \
-    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name))) \
     { \
-        CHK_ORET(mxf_uu_get_utf16string_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &reader->tempWString)); \
+        CHK_ORET(mxf_uu_get_utf16string_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name), &reader->tempWString)); \
         CHK_ORET(convert_string(reader->tempWString, infaxData->cName, sizeof(infaxData->cName))); \
         SAFE_FREE(&reader->tempWString); \
     } 
 
 #define GET_DATE_ITEM(name, cName) \
-    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name))) \
     { \
-        CHK_ORET(mxf_get_timestamp_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+        CHK_ORET(mxf_get_timestamp_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name), &infaxData->cName)); \
         infaxData->cName.hour = 0; \
         infaxData->cName.min = 0; \
         infaxData->cName.sec = 0; \
@@ -535,40 +565,40 @@ static void free_reader(Reader** reader)
     } 
 
 #define GET_INT64_ITEM(name, cName) \
-    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name))) \
     { \
-        CHK_ORET(mxf_get_int64_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+        CHK_ORET(mxf_get_int64_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name), &infaxData->cName)); \
     } 
 
 #define GET_UINT32_ITEM(name, cName) \
-    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name))) \
+    if (mxf_have_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name))) \
     { \
-        CHK_ORET(mxf_get_uint32_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_InfaxFramework, name), &infaxData->cName)); \
+        CHK_ORET(mxf_get_uint32_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_InfaxFramework, name), &infaxData->cName)); \
     } 
 
 static int get_infax_data(Reader* reader, InfaxData* infaxData)
 {
-    GET_STRING_ITEM(D3P_Format, format);
-    GET_STRING_ITEM(D3P_ProgrammeTitle, progTitle);
-    GET_STRING_ITEM(D3P_EpisodeTitle, epTitle);
-    GET_DATE_ITEM(D3P_TransmissionDate, txDate);
-    GET_STRING_ITEM(D3P_MagazinePrefix, magPrefix);
-    GET_STRING_ITEM(D3P_ProgrammeNumber, progNo);
-    GET_STRING_ITEM(D3P_ProductionCode, prodCode);
-    GET_STRING_ITEM(D3P_SpoolStatus, spoolStatus);
-    GET_DATE_ITEM(D3P_StockDate, stockDate);
-    GET_STRING_ITEM(D3P_SpoolDescriptor, spoolDesc);
-    GET_STRING_ITEM(D3P_Memo, memo);
-    GET_INT64_ITEM(D3P_Duration, duration);
-    GET_STRING_ITEM(D3P_SpoolNumber, spoolNo);
-    GET_STRING_ITEM(D3P_AccessionNumber, accNo);
-    GET_STRING_ITEM(D3P_CatalogueDetail, catDetail);
-    GET_UINT32_ITEM(D3P_ItemNumber, itemNo);
+    GET_STRING_ITEM(APP_Format, format);
+    GET_STRING_ITEM(APP_ProgrammeTitle, progTitle);
+    GET_STRING_ITEM(APP_EpisodeTitle, epTitle);
+    GET_DATE_ITEM(APP_TransmissionDate, txDate);
+    GET_STRING_ITEM(APP_MagazinePrefix, magPrefix);
+    GET_STRING_ITEM(APP_ProgrammeNumber, progNo);
+    GET_STRING_ITEM(APP_ProductionCode, prodCode);
+    GET_STRING_ITEM(APP_SpoolStatus, spoolStatus);
+    GET_DATE_ITEM(APP_StockDate, stockDate);
+    GET_STRING_ITEM(APP_SpoolDescriptor, spoolDesc);
+    GET_STRING_ITEM(APP_Memo, memo);
+    GET_INT64_ITEM(APP_Duration, duration);
+    GET_STRING_ITEM(APP_SpoolNumber, spoolNo);
+    GET_STRING_ITEM(APP_AccessionNumber, accNo);
+    GET_STRING_ITEM(APP_CatalogueDetail, catDetail);
+    GET_UINT32_ITEM(APP_ItemNumber, itemNo);
     
     return 1;
 }
 
-static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
+static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts)
 {
     mxfKey key;
     uint8_t llen;
@@ -586,6 +616,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     uint32_t arrayElementLen;
     PSEFailure* pseFailure;
     VTRErrorAtPos* vtrError;
+    DigiBetaDropout* digiBetaDropout;
     int knownDMTrack;
     uint64_t headerByteCount;
     MXFListIterator setsIter;
@@ -656,8 +687,8 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     }
     
     
-    /* read the header metadata in the footer is showing PSE failures and/or D3 VTR errors */
-    if (showPSEFailures || showVTRErrors)
+    /* read the header metadata in the footer is showing PSE failures, VTR errors and/or digibeta dropouts */
+    if (showPSEFailures || showVTRErrors || showDigiBetaDropouts)
     {
         if (fileIsComplete)
         {
@@ -678,7 +709,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
         }
         else
         {
-            mxf_log_warn("Cannot show PSE failures or D3 VTR errors from an incomplete MXF file\n");
+            mxf_log_warn("Cannot show PSE failures or VTR errors from an incomplete MXF file\n");
             headerByteCount = reader->headerPartition->headerByteCount;
         }
     }
@@ -690,7 +721,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     
     /* load the data model  */
     CHK_ORET(mxf_load_data_model(&reader->dataModel));
-    CHK_ORET(load_bbc_d3_extensions(reader->dataModel));
+    CHK_ORET(load_bbc_archive_extensions(reader->dataModel));
     CHK_ORET(mxf_finalise_data_model(reader->dataModel));
     
     
@@ -701,10 +732,16 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     CHK_ORET(mxf_read_header_metadata(reader->mxfFile, reader->headerMetadata, headerByteCount, &key, llen, len));
 
     
-    /* PSE failure and VTR error counts in the Preface */
+    /* PSE failure, VTR error and digibeta dropout counts in the Preface */
     CHK_ORET(mxf_find_singular_set_by_key(reader->headerMetadata, &MXF_SET_K(Preface), &reader->prefaceSet));
-    CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, D3P_D3ErrorCount), &reader->d3VTRErrorCount));
-    CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, D3P_PSEFailureCount), &reader->pseFailureCount));
+    CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_VTRErrorCount), &reader->vtrErrorCount));
+    CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_PSEFailureCount), &reader->pseFailureCount));
+    /* check existence of item to support older file versions */
+    reader->digiBetaDropoutCount = 0;
+    if (mxf_have_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_DigiBetaDropoutCount)))
+    {
+        CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_DigiBetaDropoutCount), &reader->digiBetaDropoutCount));
+    }
     
     
         
@@ -783,7 +820,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
         }
 
 
-        /* PSE analysis, VTR error and BBC DMS */
+        /* PSE analysis, VTR error, digibeta dropout and BBC DMS */
         
         if (mxf_is_descriptive_metadata(&dataDef))
         {
@@ -801,7 +838,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
                         if (mxf_have_item(reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
                         {
                             CHK_ORET(mxf_get_strongref_item(reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
-                            if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(D3P_PSEAnalysisFramework)))
+                            if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(APP_PSEAnalysisFramework)))
                             {
                                 /* PSE failures track */
                                 knownDMTrack = 1;
@@ -816,14 +853,14 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
                                         CHK_ORET(mxf_get_strongref_s(reader->headerMetadata, &setsIter, arrayElement, &reader->dmSet));
                                         CHK_ORET(mxf_get_position_item(reader->dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &pseFailure->position));
                                         CHK_ORET(mxf_get_strongref_item_s(&setsIter, reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
-                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_RedFlash), &pseFailure->redFlash));
-                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_SpatialPattern), &pseFailure->spatialPattern));
-                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_LuminanceFlash), &pseFailure->luminanceFlash));
-                                        CHK_ORET(mxf_get_boolean_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_PSEAnalysisFramework, D3P_ExtendedFailure), &pseFailure->extendedFailure));
+                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_RedFlash), &pseFailure->redFlash));
+                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_SpatialPattern), &pseFailure->spatialPattern));
+                                        CHK_ORET(mxf_get_int16_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_LuminanceFlash), &pseFailure->luminanceFlash));
+                                        CHK_ORET(mxf_get_boolean_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_ExtendedFailure), &pseFailure->extendedFailure));
                                     }
                                 }
                             }
-                            else if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(D3P_D3ReplayErrorFramework)))
+                            else if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(APP_VTRReplayErrorFramework)))
                             {
                                 /* VTR error track */
                                 knownDMTrack = 1;
@@ -838,11 +875,30 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
                                         CHK_ORET(mxf_get_strongref_s(reader->headerMetadata, &setsIter, arrayElement, &reader->dmSet));
                                         CHK_ORET(mxf_get_position_item(reader->dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &vtrError->position));
                                         CHK_ORET(mxf_get_strongref_item_s(&setsIter, reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
-                                        CHK_ORET(mxf_get_uint8_item(reader->dmFrameworkSet, &MXF_ITEM_K(D3P_D3ReplayErrorFramework, D3P_D3ErrorCode), &vtrError->errorCode));
+                                        CHK_ORET(mxf_get_uint8_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_VTRReplayErrorFramework, APP_VTRErrorCode), &vtrError->errorCode));
                                     }
                                 }
                             }
-                            else if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(D3P_InfaxFramework)))
+                            else if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(APP_DigiBetaDropoutFramework)))
+                            {
+                                /* digibeta dropout track */
+                                knownDMTrack = 1;
+                                if (showDigiBetaDropouts)
+                                {
+                                    initialise_sets_iter(reader->headerMetadata, &setsIter);
+                                    
+                                    mxf_initialise_array_item_iterator(reader->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                                    while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                                    {
+                                        CHK_ORET(create_digibeta_dropout(reader, &digiBetaDropout)); 
+                                        CHK_ORET(mxf_get_strongref_s(reader->headerMetadata, &setsIter, arrayElement, &reader->dmSet));
+                                        CHK_ORET(mxf_get_position_item(reader->dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &digiBetaDropout->position));
+                                        CHK_ORET(mxf_get_strongref_item_s(&setsIter, reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
+                                        CHK_ORET(mxf_get_int32_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_DigiBetaDropoutFramework, APP_Strength), &digiBetaDropout->strength));
+                                    }
+                                }
+                            }
+                            else if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(APP_InfaxFramework)))
                             {
                                 /* Infax data track */
                                 knownDMTrack = 1;
@@ -907,7 +963,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
                         {
                             CHK_ORET(mxf_get_strongref_item(reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
                             
-                            CHK_ORET(get_infax_data(reader, &reader->d3InfaxData));
+                            CHK_ORET(get_infax_data(reader, &reader->sourceInfaxData));
                             break;
                         }
                     }
@@ -924,7 +980,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors)
     return 1;
 }
 
-static void write_d3_vtr_errors(Reader* reader, int noSourceTimecode)
+static void write_vtr_errors(Reader* reader, int noSourceTimecode)
 {
     MXFListIterator iter;
     VTRErrorAtPos* vtrError;
@@ -933,7 +989,7 @@ static void write_d3_vtr_errors(Reader* reader, int noSourceTimecode)
     char ltcStr[12];
     
     printf("\nVTR error results:\n");
-    printf("    %d errors detected\n", reader->d3VTRErrorCount);
+    printf("    %d errors detected\n", reader->vtrErrorCount);
     if (mxf_get_list_length(&reader->vtrErrors) > 0)
     {
         if (noSourceTimecode)
@@ -1015,6 +1071,47 @@ static void write_d3_vtr_errors(Reader* reader, int noSourceTimecode)
     }
 }
 
+static void write_digibeta_dropouts(Reader* reader, int noSourceTimecode)
+{
+    MXFListIterator iter;
+    DigiBetaDropout* digiBetaDropout;
+    uint64_t count;
+    char vitcStr[12];
+    char ltcStr[12];
+    
+    printf("\nDigiBeta dropout results:\n");
+    printf("    %d dropouts detected\n", reader->digiBetaDropoutCount);
+    if (mxf_get_list_length(&reader->digiBetaDropouts) > 0)
+    {
+        if (noSourceTimecode)
+        {
+            printf("    %10s:%10s %10s\n", 
+                "num", "frame", "strength");
+        }
+        else
+        {
+            printf("    %10s:%10s%16s%16s %10s\n", 
+                "num", "frame", "vitc", "ltc", "strength");
+        }
+        
+        count = 0;
+        mxf_initialise_list_iter(&iter, &reader->digiBetaDropouts);
+        while (mxf_next_list_iter_element(&iter))
+        {
+            digiBetaDropout = (DigiBetaDropout*)mxf_get_iter_element(&iter);
+            printf("    %10"PFi64":%10"PFi64, count, digiBetaDropout->position);
+            if (!noSourceTimecode)
+            {
+                read_time_string_at_position(reader, digiBetaDropout->position, vitcStr, ltcStr);
+                printf("%16s%16s", vitcStr, ltcStr);
+            }
+            printf(" %10d\n", digiBetaDropout->strength);
+            
+            count++;
+        }
+    }
+}
+
 static void write_infax_data(InfaxData* infaxData)
 {
     printf("    Format: %s\n", infaxData->format);    
@@ -1044,7 +1141,7 @@ static void write_infax_data(InfaxData* infaxData)
     printf("    Item number: %d\n", infaxData->itemNo);    
 }
 
-static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, int noSourceTimecode)
+static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts, int noSourceTimecode)
 {
     MXFListIterator iter;
     WriterIdentification* writerIdent;
@@ -1055,7 +1152,7 @@ static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, in
     char ltcStr[12];
     
 
-    printf("BBC D3 MXF file information\n");
+    printf("BBC Archive MXF file information\n");
     
     printf("\nMXF writer identifications:\n");
     i = 0;
@@ -1098,8 +1195,8 @@ static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, in
         (uint8_t)(((reader->duration % (25 * 60 * 60)) % (25 * 60)) % 25));
 
         
-    printf("\nD3 source information:\n");
-    write_infax_data(&reader->d3InfaxData);
+    printf("\nSource videotape information:\n");
+    write_infax_data(&reader->sourceInfaxData);
     
     printf("\nLTO/MXF destination information:\n");
     write_infax_data(&reader->ltoInfaxData);
@@ -1117,7 +1214,10 @@ static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, in
     }
 
     printf("\nVTR error results summary:\n");
-    printf("    %d errors detected\n", reader->d3VTRErrorCount);
+    printf("    %d errors detected\n", reader->vtrErrorCount);
+
+    printf("\nDigiBeta dropout results summary:\n");
+    printf("    %d dropouts detected\n", reader->digiBetaDropoutCount);
 
     /* initialise the timecode reading if showing source vitc and ltc */
     if (!noSourceTimecode)
@@ -1201,13 +1301,18 @@ static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, in
     
     if (showVTRErrors)
     {
-        write_d3_vtr_errors(reader, noSourceTimecode);    
+        write_vtr_errors(reader, noSourceTimecode);
+    }
+    
+    if (showDigiBetaDropouts)
+    {
+        write_digibeta_dropouts(reader, noSourceTimecode);
     }
     
     return 1;
 }
 
-static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors, int noSourceTimecode)
+static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts, int noSourceTimecode)
 {
     MXFListIterator iter;
     WriterIdentification* writerIdent;
@@ -1239,7 +1344,7 @@ static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors,
                writerIdent->modificationDate.min,
                writerIdent->modificationDate.sec);
     }
-    infaxData = &reader->d3InfaxData;
+    infaxData = &reader->sourceInfaxData;
     printf("Programme title: %s\n", infaxData->progTitle);    
     printf("Episode title: %s\n", infaxData->epTitle);    
     printf("Magazine prefix: %s\n", infaxData->magPrefix);    
@@ -1357,9 +1462,13 @@ static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors,
 
     if (showVTRErrors)
     {
-        write_d3_vtr_errors(reader, noSourceTimecode);
+        write_vtr_errors(reader, noSourceTimecode);
     }
     
+    if (showDigiBetaDropouts)
+    {
+        write_digibeta_dropouts(reader, noSourceTimecode);
+    }
     
     
     return 1;
@@ -1372,8 +1481,9 @@ static void usage(const char* cmd)
     fprintf(stderr, "\n");
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  -h, --help               display this usage message\n");
-    fprintf(stderr, "  -v, --show-vtr-errors    show detailed D3 VTR errors\n");
+    fprintf(stderr, "  -v, --show-vtr-errors    show detailed VTR errors\n");
     fprintf(stderr, "  -p, --show-pse-failures  show detailed PSE failures\n");
+    fprintf(stderr, "  -d, --show-digi-dropouts show detailed DigiBeta dropouts\n");
     fprintf(stderr, "  -s, --summary-info       show summary (omit detail)\n");
     fprintf(stderr, "  -t, --no-src-tc          don't search for source VITC and LTC timecodes\n");
 }
@@ -1383,6 +1493,7 @@ int main(int argc, const char* argv[])
     Reader* reader = NULL;
     int showVTRErrors = 0;
     int showPSEFailures = 0;
+    int showDigiBetaDropouts = 0;
     int summary = 0;
     int cmdlnIndex = 1;
     const char* mxfFilename = NULL;
@@ -1414,6 +1525,12 @@ int main(int argc, const char* argv[])
             strcmp(argv[cmdlnIndex], "--show-pse-failures") == 0)
         {
             showPSEFailures = 1;
+            cmdlnIndex += 1;
+        }
+        else if (strcmp(argv[cmdlnIndex], "-d") == 0 ||
+            strcmp(argv[cmdlnIndex], "--show-digi-dropouts") == 0)
+        {
+            showDigiBetaDropouts = 1;
             cmdlnIndex += 1;
         }
         else if (strcmp(argv[cmdlnIndex], "-s") == 0 ||
@@ -1469,7 +1586,7 @@ int main(int argc, const char* argv[])
         }
     }
     
-    if (!get_info(reader, showPSEFailures, showVTRErrors))
+    if (!get_info(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts))
     {
         mxf_log_error("Failed to extract info from '%s'\n", mxfFilename);
         goto fail;
@@ -1483,7 +1600,7 @@ int main(int argc, const char* argv[])
         
     if (summary)
     {
-        if (!write_summary(reader, showPSEFailures, showVTRErrors, noSourceTimecode))
+        if (!write_summary(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts, noSourceTimecode))
         {
             mxf_log_error("Failed to write summary info\n");
             goto fail;
@@ -1491,7 +1608,7 @@ int main(int argc, const char* argv[])
     }
     else
     {
-        if (!write_info(reader, showPSEFailures, showVTRErrors, noSourceTimecode))
+        if (!write_info(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts, noSourceTimecode))
         {
             mxf_log_error("Failed to write info\n");
             goto fail;

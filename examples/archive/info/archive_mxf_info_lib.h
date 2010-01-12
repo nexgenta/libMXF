@@ -1,5 +1,5 @@
 /*
- * $Id: d3_mxf_info_lib.h,v 1.2 2008/02/18 10:18:49 philipn Exp $
+ * $Id: archive_mxf_info_lib.h,v 1.1 2010/01/12 17:40:26 john_f Exp $
  *
  * 
  *
@@ -20,8 +20,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
  
-#ifndef __D3_MXF_INFO_LIB_H__
-#define __D3_MXF_INFO_LIB_H__
+#ifndef __ARCHIVE_MXF_INFO_LIB_H__
+#define __ARCHIVE_MXF_INFO_LIB_H__
 
 
 #ifdef __cplusplus
@@ -37,21 +37,22 @@ extern "C"
 typedef struct
 {
     mxfTimestamp creationDate;
-    char filename[64];
-    InfaxData d3InfaxData;
+    char filename[256];
+    InfaxData sourceInfaxData;
     InfaxData ltoInfaxData;
-} D3MXFInfo;
+} ArchiveMXFInfo;
 
-int d3_mxf_load_extensions(MXFDataModel* dataModel);
+int archive_mxf_load_extensions(MXFDataModel* dataModel);
 
-int is_d3_mxf(MXFHeaderMetadata* headerMetadata);
-int d3_mxf_get_info(MXFHeaderMetadata* headerMetadata, D3MXFInfo* info);
-int d3_mxf_get_pse_failures(MXFHeaderMetadata* headerMetadata, PSEFailure** failures, long* numFailures);
-int d3_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** errors, long* numErrors);
+int is_archive_mxf(MXFHeaderMetadata* headerMetadata);
+int archive_mxf_get_info(MXFHeaderMetadata* headerMetadata, ArchiveMXFInfo* info);
+int archive_mxf_get_pse_failures(MXFHeaderMetadata* headerMetadata, PSEFailure** failures, long* numFailures);
+int archive_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** errors, long* numErrors);
+int archive_mxf_get_digibeta_dropouts(MXFHeaderMetadata* headerMetadata, DigiBetaDropout** digibetaDropouts, long* numDigiBetaDropouts);
 
 
 /* returns 1 if footer headermetadata was read, return 2 if none is present (*headerMetadata is NULL) */
-int d3_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata);
+int archive_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata);
 
 
 #ifdef __cplusplus
