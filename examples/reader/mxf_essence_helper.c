@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.12 2010/01/12 16:25:01 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.13 2010/02/12 13:46:26 philipn Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -114,9 +114,9 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), &track->video.componentDepth));
     CHK_ORET(track->video.componentDepth != 0);
 
-    if (mxf_have_item(descriptorSet, &MXF_ITEM_K(FileDescriptor, Codec)))
+    if (mxf_have_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, PictureEssenceCoding)))
     {
-        CHK_ORET(mxf_get_ul_item(descriptorSet, &MXF_ITEM_K(FileDescriptor, Codec), &track->codecLabel));
+        CHK_ORET(mxf_get_ul_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, PictureEssenceCoding), &track->pictureEssenceCodingLabel));
     }
     
     if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(IECDV_25_525_60_ClipWrapped)) ||
@@ -448,7 +448,7 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
             else
             {
                 /* Only support 10-bit UYVY 4:2:2 */
-                CHK_ORET(mxf_equals_ul(&track->codecLabel, &MXF_CMDEF_L(UNC_10B_422_INTERLEAVED)));
+                CHK_ORET(mxf_equals_ul(&track->pictureEssenceCodingLabel, &MXF_CMDEF_L(UNC_10B_422_INTERLEAVED)));
                 /* SMPTE 377M-2009 states in G.2.25 that "Stored width shall be a multiple of 6" */
                 CHK_ORET((fieldWidth / 6) * 6 == fieldWidth);
                 

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.c,v 1.5 2009/10/13 09:21:52 philipn Exp $
+ * $Id: mxf_data_model.c,v 1.6 2010/02/12 13:46:26 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -175,6 +175,11 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
     return typeId;
 }
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable:4706)
+#endif
+
 
 #define MXF_BASIC_TYPE_DEF(id, name, size) \
     CHK_OFAIL(mxf_register_basic_type(newDataModel, name, id, size));    
@@ -199,7 +204,7 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
     CHK_OFAIL(mxf_register_item_def(newDataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
     
 
-    
+ 
 int mxf_load_data_model(MXFDataModel** dataModel)
 {
     MXFDataModel* newDataModel;
@@ -250,6 +255,10 @@ int mxf_load_extensions_data_model(MXFDataModel* dataModel)
 
     return 1;
 }
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 void mxf_free_data_model(MXFDataModel** dataModel)
 {

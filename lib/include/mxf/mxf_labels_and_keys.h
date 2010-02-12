@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.9 2009/12/17 16:20:57 john_f Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.10 2010/02/12 13:46:26 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -489,7 +489,7 @@ static const mxfUL MXF_EC_L(DNxHD1080i185ClipWrapped) =
     MXF_GENERIC_CONTAINER_ELEMENT_KEY(0x01, 0x16, elecount, eletype, elenum)
 
 #define MXF_AES3BWF_TRACK_NUM(elecount, eletype, elenum) \
-    MXF_TRACK_NUM(0x16, elecount, eletype, elenum);
+    MXF_TRACK_NUM(0x16, elecount, eletype, elenum)
     
 #define MXF_BWF_FRAME_WRAPPED_EE_TYPE       0x01
 #define MXF_BWF_CLIP_WRAPPED_EE_TYPE        0x02
@@ -505,7 +505,7 @@ static const mxfUL MXF_EC_L(DNxHD1080i185ClipWrapped) =
     MXF_GENERIC_CONTAINER_ELEMENT_KEY(0x01, 0x18, elecount, eletype, elenum)
     
 #define MXF_DV_TRACK_NUM(elecount, eletype, elenum) \
-    MXF_TRACK_NUM(0x18, elecount, eletype, elenum);
+    MXF_TRACK_NUM(0x18, elecount, eletype, elenum)
     
 #define MXF_DV_FRAME_WRAPPED_EE_TYPE        0x01
 #define MXF_DV_CLIP_WRAPPED_EE_TYPE         0x02
@@ -517,7 +517,7 @@ static const mxfUL MXF_EC_L(DNxHD1080i185ClipWrapped) =
     MXF_GENERIC_CONTAINER_ELEMENT_KEY(0x01, 0x15, elecount, eletype, elenum)
     
 #define MXF_UNC_TRACK_NUM(elecount, eletype, elenum) \
-    MXF_TRACK_NUM(0x15, elecount, eletype, elenum);
+    MXF_TRACK_NUM(0x15, elecount, eletype, elenum)
     
 #define MXF_UNC_FRAME_WRAPPED_EE_TYPE       0x02
 #define MXF_UNC_CLIP_WRAPPED_EE_TYPE        0x03
@@ -542,6 +542,10 @@ void mxf_complete_essence_element_track_num(uint32_t* trackNum, uint8_t count, u
 static const mxfKey MXF_EE_K(SDTI_CP_System_Pack) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x02, 0x05, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x04, 0x01, 0x01, 0x00};
 
+#define MXF_SDTI_CP_PACKAGE_METADATA_KEY(elecount) \
+    {0x06, 0x0e, 0x2b, 0x34, 0x02, 0x43, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x04, 0x01, 0x02, elecount}
+
+    
 
 /* D-10 mappings */
 
@@ -549,19 +553,19 @@ static const mxfKey MXF_EE_K(SDTI_CP_System_Pack) =
     MXF_GENERIC_CONTAINER_ELEMENT_KEY(0x01, 0x05, 0x01, 0x01, elenum)
     
 #define MXF_D10_PICTURE_TRACK_NUM(elenum) \
-    MXF_TRACK_NUM(0x05, 0x01, 0x01, elenum);
+    MXF_TRACK_NUM(0x05, 0x01, 0x01, elenum)
     
 #define MXF_D10_SOUND_EE_K(elenum) \
     MXF_GENERIC_CONTAINER_ELEMENT_KEY(0x01, 0x06, 0x01, 0x10, elenum)
     
 #define MXF_D10_SOUND_TRACK_NUM(elenum) \
-    MXF_TRACK_NUM(0x06, 0x01, 0x10, elenum);
+    MXF_TRACK_NUM(0x06, 0x01, 0x10, elenum)
     
 #define MXF_D10_AUX_EE_K(elecount, eletype, elenum) \
     MXF_GENERIC_CONTAINER_ELEMENT_KEY(0x01, 0x07, elecount, eletype, elenum)
     
 #define MXF_D10_AUX_TRACK_NUM(elecount, eletype, elenum) \
-    MXF_TRACK_NUM(0x07, elecount, eletype, elenum);
+    MXF_TRACK_NUM(0x07, elecount, eletype, elenum)
     
 
 /* A-law mappings */
@@ -570,7 +574,7 @@ static const mxfKey MXF_EE_K(SDTI_CP_System_Pack) =
     MXF_GENERIC_CONTAINER_ELEMENT_KEY(0x01, 0x16, elecount, eletype, elenum)
 
 #define MXF_ALAW_TRACK_NUM(elecount, eletype, elenum) \
-    MXF_TRACK_NUM(0x16, elecount, eletype, elenum);
+    MXF_TRACK_NUM(0x16, elecount, eletype, elenum)
     
 #define MXF_ALAW_FRAME_WRAPPED_EE_TYPE      0x08
 #define MXF_ALAW_CLIP_WRAPPED_EE_TYPE       0x09
@@ -583,7 +587,7 @@ static const mxfKey MXF_EE_K(SDTI_CP_System_Pack) =
     MXF_GENERIC_CONTAINER_ELEMENT_KEY(0x01, 0x15, elecount, eletype, elenum)
 
 #define MXF_MPEG_PICT_TRACK_NUM(elecount, eletype, elenum) \
-    MXF_TRACK_NUM(0x15, elecount, eletype, elenum);
+    MXF_TRACK_NUM(0x15, elecount, eletype, elenum)
     
 #define MXF_MPEG_PICT_FRAME_WRAPPED_EE_TYPE      0x05
 #define MXF_MPEG_PICT_CLIP_WRAPPED_EE_TYPE       0x06
@@ -748,6 +752,13 @@ int is_op_1a(const mxfUL* label);
 
 static const mxfUL MXF_DM_L(DMS1) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x04, 0x01, 0x01, 0x01, 0x01, 0x00};
+
+
+
+/* Transfer characteristic labels (Gamma) */
+
+static const mxfUL ITUR_BT470_TRANSFER_CH =
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x04, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00};
 
 
 

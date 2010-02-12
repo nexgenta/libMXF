@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.h,v 1.5 2010/01/12 17:18:48 john_f Exp $
+ * $Id: write_archive_mxf.h,v 1.6 2010/02/12 13:46:25 philipn Exp $
  *
  * 
  *
@@ -54,8 +54,8 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int comp
 /* write the essence, in order, starting with the system item, followed by video and then 0 or more audio */
 int write_system_item(ArchiveMXFWriter* output, ArchiveTimecode vitc, ArchiveTimecode ltc,
     const uint32_t* crc32, int numCRC32);
-int write_video_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size);
-int write_audio_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size);
+int write_video_frame(ArchiveMXFWriter* output, const uint8_t* data, uint32_t size);
+int write_audio_frame(ArchiveMXFWriter* output, const uint8_t* data, uint32_t size);
 
 /* close and delete the file and free output */
 int abort_archive_mxf_file(ArchiveMXFWriter** output);
@@ -87,7 +87,7 @@ int64_t get_archive_mxf_content_package_size(int componentDepth8Bit, int numAudi
 
 int parse_infax_data(const char* infaxDataString, InfaxData* infaxData, int beStrict);
 
-uint32_t calc_crc32(uint8_t* data, uint32_t size);
+uint32_t calc_crc32(const uint8_t* data, uint32_t size);
 
 
 #ifdef __cplusplus

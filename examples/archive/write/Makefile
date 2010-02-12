@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.4 2009/09/18 14:35:21 philipn Exp $
+# $Id: Makefile,v 1.5 2010/02/12 13:46:24 philipn Exp $
 #
 # Makefile for building archive examples
 #
@@ -49,7 +49,7 @@ update_archive_mxf.o: update_archive_mxf.c write_archive_mxf.h ../archive_types.
 	$(CC) $(CFLAGS) -c update_archive_mxf.c
 
 test_write_archive_mxf: $(LIBMXF_DIR)/libMXF.a libwritearchivemxf.a test_write_archive_mxf.o
-	$(CC) test_write_archive_mxf.o -L$(LIBMXF_DIR) -L. -lwritearchivemxf -lMXF $(UUIDLIB) -o $@
+	$(CC) test_write_archive_mxf.o -L$(LIBMXF_DIR) -L. -lwritearchivemxf -lMXF $(UUIDLIB) -lm -o $@
 
 test_write_archive_mxf.o: test_write_archive_mxf.c write_archive_mxf.h ../archive_types.h
 	$(CC) $(CFLAGS) -c test_write_archive_mxf.c

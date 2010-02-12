@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_utils.c,v 1.4 2007/10/26 15:15:52 john_f Exp $
+ * $Id: mxf_utils.c,v 1.5 2010/02/12 13:46:27 philipn Exp $
  *
  * General purpose utilities
  *
@@ -148,7 +148,6 @@ void mxf_get_timestamp_now(mxfTimestamp* now)
 
     struct _timeb tb;
     struct tm gmt;
-    struct tm* gmtPtr = NULL;
     
     memset(&gmt, 0, sizeof(struct tm));
     
@@ -156,14 +155,14 @@ void mxf_get_timestamp_now(mxfTimestamp* now)
     _ftime_s(&tb);
     
     /* using the secure (and reentrant) gmtime */
-    gmtime_s(&tb.time, &gmt);
+    gmtime_s(&gmt, &tb.time);
 
-    now->year = gmt.tm_year + 1900;
-    now->month = gmt.tm_mon + 1;
-    now->day = gmt.tm_mday;
-    now->hour = gmt.tm_hour;
-    now->min = gmt.tm_min;
-    now->sec = gmt.tm_sec;
+    now->year = (int16_t)gmt.tm_year + 1900;
+    now->month = (uint8_t)gmt.tm_mon + 1;
+    now->day = (uint8_t)gmt.tm_mday;
+    now->hour = (uint8_t)gmt.tm_hour;
+    now->min = (uint8_t)gmt.tm_min;
+    now->sec = (uint8_t)gmt.tm_sec;
     now->qmsec = (uint8_t)(tb.millitm / 4 + 0.5); /* 1/250th second */
     
 #else

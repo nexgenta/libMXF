@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.8 2009/10/22 14:24:53 john_f Exp $
+ * $Id: mxf_avid.c,v 1.9 2010/02/12 13:46:27 philipn Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -452,6 +452,10 @@ fail:
 
 
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable:4706)
+#endif
 
 #define MXF_COMPOUND_TYPE_DEF(id, name) \
     CHK_ORET(itemType = mxf_register_compound_type(dataModel, name, id));    
@@ -473,6 +477,10 @@ int mxf_avid_load_extensions(MXFDataModel* dataModel)
 
     return 1;
 }
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 
 int mxf_avid_read_filtered_header_metadata(MXFFile* mxfFile, int skipDataDefs, MXFHeaderMetadata* headerMetadata, 
@@ -850,7 +858,7 @@ int mxf_avid_set_product_version_item(MXFMetadataSet* set, const mxfKey* itemKey
     mxf_set_uint16(value->minor, &buffer[2]);
     mxf_set_uint16(value->patch, &buffer[4]);
     mxf_set_uint16(value->build, &buffer[6]);
-    mxf_set_uint8(value->release, &buffer[8]);
+    mxf_set_uint8((uint8_t)(value->release), &buffer[8]);
 
     CHK_ORET(mxf_set_item(set, itemKey, buffer, mxfProductVersion_extlen - 1));
 

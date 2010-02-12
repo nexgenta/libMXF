@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.c,v 1.6 2009/10/12 15:25:57 philipn Exp $
+ * $Id: mxf_file.c,v 1.7 2010/02/12 13:46:27 philipn Exp $
  *
  * Wraps a files, buffers etc. in an MXF file and provides low-level functions
  *
@@ -949,13 +949,13 @@ int mxf_read_l(MXFFile* mxfFile, uint8_t* llen, uint64_t* len)
     }
     else 
     {
-        int bytesToRead = c & 0x7f;
+        uint8_t bytesToRead = ((uint8_t)c) & 0x7f;
         CHK_ORET(bytesToRead <= 8); 
         for (i = 0; i < bytesToRead; i++) 
         {
             CHK_ORET((c = mxf_file_getc(mxfFile)) != EOF); 
-            length = length << 8;
-            length = length | c;
+            length <<= 8;
+            length |= (uint8_t)c;
         }
         llength += bytesToRead;
     }

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_page_file.c,v 1.5 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_page_file.c,v 1.6 2010/02/12 13:46:27 philipn Exp $
  *
  * 
  *
@@ -763,7 +763,7 @@ int mxf_page_file_open_read(const char* filenameTemplate, MXFPageFile** mxfPageF
     
     /* count number of page files */
     pageCount = 0;
-    while (1)
+    for(;;)
     {
         sprintf(filename, filenameTemplate, pageCount);
         if ((file = fopen(filename, "rb")) == NULL)
@@ -867,7 +867,7 @@ int mxf_page_file_open_modify(const char* filenameTemplate, int64_t pageSize, MX
 
     /* count number of page files */
     pageCount = 0;
-    while (1)
+    for(;;)
     {
         sprintf(filename, filenameTemplate, pageCount);
         if ((file = fopen(filename, "rb")) == NULL)
@@ -1054,7 +1054,7 @@ int mxf_page_file_remove(const char* filenameTemplate)
     int index = 0;
     char filename[4096];
     
-    while (1)
+    for(;;)
     {
         sprintf(filename, filenameTemplate, index);
         if (remove(filename) != 0)

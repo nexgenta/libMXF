@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.7 2010/01/12 17:17:50 john_f Exp $
+ * $Id: test_write_archive_mxf.c,v 1.8 2010/02/12 13:46:24 philipn Exp $
  *
  * 
  *
@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 #include <write_archive_mxf.h>
 #include <mxf/mxf_utils.h>
@@ -142,12 +143,16 @@ static void create_tone(unsigned char* pcmBuffer, int bufferSize)
 {
     int i;
     unsigned char* pcmBufferPtr = pcmBuffer;
+    int32_t sample;
     
+    /* 1kHz, -18dbFS */
     for (i = 0; i < bufferSize; i += 3)
     {
-        (*pcmBufferPtr++) = 0; 
-        (*pcmBufferPtr++) = (unsigned char)(64 + ((i / 3) % 10) / 10.0f * 128.0f); 
-        (*pcmBufferPtr++) = 0; 
+        sample = 270352173 * sin(i / 3 * 2 * M_PI * 1000.0/48000);
+        
+        (*pcmBufferPtr++) = (sample >> 8) & 0xff; 
+        (*pcmBufferPtr++) = (sample >> 16) & 0xff; 
+        (*pcmBufferPtr++) = (sample >> 24) & 0xff;
     }
 }
 

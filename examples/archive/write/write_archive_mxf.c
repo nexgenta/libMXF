@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.9 2010/01/12 17:18:48 john_f Exp $
+ * $Id: write_archive_mxf.c,v 1.10 2010/02/12 13:46:24 philipn Exp $
  *
  * 
  *
@@ -1016,7 +1016,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int comp
     CHK_OFAIL(mxf_set_rational_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, SampleRate), &g_videoSampleRate));
     if (!componentDepth8Bit)
     {
-        CHK_OFAIL(mxf_set_ul_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, Codec), &MXF_CMDEF_L(UNC_10B_422_INTERLEAVED)));
+        CHK_OFAIL(mxf_set_ul_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, PictureEssenceCoding), &MXF_CMDEF_L(UNC_10B_422_INTERLEAVED)));
     }
     CHK_OFAIL(mxf_set_ul_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(FileDescriptor, EssenceContainer), &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)));
     CHK_OFAIL(mxf_set_uint8_item(newOutput->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameLayout), g_videoFrameLayout));
@@ -1317,7 +1317,7 @@ int write_system_item(ArchiveMXFWriter* output, ArchiveTimecode vitc, ArchiveTim
     return 1;
 }
 
-int write_video_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size)
+int write_video_frame(ArchiveMXFWriter* output, const uint8_t* data, uint32_t size)
 {
     mxfKey eeKey = g_UncBaseElementKey;
 
@@ -1340,7 +1340,7 @@ int write_video_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size)
     return 1;
 }
 
-int write_audio_frame(ArchiveMXFWriter* output, uint8_t* data, uint32_t size)
+int write_audio_frame(ArchiveMXFWriter* output, const uint8_t* data, uint32_t size)
 {
     mxfKey eeKey = g_WavBaseElementKey;
 
@@ -2353,7 +2353,7 @@ static const uint32_t g_crc32Table[256] =
     0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94, 0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
     
-uint32_t calc_crc32(uint8_t* data, uint32_t size)
+uint32_t calc_crc32(const uint8_t* data, uint32_t size)
 {
     uint32_t i;
     uint32_t crc32 = 0;

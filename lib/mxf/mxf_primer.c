@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_primer.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_primer.c,v 1.4 2010/02/12 13:46:27 philipn Exp $
  *
  * MXF header metadata primer pack
  *
@@ -198,7 +198,7 @@ int mxf_create_item_tag(MXFPrimerPack* primerPack, mxfLocalTag* localTag)
 {
     mxfLocalTag tag;
     
-    while (1)
+    for(;;)
     {
         tag = primerPack->nextTag--;
         if (tag < 0x8000)
