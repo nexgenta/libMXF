@@ -1,5 +1,5 @@
 /*
- * $Id: archive_mxf_info_lib.c,v 1.1 2010/01/12 17:40:26 john_f Exp $
+ * $Id: archive_mxf_info_lib.c,v 1.2 2010/02/17 15:52:27 philipn Exp $
  *
  * 
  *
@@ -157,14 +157,17 @@ int is_archive_mxf(MXFHeaderMetadata* headerMetadata)
 
     
     /* check BBC descriptive metadata scheme */
-    CHK_OFAIL(mxf_initialise_array_item_iterator(prefaceSet, &MXF_ITEM_K(Preface, DMSchemes), &arrayIter));
-    while (mxf_next_array_item_element(&arrayIter, &arrayElement, &arrayElementLen))
+    if (mxf_have_item(prefaceSet, &MXF_ITEM_K(Preface, DMSchemes)))
     {
-        mxf_get_ul(arrayElement, &ul);
-        if (mxf_equals_ul(&ul, &MXF_DM_L(APP_PreservationDescriptiveScheme)))
+        CHK_OFAIL(mxf_initialise_array_item_iterator(prefaceSet, &MXF_ITEM_K(Preface, DMSchemes), &arrayIter));
+        while (mxf_next_array_item_element(&arrayIter, &arrayElement, &arrayElementLen))
         {
-            haveBBCScheme = 1;
-            break;
+            mxf_get_ul(arrayElement, &ul);
+            if (mxf_equals_ul(&ul, &MXF_DM_L(APP_PreservationDescriptiveScheme)))
+            {
+                haveBBCScheme = 1;
+                break;
+            }
         }
     }
     if (!haveBBCScheme)
