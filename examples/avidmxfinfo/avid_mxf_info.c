@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.9 2009/10/21 10:10:30 philipn Exp $
+ * $Id: avid_mxf_info.c,v 1.10 2010/02/17 15:51:41 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -363,6 +363,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     uint8_t llen;
     uint64_t len;
     uint32_t sequenceComponentCount;
+    uint32_t choicesCount;
     uint8_t* arrayElement;
     MXFList* list = NULL;
     MXFListIterator listIter;
@@ -385,6 +386,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     MXFMetadataSet* sequenceSet = NULL;
     MXFMetadataSet* timecodeComponentSet = NULL;
     MXFMetadataSet* refSourcePackageSet = NULL;
+    MXFMetadataSet* essenceGroupSet = NULL;
     mxfUMID packageUID;
     MXFList* taggedValueNames = NULL;
     MXFList* taggedValueValues = NULL;
@@ -413,7 +415,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     int numAudioTrackNumberRanges = 0;
     uint32_t trackNumber;
     char tracksString[256] = {0};
-    int i;
+    int i, j;
     size_t remSize;
     char* tracksStringPtr;
     size_t strLen;
@@ -696,7 +698,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
             info->projectEditRate = editRate;
         }
     
-        /* get the file source package if this track references it through a child source clip */
+        /* get info from this track if it references the file source package through a source clip */
         packageUID = g_Null_UMID;
         segmentOffset = 0;
         CHK_ORET(mxf_get_strongref_item(materialPackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
@@ -715,11 +717,42 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
 
                 CHK_ORET(mxf_get_length_item(sourceClipSet, &MXF_ITEM_K(StructuralComponent, Duration), &segmentDuration));
                 
-                if (mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(SourceClip)))
+                if (mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(EssenceGroup)))
+                {
+                    /* is an essence group - iterate through choices */
+                    essenceGroupSet = sourceClipSet;
+                    CHK_ORET(mxf_get_array_item_count(essenceGroupSet, &MXF_ITEM_K(EssenceGroup, Choices), &choicesCount));
+                    for (j = 0; j < (int)choicesCount; j++)
+                    {
+                        CHK_ORET(mxf_get_array_item_element(essenceGroupSet, &MXF_ITEM_K(EssenceGroup, Choices), j, &arrayElement));
+                        if (!mxf_get_strongref(essenceGroupSet->headerMetadata, arrayElement, &sourceClipSet))
+                        {
+                            /* dark set not registered in the dictionary */
+                            continue;
+                        }
+
+                        if (mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(SourceClip)))
+                        {
+                            CHK_ORET(mxf_get_umid_item(sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &packageUID));
+                            if (mxf_equals_umid(&info->fileSourcePackageUID, &packageUID))
+                            {
+                                /* found source clip referencing file source package */
+                                break;
+                            }
+                        }
+                    }
+                    if (j < (int)choicesCount)
+                    {
+                        /* found source clip referencing file source package */
+                        break;
+                    }
+                }
+                else if (mxf_is_subclass_of(sourceClipSet->headerMetadata->dataModel, &sourceClipSet->key, &MXF_SET_K(SourceClip)))
                 {
                     CHK_ORET(mxf_get_umid_item(sourceClipSet, &MXF_ITEM_K(SourceClip, SourcePackageID), &packageUID));
                     if (mxf_equals_umid(&info->fileSourcePackageUID, &packageUID))
                     {
+                        /* found source clip referencing file source package */
                         break;
                     }
                 }
