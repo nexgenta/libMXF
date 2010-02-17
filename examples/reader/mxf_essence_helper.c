@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.13 2010/02/12 13:46:26 philipn Exp $
+ * $Id: mxf_essence_helper.c,v 1.14 2010/02/17 15:53:15 philipn Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -639,8 +639,6 @@ int convert_aes_to_pcm(uint32_t channelCount, uint32_t bitsPerSample,
     uint8_t* pcmDataPtr;
     uint16_t sampleNum;
     uint8_t channel;
-    uint8_t channelNumber;
-    uint8_t validChannelCount;
 
     CHK_ORET(channelCount <= aes3ChannelCount);
     CHK_ORET(blockAlign >= 1 && blockAlign <= 3); /* only 8-bit to 24-bit sample size possible */
@@ -650,12 +648,10 @@ int convert_aes_to_pcm(uint32_t channelCount, uint32_t bitsPerSample,
     pcmDataPtr = &buffer[0];
     for (sampleNum = 0; sampleNum < audioSampleCount; sampleNum++)
     {
-        validChannelCount = 0;
-        for (channel = 0; channel < 8 && validChannelCount < channelCount; channel++)
+        for (channel = 0; channel < 8; channel++)
         {
             /* write audio channel if contains valid audio data */
-            channelNumber = aesDataPtr[0] & 0x07;
-            if (channelValidFlags & (0x01 << channelNumber))
+            if (channelValidFlags & (0x01 << channel))
             {
                 /* write PCM word */
                 switch (blockAlign)
@@ -683,8 +679,6 @@ int convert_aes_to_pcm(uint32_t channelCount, uint32_t bitsPerSample,
                         return 0;
                 }
                 pcmDataPtr += blockAlign;
-                
-                validChannelCount++;
             }
             aesDataPtr += 4 ; /* 4 bytes per sample */
         }
