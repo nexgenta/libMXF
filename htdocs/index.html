@@ -1,0 +1,39 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<!-- $Id: index.html,v 1.2 2009/10/22 16:02:23 john_f Exp $ $Name:  $ -->
+<head>
+	<style type="text/css">
+	body { font-family: arial,helvetica,sans-serif; font-size: 1.0em; margin: 1; }
+	a { text-decoration: none; color: blue; background-color: transparent; }
+	a:hover { text-decoration: underline; }
+	img { border: 0; }
+	</style>
+
+	<title>libMXF - MXF software library</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+<body>
+
+<H2>libMXF</H2>
+<p>
+<b>libMXF</b> is a software library written by BBC Research to read and write MXF files.  It has been optimised for real-time capture and playout in broadcast environments, and for interoperability with editing systems such as Avid Media Composer.
+<p>
+Source code can be browsed and downloaded from the <a href="http://ingex.cvs.sourceforge.net/ingex/ingex/libMXF/">CVS repository</a>.
+<p>
+Nightly builds as binary release snapshots for MS Windows, Mac OS X and Linux are available <a href="build/">here</a>.
+<H3>Tools</H3>
+Included with <b>libMXF</b> are a number of tools:
+<ul>
+<li><a href="http://ingex.cvs.sourceforge.net/ingex/ingex/libMXF/examples/writeavidmxf">writeavidmxf</a> - takes uncompressed video or audio, DV25/50, IMX, JPEG, DNxHD and DVCProHD files and writes MXF OP-Atom files which can be used directly in Avid Media Composer and related editors.<br>
+    E.g.<br>
+    <code>writeavidmxf --prefix rushes --dv25 rushes.dv --wavpcm rushes.wav</code><br>
+    This writes three files (rushes_v1.mxf, rushes_a1.mxf, rushes_a2.mxf) which can be dropped straight into the <b>/Avid MediaFiles/MXF/1</b> directory and used immediately by Avid editors.<br>
+    Run writeavidmxf without options to see full command usage.
+</ul>
+
+<!-- sourceforge and wc3 validator links -->
+<p>
+	<a href="http://sourceforge.net/projects/ingex"><img src="http://sflogo.sourceforge.net/sflogo.php?group_id=157898&amp;type=13" width="120" height="30" alt="Get Ingex - video capture and transcoding at SourceForge.net. Fast, secure and Free Open Source software downloads" /></a>
+
+</body>
+</html>
