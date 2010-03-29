@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.h,v 1.4 2009/10/21 10:10:29 philipn Exp $
+ * $Id: avid_mxf_info.h,v 1.5 2010/03/29 15:15:57 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -66,6 +66,7 @@ typedef enum
     DNXHD_185_ESSENCE_TYPE,
     DNXHD_120_ESSENCE_TYPE,
     DNXHD_36_ESSENCE_TYPE,
+    MPEG4_ESSENCE_TYPE,
     PCM_ESSENCE_TYPE
 } AvidEssenceType;
 

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_labels_and_keys.h,v 1.7 2009/10/21 10:10:28 philipn Exp $
+ * $Id: mxf_avid_labels_and_keys.h,v 1.8 2010/03/29 15:15:57 philipn Exp $
  *
  * Avid labels, keys, etc.
  *
@@ -156,6 +156,10 @@ static const mxfUL MXF_EC_L(DV1080i50ClipWrapped) =
 static const mxfUL MXF_EC_L(DV720p50ClipWrapped) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x03, 0x01, 0x02, 0x02, 0x63, 0x02};
 
+/* Label found in Avid file containing XDCAM proxy (MPEG-4) material */
+static const mxfUL MXF_EC_L(AvidMPEG4) =
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x03, 0x00, 0x00};
+
 
 
 /*
@@ -216,6 +220,8 @@ static const uint32_t g_AvidMJPEG31p_ResolutionID = 0x61;   /* 97 */
 static const uint32_t g_AvidMJPEG21p_ResolutionID = 0x62;   /* 98 */
 static const uint32_t g_AvidMJPEG31m_ResolutionID = 0x71;  /* 113 */
 static const uint32_t g_AvidMJPEG81m_ResolutionID = 0x70;  /* 112 */
+
+static const uint32_t g_AvidMPEG4_ResolutionID = 0x05df; /* 1503 */
 
 /*
  *

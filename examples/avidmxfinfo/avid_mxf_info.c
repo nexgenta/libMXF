@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.10 2010/02/17 15:51:41 philipn Exp $
+ * $Id: avid_mxf_info.c,v 1.11 2010/03/29 15:15:56 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -235,7 +235,7 @@ static const char* essence_type_string(AvidEssenceType essenceType)
         "20:1", "2:1s", "4:1s", "15:1s", "10:1", "10:1m", "4:1m", "3:1", "2:1",
         "1:1", "1:1 NTSC", "1:1 10b NTSC",
         "35:1p", "28:1p", "14:1p", "3:1p", "2:1p", "3:1m", "8:1m",
-        "DNxHD 185", "DNxHD 120", "DNxHD 36",
+        "DNxHD 185", "DNxHD 120", "DNxHD 36", "MPEG-4",
         "PCM"
     };
     assert(essenceType < sizeof(essenceTypeStrings) / sizeof(const char*));
@@ -1208,6 +1208,10 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     else if (mxf_equals_ul(&info->essenceContainerLabel, &MXF_EC_L(DNxHD1080p36ClipWrapped)))
     {
         info->essenceType = DNXHD_36_ESSENCE_TYPE;
+    }
+    else if (mxf_equals_ul(&info->essenceContainerLabel, &MXF_EC_L(AvidMPEG4)))
+    {
+        info->essenceType = MPEG4_ESSENCE_TYPE;
     }
     else if (mxf_equals_ul(&info->essenceContainerLabel, &MXF_EC_L(BWFClipWrapped)))
     {

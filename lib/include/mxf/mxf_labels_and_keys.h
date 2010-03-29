@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.10 2010/02/12 13:46:26 philipn Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.11 2010/03/29 15:15:57 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -154,8 +154,20 @@ static const mxfUL MXF_CMDEF_L(ALaw) =
 
 /* MPEG mappings */
 
-static const mxfUL MXF_CMDEF_L(MP4AdvancedRealTimeSimpleL3) = 
-    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x03, 0x04, 0x01, 0x02, 0x02, 0x01, 0x20, 0x02, 0x03};
+#define MXF_MPEG4_CMDEV_L(profile, variant) \
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x03, 0x04, 0x01, 0x02, 0x02, 0x01, 0x20, profile, variant}
+
+static const mxfUL MXF_CMDEF_L(MP4AdvancedRealTimeSimpleL1) =
+    MXF_MPEG4_CMDEV_L(0x02, 0x01);
+
+static const mxfUL MXF_CMDEF_L(MP4AdvancedRealTimeSimpleL2) =
+    MXF_MPEG4_CMDEV_L(0x02, 0x02);
+
+static const mxfUL MXF_CMDEF_L(MP4AdvancedRealTimeSimpleL3) =
+    MXF_MPEG4_CMDEV_L(0x02, 0x03);
+
+static const mxfUL MXF_CMDEF_L(MP4AdvancedRealTimeSimpleL4) =
+    MXF_MPEG4_CMDEV_L(0x02, 0x04);
 
 
 /* AVC Intra-Frame Coding */
