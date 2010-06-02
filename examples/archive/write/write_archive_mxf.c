@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.10 2010/02/12 13:46:24 philipn Exp $
+ * $Id: write_archive_mxf.c,v 1.11 2010/06/02 10:59:20 philipn Exp $
  *
  * 
  *
@@ -1282,8 +1282,8 @@ int write_system_item(ArchiveMXFWriter* output, ArchiveTimecode vitc, ArchiveTim
     
     CHK_ORET(verify_essence_write_state(output, 1, 0, 0));
     
-    CHK_ORET(add_timecode(&output->vitcIndex, &vitc));
-    CHK_ORET(add_timecode(&output->ltcIndex, &ltc));
+    CHK_ORET(add_timecode_to_index(&output->vitcIndex, &vitc));
+    CHK_ORET(add_timecode_to_index(&output->ltcIndex, &ltc));
 
     CHK_ORET(mxf_write_fixed_kl(output->mxfFile, &g_TimecodeSysItemElementKey, 4, output->systemItemSize));
     

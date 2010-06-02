@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_baseline_data_model.h,v 1.5 2009/06/18 11:55:50 philipn Exp $
+ * $Id: mxf_baseline_data_model.h,v 1.6 2010/06/02 10:59:20 philipn Exp $
  *
  * Baseline S377M MXF data model definitions
  *
@@ -22,7 +22,7 @@
 
 
 
-/* Note: defines are undefined at the end of the file */
+/* Note: defines are undefined at the end of the file, unless KEEP_DATA_MODEL_DEFS defined */
 
 
 #if !defined (MXF_BASIC_TYPE_DEF)
@@ -1170,7 +1170,7 @@ MXF_SET_DEFINITION(InterchangeObject, DMSet,
 
 
 
-
+#if !defined(KEEP_DATA_MODEL_DEFS)
 #undef MXF_BASIC_TYPE_DEF
 #undef MXF_ARRAY_TYPE_DEF
 #undef MXF_COMPOUND_TYPE_DEF
@@ -1179,6 +1179,5 @@ MXF_SET_DEFINITION(InterchangeObject, DMSet,
 #undef MXF_LABEL
 #undef MXF_SET_DEFINITION
 #undef MXF_ITEM_DEFINITION
-
-
+#endif
 

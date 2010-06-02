@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.9 2009/10/12 15:25:57 philipn Exp $
+ * $Id: mxf_opatom_reader.c,v 1.10 2010/06/02 10:59:20 philipn Exp $
  *
  * MXF OP-Atom reader
  *
@@ -765,15 +765,26 @@ int opa_is_supported(MXFPartition* headerPartition)
 {
     mxfUL* label;
     
-    if (!is_op_atom(&headerPartition->operationalPattern))
+    if (mxf_get_list_length(&headerPartition->essenceContainers) != 1)
     {
         return 0;
     }
-   
-    
-    CHK_ORET(mxf_get_list_length(&headerPartition->essenceContainers) == 1);
     label = (mxfUL*)mxf_get_list_element(&headerPartition->essenceContainers, 0);
 
+    if (!is_op_atom(&headerPartition->operationalPattern))
+    {
+        if (is_op_1a(&headerPartition->operationalPattern) &&
+                (mxf_equals_ul(label, &MXF_EC_L(BWFClipWrapped)) ||
+                    mxf_equals_ul(label, &MXF_EC_L(AES3ClipWrapped))))
+        {
+            /* pretend OP-1A file with clip-wrapped audio is an OP-Atom file */
+            /* TODO: separate clip/frame wrapping from OP-1A/Atom */
+            return 1;
+        }
+
+        return 0;
+    }
+    
     if (mxf_equals_ul(label, &MXF_EC_L(IECDV_25_525_60_ClipWrapped)) || 
         mxf_equals_ul(label, &MXF_EC_L(IECDV_25_625_50_ClipWrapped)) || 
         mxf_equals_ul(label, &MXF_EC_L(DVBased_25_525_60_ClipWrapped)) || 
@@ -892,16 +903,15 @@ int opa_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
     
     /* move to start of essence container in the body partition */
 
-    CHK_ORET(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
-    if (!mxf_is_body_partition_pack(&key))
+    while (1)
     {
-        CHK_OFAIL(mxf_skip(mxfFile, data->headerPartition->indexByteCount - mxfKey_extlen - llen));
         CHK_OFAIL(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
+        if (mxf_is_gc_essence_element(&key) || mxf_avid_is_essence_element(&key))
+        {
+            break;
+        }
+        CHK_OFAIL(mxf_skip(mxfFile, len));
     }
-    CHK_OFAIL(mxf_is_body_partition_pack(&key));
-    CHK_OFAIL(mxf_skip(mxfFile, len));
-    CHK_OFAIL(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
-    CHK_OFAIL(mxf_is_gc_essence_element(&key) || mxf_avid_is_essence_element(&key));
 
     data->essenceDataSize = len;
         

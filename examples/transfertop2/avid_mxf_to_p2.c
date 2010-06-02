@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_to_p2.c,v 1.5 2009/10/13 09:21:52 philipn Exp $
+ * $Id: avid_mxf_to_p2.c,v 1.6 2010/06/02 10:59:20 philipn Exp $
  *
  * Transfers Avid MXF files to P2
  *
@@ -719,7 +719,6 @@ static int transfer_to_p2(AvidMXFToP2Transfer* transfer, int inputFileIndex, int
     
     /* load the baseline data model and p2 extensions */
     CHK_ORET(mxf_load_data_model(&output->dataModel));
-    CHK_ORET(mxf_load_extensions_data_model(output->dataModel));
     CHK_ORET(mxf_p2_load_extensions(output->dataModel));
     CHK_ORET(mxf_finalise_data_model(output->dataModel));
     

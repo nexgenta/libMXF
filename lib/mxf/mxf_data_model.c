@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.c,v 1.6 2010/02/12 13:46:26 philipn Exp $
+ * $Id: mxf_data_model.c,v 1.7 2010/06/02 10:59:20 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -202,9 +202,8 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
     
 #define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
     CHK_OFAIL(mxf_register_item_def(newDataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
-    
 
- 
+
 int mxf_load_data_model(MXFDataModel** dataModel)
 {
     MXFDataModel* newDataModel;
@@ -215,7 +214,11 @@ int mxf_load_data_model(MXFDataModel** dataModel)
     mxf_initialise_list(&newDataModel->itemDefs, free_item_def_in_list); 
     mxf_initialise_list(&newDataModel->setDefs, free_set_def_in_list); 
     
+#define KEEP_DATA_MODEL_DEFS 1
 #include <mxf/mxf_baseline_data_model.h>
+
+#undef KEEP_DATA_MODEL_DEFS
+#include <mxf/mxf_extensions_data_model.h>
 
     *dataModel = newDataModel;
     return 1;
@@ -224,41 +227,6 @@ fail:
     mxf_free_data_model(&newDataModel);
     return 0;
 }
-
-
-#define MXF_BASIC_TYPE_DEF(id, name, size) \
-    CHK_ORET(mxf_register_basic_type(dataModel, name, id, size));    
-
-#define MXF_ARRAY_TYPE_DEF(id, name, elementTypeId, fixedSize) \
-    CHK_ORET(mxf_register_array_type(dataModel, name, id, elementTypeId, fixedSize));    
-
-#define MXF_COMPOUND_TYPE_DEF(id, name) \
-    CHK_ORET(itemType = mxf_register_compound_type(dataModel, name, id));    
-
-#define MXF_COMPOUND_TYPE_MEMBER(name, typeId) \
-    CHK_ORET(mxf_register_compound_type_member(itemType, name, typeId));    
-
-#define MXF_INTERPRETED_TYPE_DEF(id, name, typeId, fixedSize) \
-    CHK_ORET(mxf_register_interpret_type(dataModel, name, id, typeId, fixedSize));    
-
-    
-#define MXF_SET_DEFINITION(parentName, name, label) \
-    CHK_ORET(mxf_register_set_def(dataModel, #name, &MXF_SET_K(parentName), &MXF_SET_K(name)));
-    
-#define MXF_ITEM_DEFINITION(setName, name, label, tag, typeId, isRequired) \
-    CHK_ORET(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
-    
-
-int mxf_load_extensions_data_model(MXFDataModel* dataModel)
-{
-#include <mxf/mxf_extensions_data_model.h>
-
-    return 1;
-}
-
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 void mxf_free_data_model(MXFDataModel** dataModel)
 {
@@ -279,8 +247,6 @@ void mxf_free_data_model(MXFDataModel** dataModel)
     
     SAFE_FREE(dataModel);
 }
-
-
 
 int mxf_register_set_def(MXFDataModel* dataModel, const char* name, const mxfKey* parentKey, 
     const mxfKey* key)
@@ -523,7 +489,6 @@ int mxf_finalise_data_model(MXFDataModel* dataModel)
     while (mxf_next_list_iter_element(&iter))
     {
         itemDef = (MXFItemDef*)mxf_get_iter_element(&iter);
-
         CHK_ORET(mxf_find_set_def(dataModel, &itemDef->setDefKey, &setDef));
         CHK_ORET(mxf_append_list_element(&setDef->itemDefs, (void*)itemDef));
     }

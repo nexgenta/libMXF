@@ -1,5 +1,5 @@
 /*
- * $Id: timecode_index.h,v 1.2 2010/01/12 17:43:08 john_f Exp $
+ * $Id: timecode_index.h,v 1.3 2010/06/02 10:59:20 philipn Exp $
  *
  * 
  *
@@ -69,7 +69,7 @@ typedef struct
 void initialise_timecode_index(TimecodeIndex* index, int arraySize);
 void clear_timecode_index(TimecodeIndex* index);
 
-int add_timecode(TimecodeIndex* index, ArchiveTimecode* timecode);
+int add_timecode_to_index(TimecodeIndex* index, ArchiveTimecode* timecode);
 
 int is_null_timecode_index(TimecodeIndex* index);
 

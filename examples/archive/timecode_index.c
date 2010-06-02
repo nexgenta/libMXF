@@ -1,5 +1,5 @@
 /*
- * $Id: timecode_index.c,v 1.3 2010/01/12 17:43:08 john_f Exp $
+ * $Id: timecode_index.c,v 1.4 2010/06/02 10:59:20 philipn Exp $
  *
  * 
  *
@@ -215,7 +215,7 @@ void clear_timecode_index(TimecodeIndex* index)
     mxf_clear_list(&index->indexArrays);
 }
 
-int add_timecode(TimecodeIndex* index, ArchiveTimecode* timecode)
+int add_timecode_to_index(TimecodeIndex* index, ArchiveTimecode* timecode)
 {
     TimecodeIndexArray* newArray = NULL;
     TimecodeIndexArray* lastArray;

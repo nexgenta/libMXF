@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.11 2010/03/29 15:15:56 philipn Exp $
+ * $Id: avid_mxf_info.c,v 1.12 2010/06/02 10:59:20 philipn Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -443,7 +443,6 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
     /* read the header metadata (filter out meta-dictionary and dictionary except data defs) */
     
     DCHECK(mxf_load_data_model(&dataModel));
-    DCHECK(mxf_load_extensions_data_model(dataModel));
     DCHECK(mxf_avid_load_extensions(dataModel));
     
     DCHECK(mxf_finalise_data_model(dataModel));

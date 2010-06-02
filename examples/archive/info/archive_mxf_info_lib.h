@@ -1,5 +1,5 @@
 /*
- * $Id: archive_mxf_info_lib.h,v 1.1 2010/01/12 17:40:26 john_f Exp $
+ * $Id: archive_mxf_info_lib.h,v 1.2 2010/06/02 10:59:20 philipn Exp $
  *
  * 
  *
@@ -53,6 +53,8 @@ int archive_mxf_get_digibeta_dropouts(MXFHeaderMetadata* headerMetadata, DigiBet
 
 /* returns 1 if footer headermetadata was read, return 2 if none is present (*headerMetadata is NULL) */
 int archive_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata);
+
+int archive_mxf_is_metadata_only(const char* filename);
 
 
 #ifdef __cplusplus

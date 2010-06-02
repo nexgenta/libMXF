@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.c,v 1.5 2010/01/12 16:25:07 john_f Exp $
+ * $Id: mxf_reader.c,v 1.6 2010/06/02 10:59:20 philipn Exp $
  *
  * Main functions for reading MXF files
  *
@@ -410,6 +410,11 @@ void close_mxf_reader(MXFReader** reader)
     SAFE_FREE(reader);
 }
 
+int is_metadata_only(MXFReader* reader)
+{
+    return reader->isMetadataOnly;
+}
+
 MXFClip* get_mxf_clip(MXFReader* reader)
 {
     return &reader->clip;
@@ -465,6 +470,11 @@ int clip_has_video(MXFReader* reader)
 
 int set_frame_rate(MXFReader* reader, const mxfRational* frameRate)
 {
+    if (reader->isMetadataOnly)
+    {
+        return 0;
+    }
+    
     if (memcmp(frameRate, &reader->clip.frameRate, sizeof(*frameRate)) == 0)
     {
         return 1;
@@ -500,6 +510,11 @@ int position_at_frame(MXFReader* reader, int64_t frameNumber)
     int result;
     int64_t i;
     int64_t skipFrameCount;
+    
+    if (reader->isMetadataOnly)
+    {
+        return 0;
+    }
     
     if (frameNumber < 0 || (reader->clip.duration >= 0 && frameNumber > reader->clip.duration))
     {
@@ -548,6 +563,11 @@ int position_at_frame(MXFReader* reader, int64_t frameNumber)
 
 int64_t get_last_written_frame_number(MXFReader* reader)
 {
+    if (reader->isMetadataOnly)
+    {
+        return -1;
+    }
+    
     if (reader->clip.duration >= 0 && get_frame_number(reader) >= reader->clip.duration)
     {
         /* we are at the last frame */
@@ -566,6 +586,11 @@ int64_t get_last_written_frame_number(MXFReader* reader)
 int skip_next_frame(MXFReader* reader)
 {
     int result; 
+    
+    if (reader->isMetadataOnly)
+    {
+        return -1;
+    }
     
     if (reader->clip.duration >= 0 && (get_frame_number(reader) + 1) >= reader->clip.duration)
     {
@@ -588,6 +613,11 @@ int skip_next_frame(MXFReader* reader)
 int read_next_frame(MXFReader* reader, MXFReaderListener* listener)
 {
     int result; 
+    
+    if (reader->isMetadataOnly)
+    {
+        return -1;
+    }
     
     if (reader->clip.duration >= 0 && (get_frame_number(reader) + 1) >= reader->clip.duration)
     {
@@ -621,6 +651,11 @@ int read_next_frame(MXFReader* reader, MXFReaderListener* listener)
 
 int64_t get_frame_number(MXFReader* reader)
 {
+    if (reader->isMetadataOnly)
+    {
+        return -1;
+    }
+    
     return reader->essenceReader->get_next_frame_number(reader) - 1;
 }
 
@@ -633,7 +668,7 @@ int get_playout_timecode(MXFReader* reader, MXFTimecode* timecode)
 
 int get_num_source_timecodes(MXFReader* reader)
 {
-    if (!reader->haveReadAFrame)
+    if (!reader->isMetadataOnly && !reader->haveReadAFrame)
     {
         if (mxf_file_is_seekable(reader->mxfFile))
         {
@@ -723,7 +758,7 @@ int get_source_timecode(MXFReader* reader, int index, MXFTimecode* timecode, int
 
 int get_num_archive_crc32(MXFReader* reader)
 {
-    if (!reader->haveReadAFrame)
+    if (!reader->isMetadataOnly && !reader->haveReadAFrame)
     {
         if (mxf_file_is_seekable(reader->mxfFile))
         {

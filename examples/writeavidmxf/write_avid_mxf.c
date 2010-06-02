@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.19 2009/10/22 14:17:51 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.20 2010/06/02 10:59:20 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -184,8 +184,6 @@ struct _AvidClipWriter
     int dropFrameFlag;
     int useLegacy;
     mxfRational projectEditRate;
-    
-    uint8_t dropFrameTimecode;
     
     mxfTimestamp now;
     
@@ -501,7 +499,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
     CHK_ORET(mxf_set_umid_item(writer->prefaceSet, &MXF_ITEM_K(Preface, MasterMobID), &materialPackage->uid));
     CHK_ORET(mxf_set_umid_item(writer->prefaceSet, &MXF_ITEM_K(Preface, EssenceFileMobID), &filePackage->uid));
     CHK_ORET(mxf_alloc_array_item_elements(writer->prefaceSet, &MXF_ITEM_K(Preface, DMSchemes), mxfUL_extlen, 1, &arrayElement));
-    mxf_set_ul(&MXF_DM_L(DMS1), arrayElement);
+    mxf_set_ul(&MXF_DM_L(LegacyDMS1), arrayElement);
     
 
     /* Preface - Dictionary */
@@ -961,7 +959,7 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         CHK_ORET(mxf_set_ul_item(writer->timecodeComponentSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &writer->timecodeDataDef));
         CHK_ORET(mxf_set_length_item(writer->timecodeComponentSet, &MXF_ITEM_K(StructuralComponent, Duration), tapeLen));
         CHK_ORET(mxf_set_uint16_item(writer->timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, RoundedTimecodeBase), roundedTimecodeBase));
-        CHK_ORET(mxf_set_boolean_item(writer->timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, DropFrame), clipWriter->dropFrameTimecode));
+        CHK_ORET(mxf_set_boolean_item(writer->timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, DropFrame), clipWriter->dropFrameFlag));
         CHK_ORET(mxf_set_position_item(writer->timecodeComponentSet, &MXF_ITEM_K(TimecodeComponent, StartTimecode), 0));
 
         

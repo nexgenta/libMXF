@@ -1,5 +1,5 @@
 /*
- * $Id: test_timecode_index.c,v 1.2 2008/05/07 15:21:55 philipn Exp $
+ * $Id: test_timecode_index.c,v 1.3 2010/06/02 10:59:19 philipn Exp $
  *
  * 
  *
@@ -129,8 +129,8 @@ int main()
     /* linear, equal */
     for (i = 0; i < 10; i++)
     {
-        add_timecode(&vitcIndex, &vitcTimecode);
-        add_timecode(&ltcIndex, &ltcTimecode);
+        add_timecode_to_index(&vitcIndex, &vitcTimecode);
+        add_timecode_to_index(&ltcIndex, &ltcTimecode);
         
         increment_timecode(&vitcTimecode);
         increment_timecode(&ltcTimecode);
@@ -141,8 +141,8 @@ int main()
     increment_timecode(&vitcTimecode);
     for (i = 0; i < 10; i++)
     {
-        add_timecode(&vitcIndex, &vitcTimecode);
-        add_timecode(&ltcIndex, &ltcTimecode);
+        add_timecode_to_index(&vitcIndex, &vitcTimecode);
+        add_timecode_to_index(&ltcIndex, &ltcTimecode);
         
         increment_timecode(&vitcTimecode);
         increment_timecode(&ltcTimecode);
@@ -153,8 +153,8 @@ int main()
     /* linear, not-equal, broken */
     for (i = 0; i < 10; i++)
     {
-        add_timecode(&vitcIndex, &vitcTimecode);
-        add_timecode(&ltcIndex, &ltcTimecode);
+        add_timecode_to_index(&vitcIndex, &vitcTimecode);
+        add_timecode_to_index(&ltcIndex, &ltcTimecode);
         
         if (i % 2 == 0)
         {
@@ -182,8 +182,8 @@ int main()
     increment_timecode(&ltcTimecode);
     for (i = 0; i < 10; i++)
     {
-        add_timecode(&vitcIndex, &vitcTimecode);
-        add_timecode(&ltcIndex, &ltcTimecode);
+        add_timecode_to_index(&vitcIndex, &vitcTimecode);
+        add_timecode_to_index(&ltcIndex, &ltcTimecode);
         
         if (i % 2 == 0)
         {
@@ -207,8 +207,8 @@ int main()
     /* linear, broken, not equal */
     for (i = 0; i < 90 * 60 * 25; i++)
     {
-        add_timecode(&vitcIndex, &vitcTimecode);
-        add_timecode(&ltcIndex, &ltcTimecode);
+        add_timecode_to_index(&vitcIndex, &vitcTimecode);
+        add_timecode_to_index(&ltcIndex, &ltcTimecode);
         
         increment_timecode(&vitcTimecode);
         increment_timecode(&vitcTimecode);

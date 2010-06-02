@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.c,v 1.7 2010/02/12 13:46:27 philipn Exp $
+ * $Id: mxf_file.c,v 1.8 2010/06/02 10:59:20 philipn Exp $
  *
  * Wraps a files, buffers etc. in an MXF file and provides low-level functions
  *
@@ -1214,6 +1214,28 @@ int mxf_read_array_header(MXFFile* mxfFile, uint32_t* len, uint32_t* eleLen)
 int mxf_write_array_header(MXFFile* mxfFile, uint32_t len, uint32_t eleLen)
 {
     return mxf_write_batch_header(mxfFile, len, eleLen);
+}
+
+
+int mxf_write_zeros(MXFFile* mxfFile, uint32_t len)
+{
+    static const unsigned char zeros[1024] = {0};
+    
+    uint32_t completeCount = len / sizeof(zeros);
+    uint32_t partialCount = len % sizeof(zeros);
+    uint32_t i;
+    
+    for (i = 0; i < completeCount; i++)
+    {
+        CHK_ORET(mxf_file_write(mxfFile, zeros, sizeof(zeros)) == sizeof(zeros));
+    }
+    
+    if (partialCount > 0)
+    {
+        CHK_ORET(mxf_file_write(mxfFile, zeros, partialCount) == partialCount);
+    }
+ 
+    return 1;
 }
 
 

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_partition.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_partition.h,v 1.3 2010/06/02 10:59:20 philipn Exp $
  *
  * MXF file partitions
  *
@@ -106,6 +106,7 @@ int mxf_read_partition(MXFFile* mxfFile, const mxfKey* key, MXFPartition** parti
 int mxf_is_filler(const mxfKey* key);
 int mxf_fill_to_kag(MXFFile* mxfFile, MXFPartition* partition);
 int mxf_fill_to_position(MXFFile* mxfFile, uint64_t position);
+int mxf_allocate_space_to_kag(MXFFile* mxfFile, MXFPartition* partition, uint32_t size);
 int mxf_allocate_space(MXFFile* mxfFile, uint32_t size);
 int mxf_write_fill(MXFFile* mxfFile, uint32_t size);
 int mxf_read_next_nonfiller_kl(MXFFile* mxfFile, mxfKey *key, uint8_t* llen, uint64_t *len);

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_op1a_reader.c,v 1.4 2010/01/12 16:25:07 john_f Exp $
+ * $Id: mxf_op1a_reader.c,v 1.5 2010/06/02 10:59:20 philipn Exp $
  *
  * MXF OP-1A reader
  *
@@ -336,11 +336,18 @@ static int process_metadata(MXFReader* reader, MXFPartition* partition)
     CHK_OFAIL(mxf_read_header_metadata(mxfFile, data->headerMetadata, 
         partition->headerByteCount, &key, llen, len));
 
+
+    /* check for metadata only files */
+    
+    if (!mxf_find_singular_set_by_key(data->headerMetadata, &MXF_SET_K(EssenceContainerData), &essContainerDataSet))
+    {
+        reader->isMetadataOnly = 1;
+        return 1;
+    }
     
     
     /* get the body and index SID from the (single essence container; external essence not supported) */
     
-    CHK_OFAIL(mxf_find_singular_set_by_key(data->headerMetadata, &MXF_SET_K(EssenceContainerData), &essContainerDataSet));
     CHK_OFAIL(mxf_get_uint32_item(essContainerDataSet, &MXF_ITEM_K(EssenceContainerData, BodySID), &data->bodySID));
     if (mxf_have_item(essContainerDataSet, &MXF_ITEM_K(EssenceContainerData, IndexSID)))
     {
@@ -974,6 +981,11 @@ int op1a_is_supported(MXFPartition* headerPartition)
         return 0;
     }
     
+    if (mxf_get_list_length(&headerPartition->essenceContainers) == 0)
+    {
+        /* metadata only */
+        return 1;
+    }
     
     if (mxf_get_list_length(&headerPartition->essenceContainers) == 1)
     {
@@ -1094,13 +1106,16 @@ int op1a_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
             goto fail;
         }
 
-        
-        /* create file index */
-        CHK_OFAIL(create_index(mxfFile, &data->partitions, data->indexSID, data->bodySID, &data->index));
-        
-        
-        /* position at start of essence */
-        CHK_OFAIL(set_position(mxfFile, data->index, 0));
+
+        if (!reader->isMetadataOnly)
+        {
+            /* create file index */
+            CHK_OFAIL(create_index(mxfFile, &data->partitions, data->indexSID, data->bodySID, &data->index));
+            
+            
+            /* position at start of essence */
+            CHK_OFAIL(set_position(mxfFile, data->index, 0));
+        }
     }
     else
     {
@@ -1118,8 +1133,11 @@ int op1a_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
         CHK_OFAIL(process_metadata(reader, data->headerPartition));
         
         
-        /* position at start of essence */
-        CHK_OFAIL(ns_position_at_first_frame(reader));
+        if (!reader->isMetadataOnly)
+        {
+            /* position at start of essence */
+            CHK_OFAIL(ns_position_at_first_frame(reader));
+        }
     }
 
     

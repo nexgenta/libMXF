@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.h,v 1.6 2009/10/13 09:21:52 philipn Exp $
+ * $Id: mxf_data_model.h,v 1.7 2010/06/02 10:59:20 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -197,24 +197,16 @@ typedef enum
 #define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired) \
     static const mxfUL MXF_ITEM_K(setName, name) = label;
 
+#define KEEP_DATA_MODEL_DEFS 1
 #include <mxf/mxf_baseline_data_model.h>
 
 /* declare the extensions set and item keys */
 
-#define MXF_LABEL(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15) \
-    {d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15}
-
-#define MXF_SET_DEFINITION(parentName, name, label) \
-    static const mxfUL MXF_SET_K(name) = label;
-    
-#define MXF_ITEM_DEFINITION(setName, name, label, localTag, typeId, isRequired) \
-    static const mxfUL MXF_ITEM_K(setName, name) = label;
-
+#undef KEEP_DATA_MODEL_DEFS
 #include <mxf/mxf_extensions_data_model.h>
 
 
 int mxf_load_data_model(MXFDataModel** dataModel);
-int mxf_load_extensions_data_model(MXFDataModel* dataModel);
 void mxf_free_data_model(MXFDataModel** dataModel);
 
 int mxf_register_set_def(MXFDataModel* dataModel, const char* name, const mxfKey* parentKey, 

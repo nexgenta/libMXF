@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.11 2010/03/29 15:15:57 philipn Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.12 2010/06/02 10:59:20 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -752,6 +752,10 @@ int is_op_atom(const mxfUL* label);
 static const mxfUL MXF_OP_L(1a, qq09) = 
     MXF_1A_OP_L(0x09);
     
+/* internal essence, stream file, single-track */
+static const mxfUL MXF_OP_L(1a, qq01) = 
+    MXF_1A_OP_L(0x01);
+    
     
 int is_op_1a(const mxfUL* label);
 
@@ -762,8 +766,30 @@ int is_op_1a(const mxfUL* label);
 #define MXF_DM_L(name) \
     g_##name##_dmscheme_label
 
-static const mxfUL MXF_DM_L(DMS1) = 
+/* legacy/experimental DMS-1 label with version == 0x01 */
+static const mxfUL MXF_DM_L(LegacyDMS1) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x04, 0x01, 0x01, 0x01, 0x01, 0x00};
+
+#define MXF_DMS1_L(framework, variant) \
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0d, 0x01, 0x04, 0x01, 0x01, 0x01, framework, variant};
+
+static const mxfUL MXF_DM_L(DMS1_Production_NoExtensions) = 
+    MXF_DMS1_L(0x01, 0x01);
+    
+static const mxfUL MXF_DM_L(DMS1_Production_Extensions) = 
+    MXF_DMS1_L(0x01, 0x02);
+    
+static const mxfUL MXF_DM_L(DMS1_Clip_NoExtensions) = 
+    MXF_DMS1_L(0x02, 0x01);
+    
+static const mxfUL MXF_DM_L(DMS1_Clip_Extensions) = 
+    MXF_DMS1_L(0x02, 0x02);
+    
+static const mxfUL MXF_DM_L(DMS1_Scene_NoExtensions) = 
+    MXF_DMS1_L(0x03, 0x01);
+    
+static const mxfUL MXF_DM_L(DMS1_Scene_Extensions) = 
+    MXF_DMS1_L(0x03, 0x02);
 
 
 

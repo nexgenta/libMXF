@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader_int.h,v 1.3 2010/01/12 16:25:07 john_f Exp $
+ * $Id: mxf_reader_int.h,v 1.4 2010/06/02 10:59:20 philipn Exp $
  *
  * Internal functions for reading MXF files
  *
@@ -99,6 +99,8 @@ struct _MXFReader
 {
     MXFFile* mxfFile;
     MXFClip clip;
+    
+    int isMetadataOnly;
     
     int haveReadAFrame; /* is true if a frame has been read and therefore the number of source timecodes is up to date */
     TimecodeIndex playoutTimecodeIndex;

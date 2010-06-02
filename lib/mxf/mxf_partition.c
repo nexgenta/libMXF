@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_partition.c,v 1.6 2010/02/12 13:46:27 philipn Exp $
+ * $Id: mxf_partition.c,v 1.7 2010/06/02 10:59:20 philipn Exp $
  *
  * MXF file partitions
  *
@@ -28,12 +28,7 @@
 #include <mxf/mxf.h>
 
 
-#define ZEROS_BUFFER_SIZE       1024
-
-
 static const mxfKey g_PartitionPackPrefix_key = MXF_PP_KEY(0x01, 0x00, 0x00);
-
-static const unsigned char zeros[ZEROS_BUFFER_SIZE] = {0};
 
 
 
@@ -48,25 +43,6 @@ static void free_partition_in_list(void* data)
 
     tmpPartition = (MXFPartition*)data;     
     mxf_free_partition(&tmpPartition);
-}
-
-static int write_zeros(MXFFile* mxfFile, int64_t fillSize)
-{
-    int64_t completeCount = fillSize / ZEROS_BUFFER_SIZE;
-    uint32_t partialCount = (uint32_t)(fillSize % ZEROS_BUFFER_SIZE);
-    int64_t i;
-    
-    for (i = 0; i < completeCount; i++)
-    {
-        CHK_ORET(mxf_file_write(mxfFile, zeros, ZEROS_BUFFER_SIZE) == ZEROS_BUFFER_SIZE);
-    }
-    
-    if (partialCount > 0)
-    {
-        CHK_ORET(mxf_file_write(mxfFile, zeros, partialCount) == partialCount);
-    }
- 
-    return 1;
 }
 
 
@@ -464,51 +440,9 @@ fail:
 }
 
 
-int mxf_fill_to_kag(MXFFile* mxfFile,  MXFPartition* partition)
+int mxf_fill_to_kag(MXFFile* mxfFile, MXFPartition* partition)
 {
-    int64_t filePos;
-    uint64_t relativeFilePos;
-    int64_t fillSize;
-    uint8_t llen;
-        
-    assert(partition->kagSize > 0);
-    
-    CHK_ORET((filePos = mxf_file_tell(mxfFile)) >= 0);
-    CHK_ORET((uint64_t)filePos > partition->thisPartition);
-    relativeFilePos = filePos - partition->thisPartition;    
-    
-    if ((relativeFilePos % partition->kagSize) != 0)
-    {
-        CHK_ORET(mxf_write_k(mxfFile, &g_KLVFill_key));
-        
-        fillSize = (partition->kagSize - relativeFilePos % partition->kagSize) - mxfKey_extlen;
-        if (fillSize >= 0)
-        {
-            llen = mxf_get_llen(mxfFile, fillSize);
-        }
-        else
-        {
-            llen = 0;
-        }
-        while (fillSize - llen < 0)
-        {
-            fillSize += partition->kagSize;
-            if (fillSize >= 0)
-            {
-                llen = mxf_get_llen(mxfFile, fillSize);
-            }
-            else
-            {
-                llen = 0;
-            }
-        }
-        fillSize -= llen;
-        
-        CHK_ORET(mxf_write_l(mxfFile, fillSize));
-        CHK_ORET(write_zeros(mxfFile, fillSize));
-    }
-    
-    return 1;
+    return mxf_allocate_space_to_kag(mxfFile, partition, 0);
 }
 
 int mxf_fill_to_position(MXFFile* mxfFile, uint64_t position)
@@ -534,7 +468,59 @@ int mxf_fill_to_position(MXFFile* mxfFile, uint64_t position)
     fillSize -= llen;
 
     CHK_ORET(mxf_write_l(mxfFile, fillSize));
-    CHK_ORET(write_zeros(mxfFile, fillSize));
+    CHK_ORET(mxf_write_zeros(mxfFile, fillSize));
+    
+    return 1;
+}
+
+int mxf_allocate_space_to_kag(MXFFile* mxfFile, MXFPartition* partition, uint32_t size)
+{
+    int64_t filePos;
+    uint64_t relativeFilePos;
+    int64_t fillSize;
+    uint8_t llen;
+        
+    assert(partition->kagSize > 0);
+    
+    CHK_ORET((filePos = mxf_file_tell(mxfFile)) >= 0);
+    CHK_ORET((uint64_t)filePos > partition->thisPartition);
+    relativeFilePos = filePos + size - partition->thisPartition;
+    
+    if (size != 0 || (relativeFilePos % partition->kagSize) != 0)
+    {
+        CHK_ORET(mxf_write_k(mxfFile, &g_KLVFill_key));
+        
+        fillSize = (int64_t)size - mxfKey_extlen;
+        if (partition->kagSize > 1)
+        {
+            fillSize += partition->kagSize - relativeFilePos % partition->kagSize;
+        }
+        
+        if (fillSize >= 0)
+        {
+            llen = mxf_get_llen(mxfFile, fillSize);
+        }
+        else
+        {
+            llen = 0;
+        }
+        while (fillSize - llen < 0)
+        {
+            fillSize += partition->kagSize;
+            if (fillSize >= 0)
+            {
+                llen = mxf_get_llen(mxfFile, fillSize);
+            }
+            else
+            {
+                llen = 0;
+            }
+        }
+        fillSize -= llen;
+        
+        CHK_ORET(mxf_write_l(mxfFile, fillSize));
+        CHK_ORET(mxf_write_zeros(mxfFile, fillSize));
+    }
     
     return 1;
 }
@@ -554,7 +540,7 @@ int mxf_allocate_space(MXFFile* mxfFile, uint32_t size)
     fillSize -= llen;
 
     CHK_ORET(mxf_write_l(mxfFile, fillSize));
-    CHK_ORET(write_zeros(mxfFile, fillSize));
+    CHK_ORET(mxf_write_zeros(mxfFile, fillSize));
     
     return 1;
 }

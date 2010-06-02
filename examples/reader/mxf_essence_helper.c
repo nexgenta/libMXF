@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.14 2010/02/17 15:53:15 philipn Exp $
+ * $Id: mxf_essence_helper.c,v 1.15 2010/06/02 10:59:20 philipn Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -590,9 +590,8 @@ int process_sound_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Ess
     /* Note: AudioSamplingRate is best effort */
     CHK_ORET(mxf_get_rational_item(descriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, AudioSamplingRate), &track->audio.samplingRate));
     CHK_ORET(track->audio.samplingRate.numerator != 0 && track->audio.samplingRate.denominator != 0); 
-    /* Note: ChannelCount is best effort */
+    /* Note: ChannelCount is best effort (distinguished value is 0) */
     CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, ChannelCount), &track->audio.channelCount));
-    CHK_ORET(track->audio.channelCount != 0); 
     /* Note: QuantizationBits is best effort */
     CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericSoundEssenceDescriptor, QuantizationBits), &track->audio.bitsPerSample));
     CHK_ORET(track->audio.bitsPerSample != 0); 

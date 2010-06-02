@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_header_metadata.c,v 1.3 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_header_metadata.c,v 1.4 2010/06/02 10:59:20 philipn Exp $
  *
  * MXF header metadata
  *
@@ -365,6 +365,11 @@ int mxf_find_singular_set_by_key(MXFHeaderMetadata* headerMetadata, const mxfKey
 
     if (!mxf_find_set_by_key(headerMetadata, key, &setList))
     {
+        return 0;
+    }
+    if (mxf_get_list_length(setList) == 0)
+    {
+        mxf_free_list(&setList);
         return 0;
     }
     

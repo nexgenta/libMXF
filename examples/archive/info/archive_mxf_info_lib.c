@@ -1,5 +1,5 @@
 /*
- * $Id: archive_mxf_info_lib.c,v 1.2 2010/02/17 15:52:27 philipn Exp $
+ * $Id: archive_mxf_info_lib.c,v 1.3 2010/06/02 10:59:20 philipn Exp $
  *
  * 
  *
@@ -29,6 +29,7 @@
 #include <archive_mxf_info_lib.h>
 #include <mxf/mxf_uu_metadata.h>
 #include <mxf/mxf_page_file.h>
+#include <mxf/mxf_avid.h>
 
 
 #define CHK_OFAIL_NOMSG(cmd) \
@@ -134,6 +135,380 @@ fail:
     return 0;
 }
 
+static int parse_infax_user_comments(const MXFList *nameList, const MXFList *valueList, InfaxData *infaxData)
+{
+    const mxfUTF16Char *value;
+    int haveValue = 0;
+    char buf[64];
+    int year, month, day;
+    
+#define PARSE_STRING_MEMBER(name, member) \
+    if (mxf_avid_get_user_comment(L"_BBC_" #name, nameList, valueList, &value)) \
+    { \
+        CHK_OFAIL(wcstombs(infaxData->member, value, sizeof(infaxData->member)) != (size_t)(-1)); \
+        infaxData->member[sizeof(infaxData->member) - 1] = '\0'; \
+        haveValue = 1; \
+    }
+
+#define PARSE_DATE_MEMBER(name, member) \
+    if (mxf_avid_get_user_comment(L"_BBC_" #name, nameList, valueList, &value)) \
+    { \
+        CHK_OFAIL(wcstombs(buf, value, sizeof(buf)) != (size_t)(-1)); \
+        buf[sizeof(buf) - 1] = '\0'; \
+        CHK_OFAIL(sscanf(buf, "%d-%d-%d", &year, &month, &day) == 3); \
+        infaxData->member.year = year; \
+        infaxData->member.month = month; \
+        infaxData->member.day = day; \
+        haveValue = 1; \
+    }
+
+#define PARSE_INTEGER_MEMBER(name, format, member) \
+    if (mxf_avid_get_user_comment(L"_BBC_" #name, nameList, valueList, &value)) \
+    { \
+        CHK_OFAIL(wcstombs(buf, value, sizeof(buf)) != (size_t)(-1)); \
+        buf[sizeof(buf) - 1] = '\0'; \
+        CHK_OFAIL(sscanf(buf, format, &infaxData->member) == 1); \
+        haveValue = 1; \
+    }
+
+    PARSE_STRING_MEMBER(APP_Format, format);
+    PARSE_STRING_MEMBER(APP_ProgrammeTitle, progTitle);
+    PARSE_STRING_MEMBER(APP_EpisodeTitle, epTitle);
+    PARSE_DATE_MEMBER(APP_TransmissionDate, txDate);
+    PARSE_STRING_MEMBER(APP_MagazinePrefix, magPrefix);
+    PARSE_STRING_MEMBER(APP_ProgrammeNumber, progNo);
+    PARSE_STRING_MEMBER(APP_ProductionCode, prodCode);
+    PARSE_STRING_MEMBER(APP_SpoolStatus, spoolStatus);
+    PARSE_DATE_MEMBER(APP_StockDate, stockDate);
+    PARSE_STRING_MEMBER(APP_SpoolDescriptor, spoolDesc);
+    PARSE_STRING_MEMBER(APP_Memo, memo);
+    PARSE_INTEGER_MEMBER(APP_Duration, "%"PRId64, duration);
+    PARSE_STRING_MEMBER(APP_SpoolNumber, spoolNo);
+    PARSE_STRING_MEMBER(APP_AccessionNumber, accNo);
+    PARSE_STRING_MEMBER(APP_CatalogueDetail, catDetail);
+    PARSE_INTEGER_MEMBER(APP_ItemNumber, "%u", itemNo);
+    
+    return haveValue;
+    
+fail:
+    return 0;
+}
+
+static int is_metadata_only_file(MXFHeaderMetadata* headerMetadata, MXFMetadataSet** materialPackageSet)
+{
+    MXFMetadataSet* prefaceSet;
+    uint32_t essenceContainerCount = 0;
+    
+    CHK_ORET(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(Preface), &prefaceSet));
+    if (mxf_have_item(prefaceSet, &MXF_ITEM_K(Preface, EssenceContainers)))
+    {
+        CHK_ORET(mxf_get_array_item_count(prefaceSet, &MXF_ITEM_K(Preface, EssenceContainers), &essenceContainerCount));
+    }
+
+    if (essenceContainerCount == 0)
+    {
+        CHK_ORET(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(MaterialPackage), materialPackageSet));
+        return 1;
+    }
+    
+    return 0;
+}
+
+static int archive_mxf_get_package_pse_failures(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* packageSet,
+                                                PSEFailure** failures, long* numFailures)
+{
+    MXFArrayItemIterator arrayIter;
+    MXFArrayItemIterator arrayIter2;
+    uint8_t* arrayElement;
+    uint32_t arrayElementLen;
+    mxfUL dataDef;
+    uint32_t count;
+    MXFMetadataSet* packageTrackSet;
+    MXFMetadataSet* sequenceSet;
+    MXFMetadataSet* dmSet;
+    MXFMetadataSet* dmFrameworkSet;
+    MXFListIterator setsIter;
+    PSEFailure* newFailures = NULL;
+    long countedPSEFailures = 0;
+    PSEFailure* tmp;
+    int32_t i;
+    
+
+    CHK_OFAIL(mxf_uu_get_package_tracks(packageSet, &arrayIter));
+    while (mxf_uu_next_track(headerMetadata, &arrayIter, &packageTrackSet))
+    {
+        CHK_OFAIL(mxf_uu_get_track_datadef(packageTrackSet, &dataDef));
+        if (mxf_is_descriptive_metadata(&dataDef))
+        {
+            /* get to the sequence */
+            CHK_OFAIL(mxf_get_strongref_item(packageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(Sequence)))
+            {
+                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                if (count == 0)
+                {
+                    continue;
+                }
+                
+                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
+                CHK_OFAIL(mxf_get_strongref(headerMetadata, arrayElement, &dmSet));
+            }
+            else
+            {
+                dmSet = sequenceSet;
+            }
+            
+            /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmSet->key, &MXF_SET_K(DMSegment)))
+            {
+                if (mxf_have_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
+                {
+                    CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+
+                    /* check whether the DMFrameworkSet is a APP_PSEAnalysisFramework */                   
+                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_PSEAnalysisFramework)))
+                    {
+                        /* go back to the sequence and extract the PSE failures */
+                        
+                        CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                        countedPSEFailures += count;
+                        if (newFailures == NULL)
+                        {
+                            CHK_OFAIL((tmp = malloc(sizeof(PSEFailure) * countedPSEFailures)) != NULL);
+                        }
+                        else
+                        {
+                            /* multiple tracks with PSE failures - reallocate the array */
+                            CHK_OFAIL((tmp = realloc(newFailures, sizeof(PSEFailure) * countedPSEFailures)) != NULL);
+                        }
+                        newFailures = tmp;
+                        
+                        /* extract the PSE failures */
+                        initialise_sets_iter(headerMetadata, &setsIter);
+                        i = 0;
+                        mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                        while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                        {
+                            PSEFailure* pseFailure = &newFailures[i];
+                            
+                            CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
+                            CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &pseFailure->position));
+                            CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_RedFlash), &pseFailure->redFlash));
+                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_SpatialPattern), &pseFailure->spatialPattern));
+                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_LuminanceFlash), &pseFailure->luminanceFlash));
+                            CHK_OFAIL(mxf_get_boolean_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_ExtendedFailure), &pseFailure->extendedFailure));
+                            i++;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    *failures = newFailures;
+    *numFailures = countedPSEFailures;
+    return 1;
+
+fail:
+    SAFE_FREE(&newFailures);
+    return 0;
+}
+
+static int archive_mxf_get_package_vtr_errors(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* packageSet,
+                                              VTRErrorAtPos** errors, long* numErrors)
+{
+    MXFArrayItemIterator arrayIter;
+    MXFArrayItemIterator arrayIter2;
+    uint8_t* arrayElement;
+    uint32_t arrayElementLen;
+    mxfUL dataDef;
+    uint32_t count;
+    MXFMetadataSet* packageTrackSet;
+    MXFMetadataSet* sequenceSet;
+    MXFMetadataSet* dmSet;
+    MXFMetadataSet* dmFrameworkSet;
+    MXFListIterator setsIter;
+    VTRErrorAtPos* newErrors = NULL;
+    long totalErrors = 0;
+    VTRErrorAtPos* tmp;
+    
+
+    CHK_OFAIL(mxf_uu_get_package_tracks(packageSet, &arrayIter));
+    while (mxf_uu_next_track(headerMetadata, &arrayIter, &packageTrackSet))
+    {
+        CHK_OFAIL(mxf_uu_get_track_datadef(packageTrackSet, &dataDef));
+        if (mxf_is_descriptive_metadata(&dataDef))
+        {
+            /* get to the sequence */
+            CHK_OFAIL(mxf_get_strongref_item(packageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(Sequence)))
+            {
+                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                if (count == 0)
+                {
+                    continue;
+                }
+                
+                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
+                CHK_OFAIL(mxf_get_strongref(headerMetadata, arrayElement, &dmSet));
+            }
+            else
+            {
+                dmSet = sequenceSet;
+            }
+            
+            /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmSet->key, &MXF_SET_K(DMSegment)))
+            {
+                if (mxf_have_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
+                {
+                    CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+
+                    /* check whether the DMFrameworkSet is a APP_VTRReplayErrorFramework */                   
+                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_VTRReplayErrorFramework)))
+                    {
+                        /* go back to the sequence and extract the VTR errors */
+                        
+                        CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                        if (newErrors == NULL)
+                        {
+                            CHK_OFAIL((tmp = malloc(sizeof(VTRErrorAtPos) * (totalErrors + count))) != NULL);
+                        }
+                        else
+                        {
+                            /* multiple tracks with VTR errors - reallocate the array */
+                            CHK_OFAIL((tmp = realloc(newErrors, sizeof(VTRErrorAtPos) * (totalErrors + count))) != NULL);
+                        }
+                        newErrors = tmp;
+                        
+                        /* extract the VTR errors */
+                        initialise_sets_iter(headerMetadata, &setsIter);
+                        mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                        while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                        {
+                            VTRErrorAtPos* vtrError = &newErrors[totalErrors];
+                            
+                            CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
+                            CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &vtrError->position));
+                            CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+                            CHK_OFAIL(mxf_get_uint8_item(dmFrameworkSet, &MXF_ITEM_K(APP_VTRReplayErrorFramework, APP_VTRErrorCode), &vtrError->errorCode));
+                            
+                            totalErrors++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    *errors = newErrors;
+    *numErrors = totalErrors;
+    return 1;
+
+fail:
+    SAFE_FREE(&newErrors);
+    return 0;
+}
+
+static int archive_mxf_get_package_digibeta_dropouts(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* packageSet,
+                                                     DigiBetaDropout** digiBetaDropouts, long* numDigiBetaDropouts)
+{
+    MXFArrayItemIterator arrayIter;
+    MXFArrayItemIterator arrayIter2;
+    uint8_t* arrayElement;
+    uint32_t arrayElementLen;
+    mxfUL dataDef;
+    uint32_t count;
+    MXFMetadataSet* packageTrackSet;
+    MXFMetadataSet* sequenceSet;
+    MXFMetadataSet* dmSet;
+    MXFMetadataSet* dmFrameworkSet;
+    MXFListIterator setsIter;
+    DigiBetaDropout* newDigiBetaDropouts = NULL;
+    long totalDropouts = 0;
+    DigiBetaDropout* tmp;
+    
+
+    CHK_OFAIL(mxf_uu_get_package_tracks(packageSet, &arrayIter));
+    while (mxf_uu_next_track(headerMetadata, &arrayIter, &packageTrackSet))
+    {
+        CHK_OFAIL(mxf_uu_get_track_datadef(packageTrackSet, &dataDef));
+        if (mxf_is_descriptive_metadata(&dataDef))
+        {
+            /* get to the sequence */
+            CHK_OFAIL(mxf_get_strongref_item(packageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(Sequence)))
+            {
+                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                if (count == 0)
+                {
+                    continue;
+                }
+                
+                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
+                CHK_OFAIL(mxf_get_strongref(headerMetadata, arrayElement, &dmSet));
+            }
+            else
+            {
+                dmSet = sequenceSet;
+            }
+            
+            /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmSet->key, &MXF_SET_K(DMSegment)))
+            {
+                if (mxf_have_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
+                {
+                    CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+
+                    /* check whether the DMFrameworkSet is a APP_DigiBetaDropoutFramework */
+                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_DigiBetaDropoutFramework)))
+                    {
+                        /* go back to the sequence and extract the digibeta dropouts */
+                        
+                        CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                        if (newDigiBetaDropouts == NULL)
+                        {
+                            CHK_OFAIL((tmp = malloc(sizeof(DigiBetaDropout) * (totalDropouts + count))) != NULL);
+                        }
+                        else
+                        {
+                            /* multiple tracks with digibeta dropouts - reallocate the array */
+                            CHK_OFAIL((tmp = realloc(newDigiBetaDropouts, sizeof(DigiBetaDropout) * (totalDropouts + count))) != NULL);
+                        }
+                        newDigiBetaDropouts = tmp;
+                        
+                        /* extract the digibeta dropouts */
+                        initialise_sets_iter(headerMetadata, &setsIter);
+                        mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                        while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                        {
+                            DigiBetaDropout* digiBetaDropout = &newDigiBetaDropouts[totalDropouts];
+                            
+                            CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
+                            CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &digiBetaDropout->position));
+                            CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+                            CHK_OFAIL(mxf_get_int32_item(dmFrameworkSet, &MXF_ITEM_K(APP_DigiBetaDropoutFramework, APP_Strength), &digiBetaDropout->strength));
+                            
+                            totalDropouts++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    *digiBetaDropouts = newDigiBetaDropouts;
+    *numDigiBetaDropouts = totalDropouts;
+    return 1;
+
+fail:
+    SAFE_FREE(&newDigiBetaDropouts);
+    return 0;
+}
+
+
 
 int is_archive_mxf(MXFHeaderMetadata* headerMetadata)
 {
@@ -142,8 +517,6 @@ int is_archive_mxf(MXFHeaderMetadata* headerMetadata)
     uint8_t* arrayElement;
     uint32_t arrayElementLen;
     int haveBBCScheme = 0;
-    int haveSDUncompressed = 0;
-    int havePCM = 0;
     mxfUL ul;
     
     CHK_OFAIL(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(Preface), &prefaceSet));
@@ -175,34 +548,6 @@ int is_archive_mxf(MXFHeaderMetadata* headerMetadata)
         return 0;
     }
 
-    
-    /* check essence containers include uncompressed SD and PCM */
-    CHK_OFAIL(mxf_initialise_array_item_iterator(prefaceSet, &MXF_ITEM_K(Preface, EssenceContainers), &arrayIter));
-    while (mxf_next_array_item_element(&arrayIter, &arrayElement, &arrayElementLen))
-    {
-        mxf_get_ul(arrayElement, &ul);
-        if (mxf_equals_ul(&ul, &MXF_EC_L(MultipleWrappings)))
-        {
-            continue;
-        }
-        else if (mxf_equals_ul(&ul, &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)))
-        {
-            haveSDUncompressed = 1;
-        }
-        else if (mxf_equals_ul(&ul, &MXF_EC_L(BWFFrameWrapped)))
-        {
-            havePCM = 1;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    if (!haveSDUncompressed || !havePCM)
-    {
-        return 0;
-    }
-
 
     return 1;    
     
@@ -221,6 +566,8 @@ int archive_mxf_get_info(MXFHeaderMetadata* headerMetadata, ArchiveMXFInfo* info
     uint32_t count;
     mxfUTF16Char* tempWString = NULL;
     int haveSourceInfaxData = 0;
+    MXFList* nameList = NULL;
+    MXFList* valueList = NULL;
     MXFMetadataSet* identSet;
     MXFMetadataSet* fileSourcePackageSet;
     MXFMetadataSet* sourcePackageSet;
@@ -230,6 +577,23 @@ int archive_mxf_get_info(MXFHeaderMetadata* headerMetadata, ArchiveMXFInfo* info
     MXFMetadataSet* dmFrameworkSet;
     MXFMetadataSet* descriptorSet;
     MXFMetadataSet* locatorSet;
+    MXFMetadataSet* materialPackageSet;
+    
+    
+    /* if metadata only then only try reading infax user comments */
+    
+    if (is_metadata_only_file(headerMetadata, &materialPackageSet))
+    {
+        if (mxf_avid_read_string_user_comments(materialPackageSet, &nameList, &valueList))
+        {
+            haveSourceInfaxData = parse_infax_user_comments(nameList, valueList, &info->sourceInfaxData);
+
+            mxf_free_list(&nameList);
+            mxf_free_list(&valueList);
+        }
+        
+        return 1;
+    }
     
     
     /* Creation timestamp identification info */
@@ -376,6 +740,20 @@ int archive_mxf_get_info(MXFHeaderMetadata* headerMetadata, ArchiveMXFInfo* info
         }
     }
     mxf_free_list(&list);
+    
+    
+    /* try reading Infax data from UserComments attached to the MaterialPackage if no data was found elsewhere */
+    if (!haveSourceInfaxData)
+    {
+        CHK_OFAIL(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(MaterialPackage), &materialPackageSet));
+        if (mxf_avid_read_string_user_comments(materialPackageSet, &nameList, &valueList))
+        {
+            haveSourceInfaxData = parse_infax_user_comments(nameList, valueList, &info->sourceInfaxData);
+
+            mxf_free_list(&nameList);
+            mxf_free_list(&valueList);
+        }
+    }
 
     
     return haveSourceInfaxData;
@@ -383,307 +761,52 @@ int archive_mxf_get_info(MXFHeaderMetadata* headerMetadata, ArchiveMXFInfo* info
 fail:
     SAFE_FREE(&tempWString);
     mxf_free_list(&list);
+    mxf_free_list(&nameList);
+    mxf_free_list(&valueList);
     return 0;    
 }
 
-
 int archive_mxf_get_pse_failures(MXFHeaderMetadata* headerMetadata, PSEFailure** failures, long* numFailures)
 {
-    MXFArrayItemIterator arrayIter;
-    MXFArrayItemIterator arrayIter2;
-    uint8_t* arrayElement;
-    uint32_t arrayElementLen;
-    mxfUL dataDef;
-    uint32_t count;
+    MXFMetadataSet* materialPackageSet;
     MXFMetadataSet* fileSourcePackageSet;
-    MXFMetadataSet* sourcePackageTrackSet;
-    MXFMetadataSet* sequenceSet;
-    MXFMetadataSet* dmSet;
-    MXFMetadataSet* dmFrameworkSet;
-    MXFListIterator setsIter;
-    PSEFailure* newFailures = NULL;
-    long countedPSEFailures = 0;
-    PSEFailure* tmp;
-    int32_t i;
-    
 
-    CHK_OFAIL(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
-    CHK_OFAIL(mxf_uu_get_package_tracks(fileSourcePackageSet, &arrayIter));
-    while (mxf_uu_next_track(headerMetadata, &arrayIter, &sourcePackageTrackSet))
+    if (is_metadata_only_file(headerMetadata, &materialPackageSet))
     {
-        CHK_OFAIL(mxf_uu_get_track_datadef(sourcePackageTrackSet, &dataDef));
-        if (mxf_is_descriptive_metadata(&dataDef))
-        {
-            /* get to the sequence */
-            CHK_OFAIL(mxf_get_strongref_item(sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
-            if (mxf_is_subclass_of(headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(Sequence)))
-            {
-                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
-                if (count == 0)
-                {
-                    continue;
-                }
-                
-                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
-                CHK_OFAIL(mxf_get_strongref(headerMetadata, arrayElement, &dmSet));
-            }
-            else
-            {
-                dmSet = sequenceSet;
-            }
-            
-            /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
-            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmSet->key, &MXF_SET_K(DMSegment)))
-            {
-                if (mxf_have_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
-                {
-                    CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
-
-                    /* check whether the DMFrameworkSet is a APP_PSEAnalysisFramework */                   
-                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_PSEAnalysisFramework)))
-                    {
-                        /* go back to the sequence and extract the PSE failures */
-                        
-                        CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
-                        countedPSEFailures += count;
-                        if (newFailures == NULL)
-                        {
-                            CHK_OFAIL((tmp = malloc(sizeof(PSEFailure) * countedPSEFailures)) != NULL);
-                        }
-                        else
-                        {
-                            /* multiple tracks with PSE failures - reallocate the array */
-                            CHK_OFAIL((tmp = realloc(newFailures, sizeof(PSEFailure) * countedPSEFailures)) != NULL);
-                        }
-                        newFailures = tmp;
-                        
-                        /* extract the PSE failures */
-                        initialise_sets_iter(headerMetadata, &setsIter);
-                        i = 0;
-                        mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
-                        while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
-                        {
-                            PSEFailure* pseFailure = &newFailures[i];
-                            
-                            CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
-                            CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &pseFailure->position));
-                            CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
-                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_RedFlash), &pseFailure->redFlash));
-                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_SpatialPattern), &pseFailure->spatialPattern));
-                            CHK_OFAIL(mxf_get_int16_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_LuminanceFlash), &pseFailure->luminanceFlash));
-                            CHK_OFAIL(mxf_get_boolean_item(dmFrameworkSet, &MXF_ITEM_K(APP_PSEAnalysisFramework, APP_ExtendedFailure), &pseFailure->extendedFailure));
-                            i++;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+        return archive_mxf_get_package_pse_failures(headerMetadata, materialPackageSet, failures, numFailures);
     }
     
-    *failures = newFailures;
-    *numFailures = countedPSEFailures;
-    return 1;
-
-fail:
-    SAFE_FREE(&newFailures);
-    return 0;
+    CHK_ORET(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
+    return archive_mxf_get_package_pse_failures(headerMetadata, fileSourcePackageSet, failures, numFailures);
 }
 
 int archive_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** errors, long* numErrors)
 {
-    MXFArrayItemIterator arrayIter;
-    MXFArrayItemIterator arrayIter2;
-    uint8_t* arrayElement;
-    uint32_t arrayElementLen;
-    mxfUL dataDef;
-    uint32_t count;
+    MXFMetadataSet* materialPackageSet;
     MXFMetadataSet* fileSourcePackageSet;
-    MXFMetadataSet* sourcePackageTrackSet;
-    MXFMetadataSet* sequenceSet;
-    MXFMetadataSet* dmSet;
-    MXFMetadataSet* dmFrameworkSet;
-    MXFListIterator setsIter;
-    VTRErrorAtPos* newErrors = NULL;
-    long totalErrors = 0;
-    VTRErrorAtPos* tmp;
-    
 
-    CHK_OFAIL(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
-    CHK_OFAIL(mxf_uu_get_package_tracks(fileSourcePackageSet, &arrayIter));
-    while (mxf_uu_next_track(headerMetadata, &arrayIter, &sourcePackageTrackSet))
+    if (is_metadata_only_file(headerMetadata, &materialPackageSet))
     {
-        CHK_OFAIL(mxf_uu_get_track_datadef(sourcePackageTrackSet, &dataDef));
-        if (mxf_is_descriptive_metadata(&dataDef))
-        {
-            /* get to the sequence */
-            CHK_OFAIL(mxf_get_strongref_item(sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
-            if (mxf_is_subclass_of(headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(Sequence)))
-            {
-                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
-                if (count == 0)
-                {
-                    continue;
-                }
-                
-                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
-                CHK_OFAIL(mxf_get_strongref(headerMetadata, arrayElement, &dmSet));
-            }
-            else
-            {
-                dmSet = sequenceSet;
-            }
-            
-            /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
-            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmSet->key, &MXF_SET_K(DMSegment)))
-            {
-                if (mxf_have_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
-                {
-                    CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
-
-                    /* check whether the DMFrameworkSet is a APP_VTRReplayErrorFramework */                   
-                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_VTRReplayErrorFramework)))
-                    {
-                        /* go back to the sequence and extract the VTR errors */
-                        
-                        CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
-                        if (newErrors == NULL)
-                        {
-                            CHK_OFAIL((tmp = malloc(sizeof(VTRErrorAtPos) * (totalErrors + count))) != NULL);
-                        }
-                        else
-                        {
-                            /* multiple tracks with VTR errors - reallocate the array */
-                            CHK_OFAIL((tmp = realloc(newErrors, sizeof(VTRErrorAtPos) * (totalErrors + count))) != NULL);
-                        }
-                        newErrors = tmp;
-                        
-                        /* extract the VTR errors */
-                        initialise_sets_iter(headerMetadata, &setsIter);
-                        mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
-                        while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
-                        {
-                            VTRErrorAtPos* vtrError = &newErrors[totalErrors];
-                            
-                            CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
-                            CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &vtrError->position));
-                            CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
-                            CHK_OFAIL(mxf_get_uint8_item(dmFrameworkSet, &MXF_ITEM_K(APP_VTRReplayErrorFramework, APP_VTRErrorCode), &vtrError->errorCode));
-                            
-                            totalErrors++;
-                        }
-                    }
-                }
-            }
-        }
+        return archive_mxf_get_package_vtr_errors(headerMetadata, materialPackageSet, errors, numErrors);
     }
     
-    *errors = newErrors;
-    *numErrors = totalErrors;
-    return 1;
-
-fail:
-    SAFE_FREE(&newErrors);
-    return 0;
+    CHK_ORET(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
+    return archive_mxf_get_package_vtr_errors(headerMetadata, fileSourcePackageSet, errors, numErrors);
 }
 
 int archive_mxf_get_digibeta_dropouts(MXFHeaderMetadata* headerMetadata, DigiBetaDropout** digiBetaDropouts, long* numDigiBetaDropouts)
 {
-    MXFArrayItemIterator arrayIter;
-    MXFArrayItemIterator arrayIter2;
-    uint8_t* arrayElement;
-    uint32_t arrayElementLen;
-    mxfUL dataDef;
-    uint32_t count;
+    MXFMetadataSet* materialPackageSet;
     MXFMetadataSet* fileSourcePackageSet;
-    MXFMetadataSet* sourcePackageTrackSet;
-    MXFMetadataSet* sequenceSet;
-    MXFMetadataSet* dmSet;
-    MXFMetadataSet* dmFrameworkSet;
-    MXFListIterator setsIter;
-    DigiBetaDropout* newDigiBetaDropouts = NULL;
-    long totalDropouts = 0;
-    DigiBetaDropout* tmp;
-    
 
-    CHK_OFAIL(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
-    CHK_OFAIL(mxf_uu_get_package_tracks(fileSourcePackageSet, &arrayIter));
-    while (mxf_uu_next_track(headerMetadata, &arrayIter, &sourcePackageTrackSet))
+    if (is_metadata_only_file(headerMetadata, &materialPackageSet))
     {
-        CHK_OFAIL(mxf_uu_get_track_datadef(sourcePackageTrackSet, &dataDef));
-        if (mxf_is_descriptive_metadata(&dataDef))
-        {
-            /* get to the sequence */
-            CHK_OFAIL(mxf_get_strongref_item(sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
-            if (mxf_is_subclass_of(headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(Sequence)))
-            {
-                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
-                if (count == 0)
-                {
-                    continue;
-                }
-                
-                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
-                CHK_OFAIL(mxf_get_strongref(headerMetadata, arrayElement, &dmSet));
-            }
-            else
-            {
-                dmSet = sequenceSet;
-            }
-            
-            /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
-            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmSet->key, &MXF_SET_K(DMSegment)))
-            {
-                if (mxf_have_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
-                {
-                    CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
-
-                    /* check whether the DMFrameworkSet is a APP_DigiBetaDropoutFramework */
-                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_DigiBetaDropoutFramework)))
-                    {
-                        /* go back to the sequence and extract the digibeta dropouts */
-                        
-                        CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
-                        if (newDigiBetaDropouts == NULL)
-                        {
-                            CHK_OFAIL((tmp = malloc(sizeof(DigiBetaDropout) * (totalDropouts + count))) != NULL);
-                        }
-                        else
-                        {
-                            /* multiple tracks with digibeta dropouts - reallocate the array */
-                            CHK_OFAIL((tmp = realloc(newDigiBetaDropouts, sizeof(DigiBetaDropout) * (totalDropouts + count))) != NULL);
-                        }
-                        newDigiBetaDropouts = tmp;
-                        
-                        /* extract the digibeta dropouts */
-                        initialise_sets_iter(headerMetadata, &setsIter);
-                        mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
-                        while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
-                        {
-                            DigiBetaDropout* digiBetaDropout = &newDigiBetaDropouts[totalDropouts];
-                            
-                            CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
-                            CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &digiBetaDropout->position));
-                            CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
-                            CHK_OFAIL(mxf_get_int32_item(dmFrameworkSet, &MXF_ITEM_K(APP_DigiBetaDropoutFramework, APP_Strength), &digiBetaDropout->strength));
-                            
-                            totalDropouts++;
-                        }
-                    }
-                }
-            }
-        }
+        return archive_mxf_get_package_digibeta_dropouts(headerMetadata, materialPackageSet, digiBetaDropouts, numDigiBetaDropouts);
     }
     
-    *digiBetaDropouts = newDigiBetaDropouts;
-    *numDigiBetaDropouts = totalDropouts;
-    return 1;
-
-fail:
-    SAFE_FREE(&newDigiBetaDropouts);
-    return 0;
+    CHK_ORET(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
+    return archive_mxf_get_package_digibeta_dropouts(headerMetadata, fileSourcePackageSet, digiBetaDropouts, numDigiBetaDropouts);
 }
-
 
 int archive_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata)
 {
@@ -750,4 +873,44 @@ fail:
     return result;
 }
 
+int archive_mxf_is_metadata_only(const char* filename)
+{
+    MXFPageFile* mxfPageFile = NULL;
+    MXFFile* mxfFile = NULL;
+    mxfKey key;
+    uint8_t llen;
+    uint64_t len;
+    MXFPartition* headerPartition = NULL;
+    int result;
+    
+    /* open MXF file */
+    if (strstr(filename, "%d") != NULL)
+    {
+        CHK_OFAIL_NOMSG(mxf_page_file_open_read(filename, &mxfPageFile));
+        mxfFile = mxf_page_file_get_file(mxfPageFile);
+    }
+    else
+    {
+        CHK_OFAIL_NOMSG(mxf_disk_file_open_read(filename, &mxfFile));
+    }
+    
+    /* read header partition pack */
+    if (!mxf_read_header_pp_kl_with_runin(mxfFile, &key, &llen, &len) ||
+        !mxf_read_partition(mxfFile, &key, &headerPartition))
+    {
+        return 0;
+    }
+    
+    /* check whether there is an essence container label */
+    result = (mxf_get_list_length(&headerPartition->essenceContainers) == 0);
+
+    mxf_free_partition(&headerPartition);
+    mxf_file_close(&mxfFile);
+    return result;
+
+fail:
+    mxf_free_partition(&headerPartition);
+    mxf_file_close(&mxfFile);
+    return 0;
+}
 

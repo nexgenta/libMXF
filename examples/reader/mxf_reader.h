@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.h,v 1.5 2010/02/12 13:46:26 philipn Exp $
+ * $Id: mxf_reader.h,v 1.6 2010/06/02 10:59:20 philipn Exp $
  *
  * Main functions for reading MXF files
  *
@@ -129,6 +129,8 @@ int open_mxf_reader_2(const char* filename, MXFDataModel* dataModel, MXFReader**
 int init_mxf_reader(MXFFile** mxfFile, MXFReader** reader);
 int init_mxf_reader_2(MXFFile** mxfFile, MXFDataModel* dataModel, MXFReader** reader);
 void close_mxf_reader(MXFReader** reader);
+
+int is_metadata_only(MXFReader* reader);
 
 MXFClip* get_mxf_clip(MXFReader* reader);
 MXFTrack* get_mxf_track(MXFReader* reader, int trackIndex);

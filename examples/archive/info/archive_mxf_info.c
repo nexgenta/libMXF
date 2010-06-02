@@ -1,5 +1,5 @@
 /*
- * $Id: archive_mxf_info.c,v 1.1 2010/01/12 17:40:26 john_f Exp $
+ * $Id: archive_mxf_info.c,v 1.2 2010/06/02 10:59:20 philipn Exp $
  *
  * 
  *
@@ -604,7 +604,6 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int 
     uint8_t llen;
     uint64_t len;
     MXFListIterator iter;
-    mxfUL* label;
     WriterIdentification* writerIdent;
     MXFArrayItemIterator arrayIter;
     MXFArrayItemIterator arrayIter2;
@@ -641,21 +640,6 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int 
     {
         mxf_log_error("Input file is not OP 1A" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         return 0;
-    }
-    
-    
-    /* check the essence container labels */
-    mxf_initialise_list_iter(&iter, &reader->headerPartition->essenceContainers);
-    while (mxf_next_list_iter_element(&iter))
-    {
-        label = (mxfUL*)mxf_get_iter_element(&iter);
-        if (!mxf_equals_ul(label, &MXF_EC_L(MultipleWrappings)) &&
-            !mxf_equals_ul(label, &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)) &&
-            !mxf_equals_ul(label, &MXF_EC_L(BWFFrameWrapped)))
-        {
-            mxf_log_error("Unexpected essence container label" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
-            return 0;
-        }
     }
     
     
@@ -734,9 +718,16 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int 
     
     /* PSE failure, VTR error and digibeta dropout counts in the Preface */
     CHK_ORET(mxf_find_singular_set_by_key(reader->headerMetadata, &MXF_SET_K(Preface), &reader->prefaceSet));
-    CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_VTRErrorCount), &reader->vtrErrorCount));
-    CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_PSEFailureCount), &reader->pseFailureCount));
-    /* check existence of item to support older file versions */
+    reader->vtrErrorCount = 0;
+    if (mxf_have_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_VTRErrorCount)))
+    {
+        CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_VTRErrorCount), &reader->vtrErrorCount));
+    }
+    reader->pseFailureCount = 0;
+    if (mxf_have_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_PSEFailureCount)))
+    {
+        CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_PSEFailureCount), &reader->pseFailureCount));
+    }
     reader->digiBetaDropoutCount = 0;
     if (mxf_have_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_DigiBetaDropoutCount)))
     {
