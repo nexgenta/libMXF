@@ -1,5 +1,5 @@
 /*
- * $Id: archive_mxf_info.c,v 1.2 2010/06/02 10:59:20 philipn Exp $
+ * $Id: archive_mxf_info.c,v 1.3 2010/06/18 09:29:34 philipn Exp $
  *
  * 
  *
@@ -63,6 +63,7 @@ typedef struct
     uint32_t pseFailureCount;
     uint32_t vtrErrorCount;
     uint32_t digiBetaDropoutCount;
+    uint32_t timecodeBreakCount;
     
     int numVideoTracks;
     uint32_t componentDepth;
@@ -74,6 +75,7 @@ typedef struct
     MXFList pseFailures;
     MXFList vtrErrors;
     MXFList digiBetaDropouts;
+    MXFList timecodeBreaks;
     
     InfaxData sourceInfaxData;
     InfaxData ltoInfaxData;
@@ -489,6 +491,22 @@ fail:
     return 0;
 }
 
+static int create_timecode_break(Reader* reader, TimecodeBreak** timecodeBreak)
+{
+    TimecodeBreak* newTimecodeBreak = NULL;
+    
+    CHK_MALLOC_ORET(newTimecodeBreak, TimecodeBreak);
+    memset(newTimecodeBreak, 0, sizeof(TimecodeBreak));
+    CHK_OFAIL(mxf_append_list_element(&reader->timecodeBreaks, newTimecodeBreak));
+    
+    *timecodeBreak = newTimecodeBreak;
+    return 1;
+    
+fail:
+    SAFE_FREE(&newTimecodeBreak);
+    return 0;
+}
+
 static int create_writer_ident(Reader* reader, WriterIdentification** ident)
 {
     WriterIdentification* newIdent = NULL;
@@ -515,6 +533,7 @@ static int create_reader(Reader** reader)
     mxf_initialise_list(&newReader->pseFailures, free);
     mxf_initialise_list(&newReader->vtrErrors, free);
     mxf_initialise_list(&newReader->digiBetaDropouts, free);
+    mxf_initialise_list(&newReader->timecodeBreaks, free);
     
     *reader = newReader;
     return 1;
@@ -533,6 +552,7 @@ static void free_reader(Reader** reader)
     mxf_clear_list(&(*reader)->pseFailures);
     mxf_clear_list(&(*reader)->vtrErrors);
     mxf_clear_list(&(*reader)->digiBetaDropouts);
+    mxf_clear_list(&(*reader)->timecodeBreaks);
     
     mxf_free_list(&(*reader)->list);
     mxf_free_partition(&(*reader)->headerPartition);
@@ -598,7 +618,7 @@ static int get_infax_data(Reader* reader, InfaxData* infaxData)
     return 1;
 }
 
-static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts)
+static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts, int showTimecodeBreaks)
 {
     mxfKey key;
     uint8_t llen;
@@ -616,6 +636,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int 
     PSEFailure* pseFailure;
     VTRErrorAtPos* vtrError;
     DigiBetaDropout* digiBetaDropout;
+    TimecodeBreak* timecodeBreak;
     int knownDMTrack;
     uint64_t headerByteCount;
     MXFListIterator setsIter;
@@ -671,8 +692,8 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int 
     }
     
     
-    /* read the header metadata in the footer is showing PSE failures, VTR errors and/or digibeta dropouts */
-    if (showPSEFailures || showVTRErrors || showDigiBetaDropouts)
+    /* read the header metadata in the footer is showing PSE failures, etc */
+    if (showPSEFailures || showVTRErrors || showDigiBetaDropouts || showTimecodeBreaks)
     {
         if (fileIsComplete)
         {
@@ -732,6 +753,11 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int 
     if (mxf_have_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_DigiBetaDropoutCount)))
     {
         CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_DigiBetaDropoutCount), &reader->digiBetaDropoutCount));
+    }
+    reader->timecodeBreakCount = 0;
+    if (mxf_have_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_TimecodeBreakCount)))
+    {
+        CHK_ORET(mxf_get_uint32_item(reader->prefaceSet, &MXF_ITEM_K(Preface, APP_TimecodeBreakCount), &reader->timecodeBreakCount));
     }
     
     
@@ -811,7 +837,7 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int 
         }
 
 
-        /* PSE analysis, VTR error, digibeta dropout and BBC DMS */
+        /* PSE analysis, VTR error, digibeta dropout, timecode break and BBC DMS */
         
         if (mxf_is_descriptive_metadata(&dataDef))
         {
@@ -886,6 +912,25 @@ static int get_info(Reader* reader, int showPSEFailures, int showVTRErrors, int 
                                         CHK_ORET(mxf_get_position_item(reader->dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &digiBetaDropout->position));
                                         CHK_ORET(mxf_get_strongref_item_s(&setsIter, reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
                                         CHK_ORET(mxf_get_int32_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_DigiBetaDropoutFramework, APP_Strength), &digiBetaDropout->strength));
+                                    }
+                                }
+                            }
+                            else if (mxf_is_subclass_of(reader->headerMetadata->dataModel, &reader->dmFrameworkSet->key, &MXF_SET_K(APP_TimecodeBreakFramework)))
+                            {
+                                /* timecode break dropout track */
+                                knownDMTrack = 1;
+                                if (showTimecodeBreaks)
+                                {
+                                    initialise_sets_iter(reader->headerMetadata, &setsIter);
+                                    
+                                    mxf_initialise_array_item_iterator(reader->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                                    while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                                    {
+                                        CHK_ORET(create_timecode_break(reader, &timecodeBreak)); 
+                                        CHK_ORET(mxf_get_strongref_s(reader->headerMetadata, &setsIter, arrayElement, &reader->dmSet));
+                                        CHK_ORET(mxf_get_position_item(reader->dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &timecodeBreak->position));
+                                        CHK_ORET(mxf_get_strongref_item_s(&setsIter, reader->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &reader->dmFrameworkSet));
+                                        CHK_ORET(mxf_get_uint16_item(reader->dmFrameworkSet, &MXF_ITEM_K(APP_TimecodeBreakFramework, APP_TimecodeType), &timecodeBreak->timecodeType));
                                     }
                                 }
                             }
@@ -1103,6 +1148,47 @@ static void write_digibeta_dropouts(Reader* reader, int noSourceTimecode)
     }
 }
 
+static void write_timecode_breaks(Reader* reader, int noSourceTimecode)
+{
+    MXFListIterator iter;
+    TimecodeBreak* timecodeBreak;
+    uint64_t count;
+    char vitcStr[12];
+    char ltcStr[12];
+    
+    printf("\nTimecode break results:\n");
+    printf("    %d breaks detected/stored\n", reader->timecodeBreakCount);
+    if (mxf_get_list_length(&reader->timecodeBreaks) > 0)
+    {
+        if (noSourceTimecode)
+        {
+            printf("    %10s:%10s %10s\n", 
+                "num", "frame", "type");
+        }
+        else
+        {
+            printf("    %10s:%10s%16s%16s %10s\n", 
+                "num", "frame", "vitc", "ltc", "type");
+        }
+        
+        count = 0;
+        mxf_initialise_list_iter(&iter, &reader->timecodeBreaks);
+        while (mxf_next_list_iter_element(&iter))
+        {
+            timecodeBreak = (TimecodeBreak*)mxf_get_iter_element(&iter);
+            printf("    %10"PFi64":%10"PFi64, count, timecodeBreak->position);
+            if (!noSourceTimecode)
+            {
+                read_time_string_at_position(reader, timecodeBreak->position, vitcStr, ltcStr);
+                printf("%16s%16s", vitcStr, ltcStr);
+            }
+            printf("     0x%04x\n", timecodeBreak->timecodeType);
+            
+            count++;
+        }
+    }
+}
+
 static void write_infax_data(InfaxData* infaxData)
 {
     printf("    Format: %s\n", infaxData->format);    
@@ -1132,7 +1218,8 @@ static void write_infax_data(InfaxData* infaxData)
     printf("    Item number: %d\n", infaxData->itemNo);    
 }
 
-static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts, int noSourceTimecode)
+static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts,
+                      int showTimecodeBreaks, int noSourceTimecode)
 {
     MXFListIterator iter;
     WriterIdentification* writerIdent;
@@ -1209,6 +1296,9 @@ static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, in
 
     printf("\nDigiBeta dropout results summary:\n");
     printf("    %d dropouts detected\n", reader->digiBetaDropoutCount);
+
+    printf("\nTimecode break results summary:\n");
+    printf("    %d breaks detected/stored\n", reader->timecodeBreakCount);
 
     /* initialise the timecode reading if showing source vitc and ltc */
     if (!noSourceTimecode)
@@ -1300,10 +1390,16 @@ static int write_info(Reader* reader, int showPSEFailures, int showVTRErrors, in
         write_digibeta_dropouts(reader, noSourceTimecode);
     }
     
+    if (showTimecodeBreaks)
+    {
+        write_timecode_breaks(reader, noSourceTimecode);
+    }
+    
     return 1;
 }
 
-static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts, int noSourceTimecode)
+static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors, int showDigiBetaDropouts,
+                         int showTimecodeBreaks, int noSourceTimecode)
 {
     MXFListIterator iter;
     WriterIdentification* writerIdent;
@@ -1461,6 +1557,11 @@ static int write_summary(Reader* reader, int showPSEFailures, int showVTRErrors,
         write_digibeta_dropouts(reader, noSourceTimecode);
     }
     
+    if (showTimecodeBreaks)
+    {
+        write_timecode_breaks(reader, noSourceTimecode);
+    }
+    
     
     return 1;
 }
@@ -1475,6 +1576,7 @@ static void usage(const char* cmd)
     fprintf(stderr, "  -v, --show-vtr-errors    show detailed VTR errors\n");
     fprintf(stderr, "  -p, --show-pse-failures  show detailed PSE failures\n");
     fprintf(stderr, "  -d, --show-digi-dropouts show detailed DigiBeta dropouts\n");
+    fprintf(stderr, "  -b, --show-tc-breaks     show detailed timecode breaks\n");
     fprintf(stderr, "  -s, --summary-info       show summary (omit detail)\n");
     fprintf(stderr, "  -t, --no-src-tc          don't search for source VITC and LTC timecodes\n");
 }
@@ -1485,6 +1587,7 @@ int main(int argc, const char* argv[])
     int showVTRErrors = 0;
     int showPSEFailures = 0;
     int showDigiBetaDropouts = 0;
+    int showTimecodeBreaks = 0;
     int summary = 0;
     int cmdlnIndex = 1;
     const char* mxfFilename = NULL;
@@ -1522,6 +1625,12 @@ int main(int argc, const char* argv[])
             strcmp(argv[cmdlnIndex], "--show-digi-dropouts") == 0)
         {
             showDigiBetaDropouts = 1;
+            cmdlnIndex += 1;
+        }
+        else if (strcmp(argv[cmdlnIndex], "-b") == 0 ||
+            strcmp(argv[cmdlnIndex], "--show-tc-breaks") == 0)
+        {
+            showTimecodeBreaks = 1;
             cmdlnIndex += 1;
         }
         else if (strcmp(argv[cmdlnIndex], "-s") == 0 ||
@@ -1577,7 +1686,7 @@ int main(int argc, const char* argv[])
         }
     }
     
-    if (!get_info(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts))
+    if (!get_info(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts, showTimecodeBreaks))
     {
         mxf_log_error("Failed to extract info from '%s'\n", mxfFilename);
         goto fail;
@@ -1591,7 +1700,7 @@ int main(int argc, const char* argv[])
         
     if (summary)
     {
-        if (!write_summary(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts, noSourceTimecode))
+        if (!write_summary(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts, showTimecodeBreaks, noSourceTimecode))
         {
             mxf_log_error("Failed to write summary info\n");
             goto fail;
@@ -1599,7 +1708,7 @@ int main(int argc, const char* argv[])
     }
     else
     {
-        if (!write_info(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts, noSourceTimecode))
+        if (!write_info(reader, showPSEFailures, showVTRErrors, showDigiBetaDropouts, showTimecodeBreaks, noSourceTimecode))
         {
             mxf_log_error("Failed to write info\n");
             goto fail;

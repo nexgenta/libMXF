@@ -3,6 +3,7 @@
 	<APP_VTRErrorCount detail="The number of VTR errors detected when recording" type="UInt32" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 40 01 01 00"/>
 	<APP_PSEFailureCount detail="The number of PSE failures detected" type="UInt32" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 40 01 02 00"/>
 	<APP_DigiBetaDropoutCount detail="The number of DigiBeta dropouts detected" type="UInt32" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 40 01 03 00"/>
+	<APP_TimecodeBreakCount detail="The number of Timecode breaks detected" type="UInt32" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 40 01 04 00"/>
 	<APP_InfaxFramework base="DM_Framework" detail="BBC Infax framework" type="localSet" key="06 0E 2B 34 02 53 01 01 0D 04 01 01 01 01 00 00">
 		<APP_Format detail="OFFLINE_STORAGE::OFS_VT_Technical_Code_Number" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 01 00"/>
 		<APP_ProgrammeTitle detail="EDITORIAL_OBJECT_GROUP::EOG_Title" use="optional" type="UTF16String" globalKey="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 01 02 00"/>
@@ -33,5 +34,8 @@
 	<APP_DigiBetaDropoutFramework base="DM_Framework" detail="BBC DigiBeta dropout framework" type="localSet" key="06 0E 2B 34 02 53 01 01 0D 04 01 01 01 04 00 00">
 		<APP_Strength detail="The normalized maximum digibeta dropout strength in the picture" type="Int32" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 04 01 00"/>
 	</APP_DigiBetaDropoutFramework>
+	<APP_TimecodeBreakFramework base="DM_Framework" detail="BBC timecode break framework" type="localSet" key="06 0E 2B 34 02 53 01 01 0D 04 01 01 01 05 00 00">
+		<APP_TimecodeType detail="Or of timecode types that have a break" type="UInt16" key="06 0E 2B 34 01 01 01 01 0D 04 01 01 01 05 01 00"/>
+	</APP_TimecodeBreakFramework>
 	<TapeDescriptor base="GenericDescriptor" detail="A Tape Physical Descriptor" type="localSet" key="06 0E 2b 34 02 53 01 01 0D 01 01 01 01 01 2E 00"/>
 </MXFDictionary>

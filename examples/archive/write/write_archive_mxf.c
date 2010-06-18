@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.c,v 1.11 2010/06/02 10:59:20 philipn Exp $
+ * $Id: write_archive_mxf.c,v 1.12 2010/06/18 09:29:34 philipn Exp $
  *
  * 
  *
@@ -151,6 +151,7 @@ struct _ArchiveMXFWriter
     MXFList vtrErrorTrackSets;
     MXFList pseFailureTrackSets;
     MXFList digiBetaDropoutTrackSets;
+    MXFList timecodeBreakTrackSets;
 };
     
 
@@ -198,6 +199,7 @@ static const int64_t g_tapeLen = 120 * 25 * 60 * 60;
 static const mxfUTF16Char* g_vtrErrorsTrackName = L"VTR Errors";
 static const mxfUTF16Char* g_pseFailuresTrackName = L"PSE Failures";
 static const mxfUTF16Char* g_digiBetaDropoutTrackName = L"DigiBeta Dropouts";
+static const mxfUTF16Char* g_timecodeBreakTrackName = L"Timecode Breaks";
 
 static const char* g_LTOFormatString = "LTO";
 static const mxfUTF16Char* g_LTOFormatString_w = L"LTO";
@@ -268,6 +270,7 @@ static void free_archive_mxf_file(ArchiveMXFWriter** output)
     mxf_clear_list(&(*output)->vtrErrorTrackSets);
     mxf_clear_list(&(*output)->pseFailureTrackSets);
     mxf_clear_list(&(*output)->digiBetaDropoutTrackSets);
+    mxf_clear_list(&(*output)->timecodeBreakTrackSets);
     
     mxf_file_close(&(*output)->mxfFile);
     
@@ -646,6 +649,7 @@ int prepare_archive_mxf_file_2(MXFFile** mxfFile, const char* filename, int comp
     mxf_initialise_list(&newOutput->vtrErrorTrackSets, NULL);
     mxf_initialise_list(&newOutput->pseFailureTrackSets, NULL);
     mxf_initialise_list(&newOutput->digiBetaDropoutTrackSets, NULL);
+    mxf_initialise_list(&newOutput->timecodeBreakTrackSets, NULL);
             
     
     newOutput->mxfFile = *mxfFile;
@@ -1372,7 +1376,8 @@ int abort_archive_mxf_file(ArchiveMXFWriter** output)
 int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* sourceInfaxData,
     const PSEFailure* pseFailures, long numPSEFailures,
     const VTRError* vtrErrors, long numVTRErrors,
-    const DigiBetaDropout* digiBetaDropouts, long numDigiBetaDropouts)
+    const DigiBetaDropout* digiBetaDropouts, long numDigiBetaDropouts,
+    const TimecodeBreak* timecodeBreaks, long numTimecodeBreaks)
 {
     ArchiveMXFWriter* output = *outputRef;
     int i;
@@ -1382,6 +1387,7 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* sourceInf
     const PSEFailure* pseFailure;
     const VTRError* vtrError;
     const DigiBetaDropout* digiBetaDropout;
+    const TimecodeBreak* timecodeBreak;
     uint32_t nextTrackID;
     int numTracks;
     TimecodeIndexSearcher vitcIndexSearcher;
@@ -1391,6 +1397,7 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* sourceInf
     long errorIndex;
     long failureIndex;
     long digiBetaDropoutIndex;
+    long timecodeBreakIndex;
     char mpName[64];
     int vitcIndexIsNull;
     int ltcIndexIsNull;
@@ -1405,6 +1412,7 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* sourceInf
     CHK_ORET(mxf_set_uint32_item(output->prefaceSet, &MXF_ITEM_K(Preface, APP_VTRErrorCount), numVTRErrors));
     CHK_ORET(mxf_set_uint32_item(output->prefaceSet, &MXF_ITEM_K(Preface, APP_PSEFailureCount), numPSEFailures));
     CHK_ORET(mxf_set_uint32_item(output->prefaceSet, &MXF_ITEM_K(Preface, APP_DigiBetaDropoutCount), numDigiBetaDropouts));
+    CHK_ORET(mxf_set_uint32_item(output->prefaceSet, &MXF_ITEM_K(Preface, APP_TimecodeBreakCount), numTimecodeBreaks));
     
     
     /* update the header metadata durations */
@@ -1472,9 +1480,8 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* sourceInf
 
 
     
-    /* update the metadata with just the references to the Tracks for the VTR errors and 
-       PSE failures */
-    /* the individual VTR errors and PSE failures will be written straight to file
+    /* update the metadata with just the references to the Tracks for the VTR errors, etc */
+    /* the individual VTR errors etc. will be written straight to file
        at the end of the header metadata. This is done to avoid the memory hit that results
        from storing the (potentially large) errors and failures metadata sets in memory */
     
@@ -1614,14 +1621,40 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* sourceInf
         }
     }
     
+    /* Timecode break Track(s) */
+    
+    if (numTimecodeBreaks > 0)
+    {
+        /* if num breaks exceeds MAX_STRONG_REF_ARRAY_COUNT then the failures are
+           written in > 1 tracks */
+        numTracks = 1 + numTimecodeBreaks / MAX_STRONG_REF_ARRAY_COUNT;
+        for (i = 0; i < numTracks; i++)
+        {
+            /* Preface - ContentStorage - SourcePackage - DM Event Track */    
+            CHK_ORET(mxf_create_set(output->headerMetadata, &MXF_SET_K(EventTrack), &output->sourcePackageTrackSet));
+            CHK_ORET(mxf_add_array_item_strongref(output->sourcePackageSet, &MXF_ITEM_K(GenericPackage, Tracks), output->sourcePackageTrackSet));
+            CHK_ORET(mxf_set_utf16string_item(output->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackName), g_timecodeBreakTrackName));
+            CHK_ORET(mxf_set_uint32_item(output->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackID), nextTrackID++));
+            CHK_ORET(mxf_set_uint32_item(output->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, TrackNumber), 0));
+            CHK_ORET(mxf_set_rational_item(output->sourcePackageTrackSet, &MXF_ITEM_K(EventTrack, EventEditRate), &g_videoEditRate));
+            CHK_ORET(mxf_set_position_item(output->sourcePackageTrackSet, &MXF_ITEM_K(EventTrack, EventOrigin), 0));
+        
+            /* remove Track set from header metadata, leaving just the reference in the sourcePackageSet
+               The Track will be written when the breaks are written */
+            CHK_ORET(mxf_remove_set(output->headerMetadata, output->sourcePackageTrackSet));
+            CHK_ORET(mxf_append_list_element(&output->timecodeBreakTrackSets, output->sourcePackageTrackSet));
+        }
+    }
+    
     
 
-    /* register the PSE failure, VTR error and DigiBeta dropout items that will be written later 
+    /* register the VTR error etc. items that will be written later 
        This must be done so that the local tags are registered in the Primer */
     CHK_ORET(mxf_register_set_items(output->headerMetadata, &MXF_SET_K(DMSegment)));
     CHK_ORET(mxf_register_set_items(output->headerMetadata, &MXF_SET_K(APP_VTRReplayErrorFramework)));
     CHK_ORET(mxf_register_set_items(output->headerMetadata, &MXF_SET_K(APP_PSEAnalysisFramework)));
     CHK_ORET(mxf_register_set_items(output->headerMetadata, &MXF_SET_K(APP_DigiBetaDropoutFramework)));
+    CHK_ORET(mxf_register_set_items(output->headerMetadata, &MXF_SET_K(APP_TimecodeBreakFramework)));
 
     
     /* write the footer header metadata created thus far */
@@ -1630,6 +1663,63 @@ int complete_archive_mxf_file(ArchiveMXFWriter** outputRef, InfaxData* sourceInf
     CHK_ORET(mxf_write_header_metadata(output->mxfFile, output->headerMetadata));
     
     
+    /* write the timecode breaks Track(s) and child items */
+    
+    if (mxf_get_list_length(&output->timecodeBreakTrackSets) > 0)
+    {
+        timecodeBreakIndex = 0;
+        mxf_initialise_list_iter(&iter, &output->timecodeBreakTrackSets);
+        while (mxf_next_list_iter_element(&iter))
+        {
+            output->sourcePackageTrackSet = (MXFMetadataSet*)mxf_get_iter_element(&iter);
+            CHK_ORET(mxf_add_set(output->headerMetadata, output->sourcePackageTrackSet));
+            
+            /* Preface - ContentStorage - SourcePackage - DM Event Track - Sequence */    
+            CHK_ORET(mxf_create_set(output->headerMetadata, &MXF_SET_K(Sequence), &output->sequenceSet));
+            CHK_ORET(mxf_set_strongref_item(output->sourcePackageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), output->sequenceSet));
+            CHK_ORET(mxf_set_ul_item(output->sequenceSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &MXF_DDEF_L(DescriptiveMetadata)));
+        
+            for (j = 0; j < MAX_STRONG_REF_ARRAY_COUNT && timecodeBreakIndex < numTimecodeBreaks; j++, timecodeBreakIndex++)
+            {
+                timecodeBreak = (const TimecodeBreak*)&timecodeBreaks[timecodeBreakIndex];
+                
+                /* Preface - ContentStorage - SourcePackage - DM Event Track - Sequence - DMSegment */    
+                CHK_ORET(mxf_create_set(output->headerMetadata, &MXF_SET_K(DMSegment), &output->dmSet));
+                CHK_ORET(mxf_add_array_item_strongref(output->sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), output->dmSet));
+                CHK_ORET(mxf_set_ul_item(output->dmSet, &MXF_ITEM_K(StructuralComponent, DataDefinition), &MXF_DDEF_L(DescriptiveMetadata)));
+                CHK_ORET(mxf_set_position_item(output->dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), timecodeBreak->position));
+                CHK_ORET(mxf_set_length_item(output->dmSet, &MXF_ITEM_K(StructuralComponent, Duration), 1));
+    
+                /* Preface - ContentStorage - SourcePackage - DM Event Track - Sequence - DMSegment - DMFramework */    
+                CHK_ORET(mxf_create_set(output->headerMetadata, &MXF_SET_K(APP_TimecodeBreakFramework), &output->dmFrameworkSet));
+                CHK_ORET(mxf_set_strongref_item(output->dmSet, &MXF_ITEM_K(DMSegment, DMFramework), output->dmFrameworkSet));
+                CHK_ORET(mxf_set_uint16_item(output->dmFrameworkSet, &MXF_ITEM_K(APP_TimecodeBreakFramework, APP_TimecodeType), timecodeBreak->timecodeType));
+                
+                
+                /* write the DMSegment and DMFramework to file */
+                CHK_ORET(mxf_write_set(output->mxfFile, output->dmSet));
+                CHK_ORET(mxf_write_set(output->mxfFile, output->dmFrameworkSet));
+                
+                /* remove and free the sets to limit memory usage */
+                CHK_ORET(mxf_remove_set(output->headerMetadata, output->dmSet));
+                mxf_free_set(&output->dmSet);
+                CHK_ORET(mxf_remove_set(output->headerMetadata, output->dmFrameworkSet));
+                mxf_free_set(&output->dmFrameworkSet);
+            }
+
+            /* write the Track and Sequence to file */
+            CHK_ORET(mxf_write_set(output->mxfFile, output->sourcePackageTrackSet));
+            CHK_ORET(mxf_write_set(output->mxfFile, output->sequenceSet));
+
+            /* remove and free the sets to limit memory usage */
+            CHK_ORET(mxf_remove_set(output->headerMetadata, output->sourcePackageTrackSet));
+            mxf_free_set(&output->sourcePackageTrackSet);
+            CHK_ORET(mxf_remove_set(output->headerMetadata, output->sequenceSet));
+            mxf_free_set(&output->sequenceSet);
+        }
+    }
+
+
     /* write the digibeta dropouts Track(s) and child items */
     
     if (mxf_get_list_length(&output->digiBetaDropoutTrackSets) > 0)

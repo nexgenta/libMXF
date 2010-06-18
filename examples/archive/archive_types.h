@@ -1,5 +1,5 @@
 /*
- * $Id: archive_types.h,v 1.4 2010/01/12 17:37:38 john_f Exp $
+ * $Id: archive_types.h,v 1.5 2010/06/18 09:29:34 philipn Exp $
  *
  * 
  *
@@ -55,6 +55,11 @@ extern "C"
 = 958 */
 #define COMPLETE_INFAX_EXTERNAL_SIZE    958
 
+/* use for TimecodeBreak::timecodeType */
+#define TIMECODE_BREAK_VITC             0x0001
+#define TIMECODE_BREAK_LTC              0x0002
+
+
 
 typedef struct
 {
@@ -95,6 +100,12 @@ typedef struct
     int64_t position;
     int32_t strength;
 } DigiBetaDropout;
+
+typedef struct
+{
+    int64_t position;
+    uint16_t timecodeType;
+} TimecodeBreak;
 
 typedef struct
 {

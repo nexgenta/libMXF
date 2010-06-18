@@ -1,5 +1,5 @@
 /*
- * $Id: write_archive_mxf.h,v 1.6 2010/02/12 13:46:25 philipn Exp $
+ * $Id: write_archive_mxf.h,v 1.7 2010/06/18 09:29:34 philipn Exp $
  *
  * 
  *
@@ -64,7 +64,8 @@ int abort_archive_mxf_file(ArchiveMXFWriter** output);
 int complete_archive_mxf_file(ArchiveMXFWriter** output, InfaxData* sourceInfaxData,
     const PSEFailure* pseFailures, long numPSEFailures,
     const VTRError* vtrErrors, long numVTRErrors,
-    const DigiBetaDropout* digiBetaDropouts, long numDigiBetaDropouts);
+    const DigiBetaDropout* digiBetaDropouts, long numDigiBetaDropouts,
+    const TimecodeBreak* timecodeBreaks, long numTimecodeBreaks);
 
 int64_t get_archive_mxf_file_size(ArchiveMXFWriter* writer);
 

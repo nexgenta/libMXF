@@ -1,5 +1,5 @@
 /*
- * $Id: archive_mxf_info_lib.c,v 1.3 2010/06/02 10:59:20 philipn Exp $
+ * $Id: archive_mxf_info_lib.c,v 1.4 2010/06/18 09:29:34 philipn Exp $
  *
  * 
  *
@@ -508,6 +508,102 @@ fail:
     return 0;
 }
 
+static int archive_mxf_get_package_timecode_breaks(MXFHeaderMetadata* headerMetadata, MXFMetadataSet* packageSet,
+                                                   TimecodeBreak** timecodeBreaks, long* numTimecodeBreaks)
+{
+    MXFArrayItemIterator arrayIter;
+    MXFArrayItemIterator arrayIter2;
+    uint8_t* arrayElement;
+    uint32_t arrayElementLen;
+    mxfUL dataDef;
+    uint32_t count;
+    MXFMetadataSet* packageTrackSet;
+    MXFMetadataSet* sequenceSet;
+    MXFMetadataSet* dmSet;
+    MXFMetadataSet* dmFrameworkSet;
+    MXFListIterator setsIter;
+    TimecodeBreak* newTimecodeBreaks = NULL;
+    long totalBreaks = 0;
+    TimecodeBreak* tmp;
+    
+
+    CHK_OFAIL(mxf_uu_get_package_tracks(packageSet, &arrayIter));
+    while (mxf_uu_next_track(headerMetadata, &arrayIter, &packageTrackSet))
+    {
+        CHK_OFAIL(mxf_uu_get_track_datadef(packageTrackSet, &dataDef));
+        if (mxf_is_descriptive_metadata(&dataDef))
+        {
+            /* get to the sequence */
+            CHK_OFAIL(mxf_get_strongref_item(packageTrackSet, &MXF_ITEM_K(GenericTrack, Sequence), &sequenceSet));
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &sequenceSet->key, &MXF_SET_K(Sequence)))
+            {
+                CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                if (count == 0)
+                {
+                    continue;
+                }
+                
+                CHK_OFAIL(mxf_get_array_item_element(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), 0, &arrayElement));
+                CHK_OFAIL(mxf_get_strongref(headerMetadata, arrayElement, &dmSet));
+            }
+            else
+            {
+                dmSet = sequenceSet;
+            }
+            
+            /* if it is a DMSegment with a DMFramework reference then we have the DMS track */
+            if (mxf_is_subclass_of(headerMetadata->dataModel, &dmSet->key, &MXF_SET_K(DMSegment)))
+            {
+                if (mxf_have_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework)))
+                {
+                    CHK_OFAIL(mxf_get_strongref_item(dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+
+                    /* check whether the DMFrameworkSet is a APP_TimecodeBreakFramework */
+                    if (mxf_is_subclass_of(headerMetadata->dataModel, &dmFrameworkSet->key, &MXF_SET_K(APP_TimecodeBreakFramework)))
+                    {
+                        /* go back to the sequence and extract the timecode breaks */
+                        
+                        CHK_OFAIL(mxf_get_array_item_count(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &count));
+                        if (newTimecodeBreaks == NULL)
+                        {
+                            CHK_OFAIL((tmp = malloc(sizeof(TimecodeBreak) * (totalBreaks + count))) != NULL);
+                        }
+                        else
+                        {
+                            /* multiple tracks with timecode breaks - reallocate the array */
+                            CHK_OFAIL((tmp = realloc(newTimecodeBreaks, sizeof(TimecodeBreak) * (totalBreaks + count))) != NULL);
+                        }
+                        newTimecodeBreaks = tmp;
+                        
+                        /* extract the digibeta dropouts */
+                        initialise_sets_iter(headerMetadata, &setsIter);
+                        mxf_initialise_array_item_iterator(sequenceSet, &MXF_ITEM_K(Sequence, StructuralComponents), &arrayIter2);
+                        while (mxf_next_array_item_element(&arrayIter2, &arrayElement, &arrayElementLen))
+                        {
+                            TimecodeBreak* timecodeBreak = &newTimecodeBreaks[totalBreaks];
+                            
+                            CHK_OFAIL(mxf_get_strongref_s(headerMetadata, &setsIter, arrayElement, &dmSet));
+                            CHK_OFAIL(mxf_get_position_item(dmSet, &MXF_ITEM_K(DMSegment, EventStartPosition), &timecodeBreak->position));
+                            CHK_OFAIL(mxf_get_strongref_item_s(&setsIter, dmSet, &MXF_ITEM_K(DMSegment, DMFramework), &dmFrameworkSet));
+                            CHK_OFAIL(mxf_get_uint16_item(dmFrameworkSet, &MXF_ITEM_K(APP_TimecodeBreakFramework, APP_TimecodeType), &timecodeBreak->timecodeType));
+                            
+                            totalBreaks++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    *timecodeBreaks = newTimecodeBreaks;
+    *numTimecodeBreaks = totalBreaks;
+    return 1;
+
+fail:
+    SAFE_FREE(&newTimecodeBreaks);
+    return 0;
+}
+
 
 
 int is_archive_mxf(MXFHeaderMetadata* headerMetadata)
@@ -806,6 +902,20 @@ int archive_mxf_get_digibeta_dropouts(MXFHeaderMetadata* headerMetadata, DigiBet
     
     CHK_ORET(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
     return archive_mxf_get_package_digibeta_dropouts(headerMetadata, fileSourcePackageSet, digiBetaDropouts, numDigiBetaDropouts);
+}
+
+int archive_mxf_get_timecode_breaks(MXFHeaderMetadata* headerMetadata, TimecodeBreak** timecodeBreaks, long* numTimecodeBreaks)
+{
+    MXFMetadataSet* materialPackageSet;
+    MXFMetadataSet* fileSourcePackageSet;
+
+    if (is_metadata_only_file(headerMetadata, &materialPackageSet))
+    {
+        return archive_mxf_get_package_timecode_breaks(headerMetadata, materialPackageSet, timecodeBreaks, numTimecodeBreaks);
+    }
+    
+    CHK_ORET(mxf_uu_get_top_file_package(headerMetadata, &fileSourcePackageSet));
+    return archive_mxf_get_package_timecode_breaks(headerMetadata, fileSourcePackageSet, timecodeBreaks, numTimecodeBreaks);
 }
 
 int archive_mxf_read_footer_metadata(const char* filename, MXFDataModel* dataModel, MXFHeaderMetadata** headerMetadata)

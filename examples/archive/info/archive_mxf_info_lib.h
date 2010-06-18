@@ -1,5 +1,5 @@
 /*
- * $Id: archive_mxf_info_lib.h,v 1.2 2010/06/02 10:59:20 philipn Exp $
+ * $Id: archive_mxf_info_lib.h,v 1.3 2010/06/18 09:29:34 philipn Exp $
  *
  * 
  *
@@ -49,6 +49,7 @@ int archive_mxf_get_info(MXFHeaderMetadata* headerMetadata, ArchiveMXFInfo* info
 int archive_mxf_get_pse_failures(MXFHeaderMetadata* headerMetadata, PSEFailure** failures, long* numFailures);
 int archive_mxf_get_vtr_errors(MXFHeaderMetadata* headerMetadata, VTRErrorAtPos** errors, long* numErrors);
 int archive_mxf_get_digibeta_dropouts(MXFHeaderMetadata* headerMetadata, DigiBetaDropout** digibetaDropouts, long* numDigiBetaDropouts);
+int archive_mxf_get_timecode_breaks(MXFHeaderMetadata* headerMetadata, TimecodeBreak** timecodeBreaks, long* numTimecodeBreaks);
 
 
 /* returns 1 if footer headermetadata was read, return 2 if none is present (*headerMetadata is NULL) */

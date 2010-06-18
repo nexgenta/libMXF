@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.8 2010/02/12 13:46:24 philipn Exp $
+ * $Id: test_write_archive_mxf.c,v 1.9 2010/06/18 09:29:34 philipn Exp $
  *
  * 
  *
@@ -204,6 +204,8 @@ int main(int argc, const char* argv[])
     long numPSEFailures = 0;
     DigiBetaDropout* digiBetaDropouts = NULL;
     long numDigiBetaDropouts = 0;
+    TimecodeBreak* timecodeBreaks = NULL;
+    long numTimecodeBreaks = 0;
     int numAudioTracks = 4;
     int ltoUpdate = 1;
     int depth8Bit = 1;
@@ -319,6 +321,7 @@ int main(int argc, const char* argv[])
     vtrErrors = (VTRError*)malloc(sizeof(VTRError) * numFrames);
     pseFailures = (PSEFailure*)malloc(sizeof(PSEFailure) * numFrames);
     digiBetaDropouts = (DigiBetaDropout*)malloc(sizeof(DigiBetaDropout) * numFrames);
+    timecodeBreaks = (TimecodeBreak*)malloc(sizeof(TimecodeBreak) * numFrames);
     memset(&vitc, 0, sizeof(ArchiveTimecode));
     memset(&ltc, 0, sizeof(ArchiveTimecode));
     vitc.hour = 10;
@@ -432,6 +435,14 @@ int main(int argc, const char* argv[])
             digiBetaDropouts[numDigiBetaDropouts].strength = 160;
             numDigiBetaDropouts++;
         }
+
+        if (i % 12 == 0)
+        {
+            memset(&timecodeBreaks[numTimecodeBreaks], 0, sizeof(TimecodeBreak));
+            timecodeBreaks[numTimecodeBreaks].position = i;
+            timecodeBreaks[numTimecodeBreaks].timecodeType = (i % 24 == 0) ? TIMECODE_BREAK_VITC : TIMECODE_BREAK_LTC;
+            numTimecodeBreaks++;
+        }
     }
     
     if (!passed)
@@ -465,7 +476,8 @@ int main(int argc, const char* argv[])
         if (!complete_archive_mxf_file(&output, &d3InfaxData,
             pseFailures, numPSEFailures,
             vtrErrors, numVTRErrors,
-            digiBetaDropouts, numDigiBetaDropouts))
+            digiBetaDropouts, numDigiBetaDropouts,
+            timecodeBreaks, numTimecodeBreaks))
         {
             fprintf(stderr, "Failed to complete writing archive MXF file\n");
             abort_archive_mxf_file(&output);
@@ -571,6 +583,14 @@ int main(int argc, const char* argv[])
     if (pseFailures != NULL)
     {
         free(pseFailures);
+    }
+    if (digiBetaDropouts != NULL)
+    {
+        free(digiBetaDropouts);
+    }
+    if (timecodeBreaks != NULL)
+    {
+        free(timecodeBreaks);
     }
     return 0;
 }
