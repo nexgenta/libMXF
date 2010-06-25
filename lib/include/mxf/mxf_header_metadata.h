@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_header_metadata.h,v 1.3 2008/11/07 14:12:59 philipn Exp $
+ * $Id: mxf_header_metadata.h,v 1.4 2010/06/25 13:59:02 philipn Exp $
  *
  * MXF header metadata
  *
@@ -99,10 +99,12 @@ int mxf_find_set_by_key(MXFHeaderMetadata* headerMetadata, const mxfKey* key, MX
 int mxf_find_singular_set_by_key(MXFHeaderMetadata* headerMetadata, const mxfKey* key, MXFMetadataSet** set);
 int mxf_get_item(MXFMetadataSet* set, const mxfKey* key, MXFMetadataItem** resultItem);
 int mxf_have_item(MXFMetadataSet* set, const mxfKey* key);
-    
+
 int mxf_set_is_subclass_of(MXFMetadataSet* set, const mxfKey* parentSetKey);
 
-    
+int mxf_clone_set(MXFMetadataSet* fromSet, MXFHeaderMetadata* toHeaderMetadata, MXFMetadataSet** toSet);
+
+
 int mxf_read_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata,
     uint64_t headerByteCount, const mxfKey* key, uint8_t llen, uint64_t len);
 int mxf_read_filtered_header_metadata(MXFFile* mxfFile, MXFReadFilter* filter, 

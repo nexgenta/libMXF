@@ -74,12 +74,37 @@ EXT_DATA_MODEL_2
 #undef MXF_ITEM_DEFINITION
 
 
+static int test_model(MXFDataModel* dataModel)
+{
+    MXFSetDef* setDef;
+    MXFItemDef* itemDef;
+    
+    CHK_ORET(mxf_find_set_def(dataModel, &MXF_SET_K(SourcePackage), &setDef));
+    CHK_ORET(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet1), &setDef));
+    CHK_ORET(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet2), &setDef));
+    CHK_ORET(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet3), &setDef));
+    CHK_ORET(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet4), &setDef));
+
+    CHK_ORET(mxf_find_item_def(dataModel, &MXF_ITEM_K(GenericPackage, PackageUID), &itemDef));
+    CHK_ORET(mxf_find_item_def(dataModel, &MXF_ITEM_K(TestSet1, TestItem1), &itemDef));
+    CHK_ORET(mxf_find_item_def(dataModel, &MXF_ITEM_K(TestSet1, TestItem2), &itemDef));
+    CHK_ORET(mxf_find_item_def(dataModel, &MXF_ITEM_K(TestSet4, TestItem3), &itemDef));
+    
+    CHK_ORET(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet4), &setDef));
+    CHK_ORET(mxf_find_item_def_in_set_def(&MXF_ITEM_K(TestSet1, TestItem1), setDef, &itemDef));
+    
+    CHK_ORET(mxf_is_subclass_of(dataModel, &MXF_SET_K(TestSet4), &MXF_SET_K(TestSet1)));
+    
+    return 1;
+}
+
 
 int test()
 {
     MXFDataModel* dataModel = NULL;
+    MXFDataModel* clonedDataModel = NULL;
     MXFSetDef* setDef;
-    MXFItemDef* itemDef;
+    MXFSetDef* clonedSetDef;
     unsigned int extTypeIds[16];
     MXFItemType* type;
     int typeIndex = 0;
@@ -113,9 +138,9 @@ int test()
     CHK_OFAIL(mxf_register_item_def(dataModel, #name, &MXF_SET_K(setName), &MXF_ITEM_K(setName, name), tag, typeId, isRequired));
     
     
+    EXT_TYPES
     EXT_DATA_MODEL
     EXT_DATA_MODEL_2
-    EXT_TYPES
     
 #undef MXF_BASIC_TYPE_DEF
 #undef MXF_ARRAY_TYPE_DEF
@@ -130,49 +155,35 @@ int test()
     CHK_OFAIL(mxf_finalise_data_model(dataModel));
     CHK_OFAIL(mxf_check_data_model(dataModel));
 
-    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(SourcePackage), &setDef));
-    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet1), &setDef));
-    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet2), &setDef));
-    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet3), &setDef));
-    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet4), &setDef));
+    CHK_OFAIL(test_model(dataModel));
 
-    CHK_OFAIL(mxf_find_item_def(dataModel, &MXF_ITEM_K(GenericPackage, PackageUID), &itemDef));
-    CHK_OFAIL(mxf_find_item_def(dataModel, &MXF_ITEM_K(TestSet1, TestItem1), &itemDef));
-    CHK_OFAIL(mxf_find_item_def(dataModel, &MXF_ITEM_K(TestSet1, TestItem2), &itemDef));
-    CHK_OFAIL(mxf_find_item_def(dataModel, &MXF_ITEM_K(TestSet4, TestItem3), &itemDef));
-    
-    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet4), &setDef));
-    CHK_OFAIL(mxf_find_item_def_in_set_def(&MXF_ITEM_K(TestSet1, TestItem1), setDef, &itemDef));
-    
-    CHK_OFAIL(mxf_is_subclass_of(dataModel, &MXF_SET_K(TestSet4), &MXF_SET_K(TestSet1)));
-    
     
 #define MXF_ARRAY_TYPE_DEF(pid, pname, pelementTypeId, pfixedSize) \
     type = mxf_get_item_def_type(dataModel, extTypeIds[typeIndex]); \
-    CHK_OFAIL(type != NULL); \
-    CHK_OFAIL(strcmp(type->name, pname) == 0); \
-    CHK_OFAIL(type->info.array.elementTypeId == pelementTypeId); \
-    CHK_OFAIL(type->info.array.fixedSize == pfixedSize); \
+    CHK_ORET(type != NULL); \
+    CHK_ORET(strcmp(type->name, pname) == 0); \
+    CHK_ORET(type->info.array.elementTypeId == pelementTypeId); \
+    CHK_ORET(type->info.array.fixedSize == pfixedSize); \
     typeIndex++;
 
 #define MXF_COMPOUND_TYPE_DEF(pid, pname) \
     type = mxf_get_item_def_type(dataModel, extTypeIds[typeIndex]); \
-    CHK_OFAIL(type != NULL); \
-    CHK_OFAIL(strcmp(type->name, pname) == 0); \
+    CHK_ORET(type != NULL); \
+    CHK_ORET(strcmp(type->name, pname) == 0); \
     memberIndex = 0; \
     typeIndex++;
 
 #define MXF_COMPOUND_TYPE_MEMBER(pname, ptypeId) \
-    CHK_OFAIL(type->info.compound.members[memberIndex].typeId == ptypeId); \
-    CHK_OFAIL(strcmp(type->info.compound.members[memberIndex].name, pname) == 0); \
+    CHK_ORET(type->info.compound.members[memberIndex].typeId == ptypeId); \
+    CHK_ORET(strcmp(type->info.compound.members[memberIndex].name, pname) == 0); \
     memberIndex++;
 
 #define MXF_INTERPRETED_TYPE_DEF(pid, pname, ptypeId, pfixedSize) \
     type = mxf_get_item_def_type(dataModel, extTypeIds[typeIndex]); \
-    CHK_OFAIL(type != NULL); \
-    CHK_OFAIL(strcmp(type->name, pname) == 0); \
-    CHK_OFAIL(type->info.interpret.typeId == ptypeId); \
-    CHK_OFAIL(type->info.interpret.fixedArraySize == pfixedSize); \
+    CHK_ORET(type != NULL); \
+    CHK_ORET(strcmp(type->name, pname) == 0); \
+    CHK_ORET(type->info.interpret.typeId == ptypeId); \
+    CHK_ORET(type->info.interpret.fixedArraySize == pfixedSize); \
     typeIndex++;
     
     
@@ -184,12 +195,32 @@ int test()
 #undef MXF_COMPOUND_TYPE_MEMBER
 #undef MXF_INTERPRETED_TYPE_DEF
 
+
+    CHK_OFAIL(mxf_load_data_model(&clonedDataModel));
+    CHK_OFAIL(mxf_finalise_data_model(clonedDataModel));
+    CHK_OFAIL(mxf_check_data_model(clonedDataModel));
     
+    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(SourcePackage), &setDef));
+    CHK_OFAIL(mxf_clone_set_def(dataModel, setDef, clonedDataModel, &clonedSetDef));
+    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet1), &setDef));
+    CHK_OFAIL(mxf_clone_set_def(dataModel, setDef, clonedDataModel, &clonedSetDef));
+    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet2), &setDef));
+    CHK_OFAIL(mxf_clone_set_def(dataModel, setDef, clonedDataModel, &clonedSetDef));
+    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet3), &setDef));
+    CHK_OFAIL(mxf_clone_set_def(dataModel, setDef, clonedDataModel, &clonedSetDef));
+    CHK_OFAIL(mxf_find_set_def(dataModel, &MXF_SET_K(TestSet4), &setDef));
+    CHK_OFAIL(mxf_clone_set_def(dataModel, setDef, clonedDataModel, &clonedSetDef));
+
+    CHK_OFAIL(test_model(clonedDataModel));
+    
+
     mxf_free_data_model(&dataModel);
+    mxf_free_data_model(&clonedDataModel);
     return 1;
     
 fail:
     mxf_free_data_model(&dataModel);
+    mxf_free_data_model(&clonedDataModel);
     return 0;
 }
 

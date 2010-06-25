@@ -1,5 +1,5 @@
 /*
- * $Id: test_mxf_reader.c,v 1.3 2010/01/12 16:25:07 john_f Exp $
+ * $Id: test_mxf_reader.c,v 1.4 2010/06/25 13:59:02 philipn Exp $
  *
  * Test the MXF Reader 
  *
@@ -365,10 +365,10 @@ static int test2(const char* mxfFilename, const char* outFilename)
         frameCount++;
         if (frameCount == 10)
         {
-            printf("Positioning at frame %lld + 5\n", frameCount);
+            printf("Positioning at frame %"PFi64" + 5\n", frameCount);
             if (!position_at_frame(input, frameCount + 5))
             {
-                fprintf(stderr, "Failed to position file at %lld + 5\n", frameCount);
+                fprintf(stderr, "Failed to position file at %"PFi64" + 5\n", frameCount);
                 break;
             }
         }

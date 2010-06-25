@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.c,v 1.2 2007/09/11 13:24:55 stuart_hc Exp $
+ * $Id: mxf_labels_and_keys.c,v 1.3 2010/06/25 13:59:02 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc.
  *
@@ -29,6 +29,7 @@
 
 static const mxfUL g_opAtomPrefix = MXF_ATOM_OP_L(0);
 static const mxfUL g_op1APrefix = MXF_1A_OP_L(0);
+static const mxfUL g_op1BPrefix = MXF_1B_OP_L(0);
     
 
 
@@ -87,4 +88,8 @@ int is_op_1a(const mxfUL* label)
     return memcmp(&g_op1APrefix, label, 13) == 0;
 }
 
+int is_op_1b(const mxfUL* label)
+{
+    return memcmp(&g_op1BPrefix, label, 13) == 0;
+}
 

@@ -66,6 +66,22 @@ MXF_SET_DEFINITION(InterchangeObject, TestSet2, \
 \
 MXF_SET_DEFINITION(InterchangeObject, TestSet3, \
     MXF_LABEL(0x06, 0x0e, 0x2B, 0x34, 0x02, 0x53, 0x01, 0x7f, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03) \
+); \
+\
+MXF_SET_DEFINITION(InterchangeObject, TestSet4, \
+    MXF_LABEL(0x06, 0x0e, 0x2B, 0x34, 0x02, 0x53, 0x01, 0x7f, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04) \
+); \
+\
+MXF_SET_DEFINITION(InterchangeObject, TestSet5, \
+    MXF_LABEL(0x06, 0x0e, 0x2B, 0x34, 0x02, 0x53, 0x01, 0x7f, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05) \
+); \
+\
+MXF_SET_DEFINITION(InterchangeObject, TestSet6, \
+    MXF_LABEL(0x06, 0x0e, 0x2B, 0x34, 0x02, 0x53, 0x01, 0x7f, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06) \
+); \
+\
+MXF_SET_DEFINITION(InterchangeObject, TestSet7, \
+    MXF_LABEL(0x06, 0x0e, 0x2B, 0x34, 0x02, 0x53, 0x01, 0x7f, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07) \
 );
 
 
@@ -167,10 +183,24 @@ int test_read(const char* filename)
     MXFPartition* footerPartition = NULL;
     MXFDataModel* dataModel = NULL;
     MXFHeaderMetadata* headerMetadata = NULL;
+    MXFDataModel* srcDataModel = NULL;
+    MXFHeaderMetadata* srcHeaderMetadata = NULL;
     MXFMetadataSet* prefaceSet;
     MXFMetadataSet* set1;
     MXFMetadataSet* set2;
     MXFMetadataSet* set3;
+    MXFMetadataSet* set4;
+    MXFMetadataSet* set5;
+    MXFMetadataSet* set6;
+    MXFMetadataSet* set7;
+    MXFMetadataSet* srcPrefaceSet;
+    MXFMetadataSet* srcSet1;
+    MXFMetadataSet* srcSet2;
+    MXFMetadataSet* srcSet3;
+    MXFMetadataSet* srcSet4;
+    MXFMetadataSet* srcSet5;
+    MXFMetadataSet* srcSet6;
+    MXFMetadataSet* srcSet7;
     mxfKey key;
     uint8_t llen;
     uint64_t len;
@@ -215,10 +245,13 @@ int test_read(const char* filename)
     mxf_initialise_file_partitions(&partitions);
     
     CHK_OFAIL(mxf_load_data_model(&dataModel));
-    CHK_OFAIL(load_extensions(dataModel));
     CHK_OFAIL(mxf_finalise_data_model(dataModel));
-
     CHK_OFAIL(mxf_create_header_metadata(&headerMetadata, dataModel));
+
+    CHK_OFAIL(mxf_load_data_model(&srcDataModel));
+    CHK_OFAIL(load_extensions(srcDataModel));
+    CHK_OFAIL(mxf_finalise_data_model(srcDataModel));
+    CHK_OFAIL(mxf_create_header_metadata(&srcHeaderMetadata, srcDataModel));
     
    
     /* TEST */
@@ -232,15 +265,29 @@ int test_read(const char* filename)
     CHK_OFAIL((headerMetadataFilePos = mxf_file_tell(mxfFile)) >= 0);
     CHK_OFAIL(mxf_read_next_nonfiller_kl(mxfFile, &key, &llen, &len));
     CHK_OFAIL(mxf_is_header_metadata(&key));
-    CHK_OFAIL(mxf_read_header_metadata(mxfFile, headerMetadata, headerPartition->headerByteCount, 
+    CHK_OFAIL(mxf_read_header_metadata(mxfFile, srcHeaderMetadata, headerPartition->headerByteCount, 
         &key, llen, len));
 
     /* read and check items */
     
-    CHK_OFAIL(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(Preface), &prefaceSet));
-    CHK_OFAIL(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(TestSet1), &set1));
-    CHK_OFAIL(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(TestSet2), &set2));
-    CHK_OFAIL(mxf_find_singular_set_by_key(headerMetadata, &MXF_SET_K(TestSet3), &set3));
+    CHK_OFAIL(mxf_find_singular_set_by_key(srcHeaderMetadata, &MXF_SET_K(Preface), &srcPrefaceSet));
+    CHK_OFAIL(mxf_find_singular_set_by_key(srcHeaderMetadata, &MXF_SET_K(TestSet1), &srcSet1));
+    CHK_OFAIL(mxf_find_singular_set_by_key(srcHeaderMetadata, &MXF_SET_K(TestSet2), &srcSet2));
+    CHK_OFAIL(mxf_find_singular_set_by_key(srcHeaderMetadata, &MXF_SET_K(TestSet3), &srcSet3));
+    CHK_OFAIL(mxf_find_singular_set_by_key(srcHeaderMetadata, &MXF_SET_K(TestSet4), &srcSet4));
+    CHK_OFAIL(mxf_find_singular_set_by_key(srcHeaderMetadata, &MXF_SET_K(TestSet5), &srcSet5));
+    CHK_OFAIL(mxf_find_singular_set_by_key(srcHeaderMetadata, &MXF_SET_K(TestSet6), &srcSet6));
+    CHK_OFAIL(mxf_find_singular_set_by_key(srcHeaderMetadata, &MXF_SET_K(TestSet7), &srcSet7));
+    
+    /* test cloning by checking using a clone */
+    CHK_OFAIL(mxf_clone_set(srcPrefaceSet, headerMetadata, &prefaceSet));
+    CHK_OFAIL(mxf_clone_set(srcSet1, headerMetadata, &set1));
+    CHK_OFAIL(mxf_clone_set(srcSet2, headerMetadata, &set2));
+    CHK_OFAIL(mxf_clone_set(srcSet3, headerMetadata, &set3));
+    CHK_OFAIL(mxf_clone_set(srcSet4, headerMetadata, &set4));
+    CHK_OFAIL(mxf_clone_set(srcSet5, headerMetadata, &set5));
+    CHK_OFAIL(mxf_clone_set(srcSet6, headerMetadata, &set6));
+    CHK_OFAIL(mxf_clone_set(srcSet7, headerMetadata, &set7));
     
     CHK_OFAIL(mxf_get_uint8_item(set1, &MXF_ITEM_K(TestSet1, TestItem1), &value1));
     CHK_OFAIL(value1 == 0x0f);
@@ -274,8 +321,10 @@ int test_read(const char* filename)
     CHK_OFAIL(wcscmp(L"A UTF16 String", value14) == 0);
     CHK_OFAIL(mxf_get_strongref_item(set1, &MXF_ITEM_K(TestSet1, TestItem15), &set2));
     CHK_OFAIL(memcmp(&set2->key, &MXF_SET_K(TestSet2), sizeof(mxfKey)) == 0);
-    CHK_OFAIL(mxf_get_weakref_item(set1, &MXF_ITEM_K(TestSet1, TestItem16), &set2));
-    CHK_OFAIL(memcmp(&set2->key, &MXF_SET_K(TestSet2), sizeof(mxfKey)) == 0);
+    /* CHK_OFAIL(mxf_get_weakref_item(set1, &MXF_ITEM_K(TestSet1, TestItem16), &set3)); */
+    /* cloning weak references is not yet supported, so we test the source set instead */
+    CHK_OFAIL(mxf_get_weakref_item(srcSet1, &MXF_ITEM_K(TestSet1, TestItem16), &set3));
+    CHK_OFAIL(memcmp(&set3->key, &MXF_SET_K(TestSet3), sizeof(mxfKey)) == 0);
     CHK_OFAIL(mxf_get_rational_item(set1, &MXF_ITEM_K(TestSet1, TestItem17), &value17));
     CHK_OFAIL(memcmp(&value17, &someRational, sizeof(mxfRational)) == 0);
     CHK_OFAIL(mxf_get_position_item(set1, &MXF_ITEM_K(TestSet1, TestItem18), &value18));
@@ -309,11 +358,11 @@ int test_read(const char* filename)
     {
         CHK_OFAIL(mxf_next_array_item_element(&arrayIter, &arrayElement, &arrayElementLength));
         CHK_OFAIL(mxf_get_strongref(set1->headerMetadata, arrayElement, &set));
-        CHK_OFAIL(memcmp(&set->key, &MXF_SET_K(TestSet1), sizeof(mxfKey)) == 0);
+        CHK_OFAIL(memcmp(&set->key, &MXF_SET_K(TestSet4), sizeof(mxfKey)) == 0);
 
         CHK_OFAIL(mxf_next_array_item_element(&arrayIter, &arrayElement, &arrayElementLength));
         CHK_OFAIL(mxf_get_strongref(set1->headerMetadata, arrayElement, &set));
-        CHK_OFAIL(memcmp(&set->key, &MXF_SET_K(TestSet2), sizeof(mxfKey)) == 0);
+        CHK_OFAIL(memcmp(&set->key, &MXF_SET_K(TestSet5), sizeof(mxfKey)) == 0);
     }
     
     CHK_OFAIL(mxf_get_array_item_count(set1, &MXF_ITEM_K(TestSet1, TestItem24), &arrayCount));
@@ -322,10 +371,10 @@ int test_read(const char* filename)
     CHK_OFAIL(arrayElementLength == mxfUUID_extlen);
     CHK_OFAIL(mxf_get_array_item_element(set1, &MXF_ITEM_K(TestSet1, TestItem24), 0, &arrayElement));
     CHK_OFAIL(mxf_get_strongref(set1->headerMetadata, arrayElement, &set));
-    CHK_OFAIL(memcmp(&set->key, &MXF_SET_K(TestSet1), sizeof(mxfKey)) == 0);
+    CHK_OFAIL(memcmp(&set->key, &MXF_SET_K(TestSet6), sizeof(mxfKey)) == 0);
     CHK_OFAIL(mxf_get_array_item_element(set1, &MXF_ITEM_K(TestSet1, TestItem24), 1, &arrayElement));
     CHK_OFAIL(mxf_get_strongref(set1->headerMetadata, arrayElement, &set));
-    CHK_OFAIL(memcmp(&set->key, &MXF_SET_K(TestSet2), sizeof(mxfKey)) == 0);
+    CHK_OFAIL(memcmp(&set->key, &MXF_SET_K(TestSet7), sizeof(mxfKey)) == 0);
     
     CHK_OFAIL(mxf_get_product_version_item(set1, &MXF_ITEM_K(TestSet1, TestItem26), &value26));
     CHK_OFAIL(memcmp(mxf_get_version(), &value26, sizeof(mxfProductVersion)) == 0);
@@ -367,8 +416,8 @@ int test_read(const char* filename)
         headerPartition->headerByteCount, &key, llen, len));
         
     CHK_OFAIL(filterData.skippedBeforeCount == 1); /* TestSet1 skipped */
-    CHK_OFAIL(filterData.nonSkippedBeforeCount == 3); /* all except TestSet1 */
-    CHK_OFAIL(filterData.skippedAfterCount == 2); /* all except Preface */
+    CHK_OFAIL(filterData.nonSkippedBeforeCount == 7); /* all except TestSet1 */
+    CHK_OFAIL(filterData.skippedAfterCount == 6); /* all except Preface */
     CHK_OFAIL(filterData.nonSkippedAfterCount == 1); /* Preface was not skipped */
     CHK_OFAIL(mxf_get_list_length(&headerMetadata->sets) == 1); /* Preface */
     
@@ -386,6 +435,8 @@ int test_read(const char* filename)
     mxf_clear_file_partitions(&partitions);
     mxf_free_data_model(&dataModel);
     mxf_free_header_metadata(&headerMetadata);
+    mxf_free_data_model(&srcDataModel);
+    mxf_free_header_metadata(&srcHeaderMetadata);
     return 1;
     
 fail:
@@ -393,6 +444,8 @@ fail:
     mxf_clear_file_partitions(&partitions);
     mxf_free_data_model(&dataModel);
     mxf_free_header_metadata(&headerMetadata);
+    mxf_free_data_model(&srcDataModel);
+    mxf_free_header_metadata(&srcHeaderMetadata);
     return 0;
 }
 
@@ -408,6 +461,10 @@ int test_create_and_write(const char* filename)
     MXFMetadataSet* set1;
     MXFMetadataSet* set2;
     MXFMetadataSet* set3;
+    MXFMetadataSet* set4;
+    MXFMetadataSet* set5;
+    MXFMetadataSet* set6;
+    MXFMetadataSet* set7;
     uint8_t* arrayElement;
 
     
@@ -434,6 +491,10 @@ int test_create_and_write(const char* filename)
     mxf_set_fixed_set_space_allocation(set1, 2048);
     CHK_OFAIL(mxf_create_set(headerMetadata, &MXF_SET_K(TestSet2), &set2));
     CHK_OFAIL(mxf_create_set(headerMetadata, &MXF_SET_K(TestSet3), &set3));
+    CHK_OFAIL(mxf_create_set(headerMetadata, &MXF_SET_K(TestSet4), &set4));
+    CHK_OFAIL(mxf_create_set(headerMetadata, &MXF_SET_K(TestSet5), &set5));
+    CHK_OFAIL(mxf_create_set(headerMetadata, &MXF_SET_K(TestSet6), &set6));
+    CHK_OFAIL(mxf_create_set(headerMetadata, &MXF_SET_K(TestSet7), &set7));
     
     CHK_OFAIL(mxf_set_uint8_item(set1, &MXF_ITEM_K(TestSet1, TestItem1), 0x0f));
     CHK_OFAIL(mxf_set_uint16_item(set1, &MXF_ITEM_K(TestSet1, TestItem2), 0x0f00));
@@ -450,7 +511,7 @@ int test_create_and_write(const char* filename)
     CHK_OFAIL(mxf_set_timestamp_item(set1, &MXF_ITEM_K(TestSet1, TestItem13), &someTimestamp));
     CHK_OFAIL(mxf_set_utf16string_item(set1, &MXF_ITEM_K(TestSet1, TestItem14), L"A UTF16 String"));
     CHK_OFAIL(mxf_set_strongref_item(set1, &MXF_ITEM_K(TestSet1, TestItem15), set2));
-    CHK_OFAIL(mxf_set_weakref_item(set1, &MXF_ITEM_K(TestSet1, TestItem16), set2));
+    CHK_OFAIL(mxf_set_weakref_item(set1, &MXF_ITEM_K(TestSet1, TestItem16), set3));
     CHK_OFAIL(mxf_set_rational_item(set1, &MXF_ITEM_K(TestSet1, TestItem17), &someRational));
     CHK_OFAIL(mxf_set_position_item(set1, &MXF_ITEM_K(TestSet1, TestItem18), 0x0f000000));
     CHK_OFAIL(mxf_set_length_item(set1, &MXF_ITEM_K(TestSet1, TestItem19), 0x0f000000));
@@ -462,10 +523,10 @@ int test_create_and_write(const char* filename)
     CHK_OFAIL(mxf_alloc_array_item_elements(set1, &MXF_ITEM_K(TestSet1, TestItem22), mxfUL_extlen, 2, &arrayElement));
     mxf_set_ul(&someUL, arrayElement);
     mxf_set_ul(&someUL, &arrayElement[mxfUL_extlen]);
-    CHK_OFAIL(mxf_add_array_item_strongref(set1, &MXF_ITEM_K(TestSet1, TestItem23), set1));
-    CHK_OFAIL(mxf_add_array_item_strongref(set1, &MXF_ITEM_K(TestSet1, TestItem23), set2));
-    CHK_OFAIL(mxf_add_array_item_strongref(set1, &MXF_ITEM_K(TestSet1, TestItem24), set1));
-    CHK_OFAIL(mxf_add_array_item_strongref(set1, &MXF_ITEM_K(TestSet1, TestItem24), set2));
+    CHK_OFAIL(mxf_add_array_item_strongref(set1, &MXF_ITEM_K(TestSet1, TestItem23), set4));
+    CHK_OFAIL(mxf_add_array_item_strongref(set1, &MXF_ITEM_K(TestSet1, TestItem23), set5));
+    CHK_OFAIL(mxf_add_array_item_strongref(set1, &MXF_ITEM_K(TestSet1, TestItem24), set6));
+    CHK_OFAIL(mxf_add_array_item_strongref(set1, &MXF_ITEM_K(TestSet1, TestItem24), set7));
     CHK_OFAIL(mxf_set_product_version_item(set1, &MXF_ITEM_K(TestSet1, TestItem26), mxf_get_version()));
     CHK_OFAIL(mxf_grow_array_item(set1, &MXF_ITEM_K(TestSet1, TestItem28), mxfUL_extlen, 1, &arrayElement));
     mxf_set_ul(&someUL, arrayElement);

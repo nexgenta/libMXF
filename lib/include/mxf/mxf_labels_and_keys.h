@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.12 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.13 2010/06/25 13:59:02 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -758,6 +758,19 @@ static const mxfUL MXF_OP_L(1a, qq01) =
     
     
 int is_op_1a(const mxfUL* label);
+
+
+/* OP-1B labels */
+ 
+#define MXF_1B_OP_L(qualifier) \
+    MXF_OP_L_LABEL(0x01, 0x01, 0x02, qualifier)
+    
+/* external essence, non-streamable file, single-track */
+static const mxfUL MXF_OP_L(1b, qq06) = 
+    MXF_1B_OP_L(0x06);
+    
+    
+int is_op_1b(const mxfUL* label);
 
 
 

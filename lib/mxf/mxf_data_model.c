@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.c,v 1.7 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_data_model.c,v 1.8 2010/06/25 13:59:02 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -174,6 +174,81 @@ static unsigned int get_type_id(MXFDataModel* dataModel)
     
     return typeId;
 }
+
+static int clone_item_type(MXFDataModel* fromDataModel, unsigned int fromItemTypeId,
+                           MXFDataModel* toDataModel, MXFItemType** toItemType)
+{
+    MXFItemType* clonedItemType = NULL;
+    MXFItemType* fromItemType;
+    MXFItemType* toRefItemType;
+    int i;
+
+    clonedItemType = mxf_get_item_def_type(toDataModel, fromItemTypeId);
+    if (clonedItemType)
+    {
+        *toItemType = clonedItemType;
+        return 1;
+    }
+
+    CHK_ORET((fromItemType = mxf_get_item_def_type(fromDataModel, fromItemTypeId)) != NULL);
+    
+    switch (fromItemType->category)
+    {
+        case MXF_BASIC_TYPE_CAT:
+            clonedItemType = mxf_register_basic_type(toDataModel, fromItemType->name, fromItemType->typeId,
+                                                     fromItemType->info.basic.size);
+            CHK_ORET(clonedItemType);
+            break;
+        case MXF_ARRAY_TYPE_CAT:
+            CHK_ORET(clone_item_type(fromDataModel, fromItemType->info.array.elementTypeId, toDataModel, &toRefItemType));
+            clonedItemType = mxf_register_array_type(toDataModel, fromItemType->name, fromItemType->typeId,
+                                                     fromItemType->info.array.elementTypeId,
+                                                     fromItemType->info.array.fixedSize);
+            CHK_ORET(clonedItemType);
+            break;
+        case MXF_COMPOUND_TYPE_CAT:
+            clonedItemType = mxf_register_compound_type(toDataModel, fromItemType->name, fromItemType->typeId);
+            CHK_ORET(clonedItemType);
+            
+            i = 0;
+            while (fromItemType->info.compound.members[i].typeId)
+            {
+                CHK_ORET(clone_item_type(fromDataModel, fromItemType->info.compound.members[i].typeId,
+                                         toDataModel, &toRefItemType));
+                CHK_ORET(mxf_register_compound_type_member(clonedItemType, fromItemType->info.compound.members[i].name,
+                                                           fromItemType->info.compound.members[i].typeId));
+                i++;
+            }
+            break;
+        case MXF_INTERPRET_TYPE_CAT:
+            CHK_ORET(clone_item_type(fromDataModel, fromItemType->info.interpret.typeId,
+                                     toDataModel, &toRefItemType));
+            clonedItemType = mxf_register_interpret_type(toDataModel, fromItemType->name, fromItemType->typeId,
+                                                         fromItemType->info.interpret.typeId,
+                                                         fromItemType->info.interpret.fixedArraySize);
+            CHK_ORET(clonedItemType);
+            break;
+    }
+    
+    *toItemType = clonedItemType;
+    return 1;
+}
+
+static int clone_item_def(MXFDataModel* fromDataModel, MXFItemDef* fromItemDef,
+                          MXFDataModel* toDataModel, MXFItemDef** toItemDef)
+{
+    MXFItemType* toItemType;
+    
+    CHK_ORET(clone_item_type(fromDataModel, fromItemDef->typeId, toDataModel, &toItemType));
+    
+    CHK_ORET(mxf_register_item_def(toDataModel, fromItemDef->name, &fromItemDef->setDefKey, &fromItemDef->key,
+                                   fromItemDef->localTag, fromItemDef->typeId, fromItemDef->isRequired));
+    
+    *toItemDef = (MXFItemDef*)mxf_get_last_list_element(&toDataModel->itemDefs);
+    return 1;
+}
+
+
 
 #if defined(_MSC_VER)
 #pragma warning(push)
@@ -683,4 +758,43 @@ int mxf_is_subclass_of_2(MXFDataModel* dataModel, MXFSetDef* setDef, const mxfKe
     return mxf_is_subclass_of_2(dataModel, setDef->parentSetDef, parentSetKey);
 }
 
+
+int mxf_clone_set_def(MXFDataModel* fromDataModel, MXFSetDef* fromSetDef,
+                      MXFDataModel* toDataModel, MXFSetDef** toSetDef)
+{
+    MXFSetDef* clonedSetDef = NULL;
+    MXFSetDef* toParentSetDef = NULL;
+    MXFListIterator iter;
+    MXFItemDef* fromItemDef;
+    MXFItemDef* toItemDef = NULL;
+    
+    if (!mxf_find_set_def(toDataModel, &fromSetDef->key, &clonedSetDef))
+    {
+        if (fromSetDef->parentSetDef)
+        {
+            CHK_ORET(mxf_clone_set_def(fromDataModel, fromSetDef->parentSetDef, toDataModel, &toParentSetDef));
+        }
+        
+        CHK_ORET(mxf_register_set_def(toDataModel, fromSetDef->name, &fromSetDef->parentSetDefKey, &fromSetDef->key));
+        clonedSetDef = (MXFSetDef*)mxf_get_last_list_element(&toDataModel->setDefs);
+        clonedSetDef->parentSetDef = toParentSetDef;
+    }
+    
+    mxf_initialise_list_iter(&iter, &fromSetDef->itemDefs);
+    while (mxf_next_list_iter_element(&iter))
+    {
+        fromItemDef = (MXFItemDef*)mxf_get_iter_element(&iter);
+        
+        if (mxf_find_item_def_in_set_def(&fromItemDef->key, clonedSetDef, &toItemDef))
+        {
+            continue;
+        }
+        
+        CHK_ORET(clone_item_def(fromDataModel, fromItemDef, toDataModel, &toItemDef));
+        CHK_ORET(mxf_append_list_element(&clonedSetDef->itemDefs, (void*)toItemDef));
+    }
+    
+    *toSetDef = clonedSetDef;
+    return 1;
+}
 

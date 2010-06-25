@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_header_metadata.c,v 1.4 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_header_metadata.c,v 1.5 2010/06/25 13:59:02 philipn Exp $
  *
  * MXF header metadata
  *
@@ -412,6 +412,82 @@ int mxf_set_is_subclass_of(MXFMetadataSet* set, const mxfKey* parentSetKey)
     return mxf_is_subclass_of(set->headerMetadata->dataModel, &set->key, parentSetKey);
 }
 
+
+int mxf_clone_set(MXFMetadataSet* fromSet, MXFHeaderMetadata* toHeaderMetadata, MXFMetadataSet** toSet)
+{
+    MXFMetadataSet* clonedSet = NULL;
+    MXFSetDef* fromSetDef;
+    MXFSetDef* toSetDef;
+    MXFListIterator fromItemIter;
+    MXFMetadataItem* toItem = NULL;
+    MXFItemDef* toItemDef = NULL;
+    MXFMetadataSet* fromRefSet = NULL;
+    MXFMetadataSet* toRefSet = NULL;
+    MXFArrayItemIterator fromArrayIter;
+    uint32_t count;
+    uint8_t* toUUIDElement;
+    uint8_t* fromUUIDElement;
+    uint32_t fromUUIDElementLen;
+    MXFListIterator fromSetsIter;
+
+    CHK_ORET(mxf_find_set_def(fromSet->headerMetadata->dataModel, &fromSet->key, &fromSetDef));
+    CHK_ORET(mxf_clone_set_def(fromSet->headerMetadata->dataModel, fromSetDef,
+                               toHeaderMetadata->dataModel, &toSetDef));
+    CHK_ORET(mxf_create_set(toHeaderMetadata, &fromSet->key, &clonedSet));
+
+    mxf_initialise_list_iter(&fromSetsIter, &fromSet->headerMetadata->sets);
+
+    mxf_initialise_list_iter(&fromItemIter, &fromSet->items);
+    while (mxf_next_list_iter_element(&fromItemIter))
+    {
+        MXFMetadataItem* fromItem = (MXFMetadataItem*)mxf_get_iter_element(&fromItemIter);
+        
+        CHK_OFAIL(mxf_find_item_def_in_set_def(&fromItem->key, toSetDef, &toItemDef));
+        
+        if (toItemDef->typeId == MXF_WEAKREFARRAY_TYPE ||
+            toItemDef->typeId == MXF_WEAKREFBATCH_TYPE ||
+            toItemDef->typeId == MXF_WEAKREF_TYPE)
+        {
+            mxf_log_error("Not cloning item because weak reference clones are not yet supported" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
+            continue;
+        }
+        else if (toItemDef->typeId == MXF_STRONGREFARRAY_TYPE ||
+                 toItemDef->typeId == MXF_STRONGREFBATCH_TYPE)
+        {
+            CHK_OFAIL(mxf_get_array_item_count(fromSet, &fromItem->key, &count));
+            CHK_OFAIL(mxf_alloc_array_item_elements(clonedSet, &fromItem->key, mxfUUID_extlen, count, &toUUIDElement));
+
+            CHK_OFAIL(mxf_initialise_array_item_iterator(fromSet, &fromItem->key, &fromArrayIter));
+            while (mxf_next_array_item_element(&fromArrayIter, &fromUUIDElement, &fromUUIDElementLen))
+            {
+                CHK_OFAIL(mxf_get_strongref_s(fromSet->headerMetadata, &fromSetsIter, fromUUIDElement, &fromRefSet));
+                CHK_OFAIL(mxf_clone_set(fromRefSet, toHeaderMetadata, &toRefSet));
+                mxf_set_strongref(toRefSet, toUUIDElement);
+                
+                toUUIDElement += mxfUUID_extlen;
+            }
+        }
+        else if (toItemDef->typeId == MXF_STRONGREF_TYPE)
+        {
+            CHK_OFAIL(mxf_get_strongref_s(fromSet->headerMetadata, &fromSetsIter, fromItem->value, &fromRefSet));
+            CHK_OFAIL(mxf_clone_set(fromRefSet, toHeaderMetadata, &toRefSet));
+            CHK_OFAIL(mxf_set_strongref_item(clonedSet, &fromItem->key, toRefSet));
+        }
+        else if (!mxf_equals_key(&toItemDef->key, &MXF_ITEM_K(InterchangeObject, InstanceUID)) &&
+                 !mxf_equals_key(&toItemDef->key, &MXF_ITEM_K(InterchangeObject, GenerationUID)))
+        {
+            CHK_OFAIL(get_or_create_set_item(toHeaderMetadata, clonedSet, &fromItem->key, &toItem));
+            CHK_OFAIL(mxf_set_item_value(toItem, fromItem->value, fromItem->length));
+        }
+    }
+
+    *toSet = clonedSet;
+    return 1;
+
+fail:
+    mxf_remove_set(toHeaderMetadata, clonedSet);
+    return 0;
+}
 
 
 int mxf_read_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata,

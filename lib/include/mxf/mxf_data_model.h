@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_data_model.h,v 1.7 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_data_model.h,v 1.8 2010/06/25 13:59:02 philipn Exp $
  *
  * MXF header metadata data model
  *
@@ -234,6 +234,10 @@ MXFItemType* mxf_get_item_def_type(MXFDataModel* dataModel, unsigned int typeId)
 
 int mxf_is_subclass_of(MXFDataModel* dataModel, const mxfKey* setKey, const mxfKey* parentSetKey);
 int mxf_is_subclass_of_2(MXFDataModel* dataModel, MXFSetDef* setDef, const mxfKey* parentSetKey);
+
+
+int mxf_clone_set_def(MXFDataModel* fromDataModel, MXFSetDef* fromSetDef,
+                      MXFDataModel* toDataModel, MXFSetDef** toSetDef);
 
 
 #ifdef __cplusplus
