@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.3 2009/09/18 14:35:21 philipn Exp $
+# $Id: Makefile,v 1.4 2010/07/14 13:06:35 john_f Exp $
 #
 # Copyright (C) 2006  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
 #
@@ -47,6 +47,10 @@ avidmxfinfo: main.o $(LIBMXF_DIR)/libMXF.a libavidmxfinfo.a
 install: all
 	mkdir -p $(MXF_INSTALL_PREFIX)/bin
 	cp avidmxfinfo $(MXF_INSTALL_PREFIX)/bin/
+	mkdir -p $(MXF_INSTALL_PREFIX)/lib
+	cp libavidmxfinfo.a $(MXF_INSTALL_PREFIX)/lib
+	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf/examples/avidmxfinfo
+	cp *.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/avidmxfinfo/
 
 .PHONY: clean
 clean:

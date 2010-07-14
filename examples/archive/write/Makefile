@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.5 2010/02/12 13:46:24 philipn Exp $
+# $Id: Makefile,v 1.6 2010/07/14 13:06:35 john_f Exp $
 #
 # Makefile for building archive examples
 #
@@ -61,8 +61,8 @@ install: libwritearchivemxf.a
 	cp libwritearchivemxf.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/bin
 	cp update_archive_mxf $(MXF_INSTALL_PREFIX)/bin
-	mkdir -p $(MXF_INSTALL_PREFIX)/include
-	cp write_archive_mxf.h $(MXF_INSTALL_PREFIX)/include
+	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive
+	cp write_archive_mxf.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive/
 
 .PHONY: clean
 clean:

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.4 2010/01/12 17:41:39 john_f Exp $
+# $Id: Makefile,v 1.5 2010/07/14 13:06:35 john_f Exp $
 #
 # Makefile for building archive examples
 #
@@ -53,8 +53,9 @@ clean:
 install: libarchivemxfinfo.a
 	mkdir -p $(MXF_INSTALL_PREFIX)/lib
 	cp libarchivemxfinfo.a $(MXF_INSTALL_PREFIX)/lib
-	mkdir -p $(MXF_INSTALL_PREFIX)/include
-	cp archive_mxf_info_lib.h $(MXF_INSTALL_PREFIX)/include/
-	cp ../archive_types.h $(MXF_INSTALL_PREFIX)/include/
 	mkdir -p $(MXF_INSTALL_PREFIX)/bin
 	cp archive_mxf_info $(MXF_INSTALL_PREFIX)/bin/
+	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive
+	cp archive_mxf_info_lib.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive/
+	cp ../archive_types.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive/
+
