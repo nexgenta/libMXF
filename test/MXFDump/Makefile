@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.2 2008/05/07 15:22:31 philipn Exp $
+# $Id: Makefile,v 1.3 2010/07/21 16:29:33 john_f Exp $
 #
 # Makefile for building MXFDump utility from the AAFSDK
 #
@@ -30,29 +30,47 @@ ifeq ($(OSNAME),Darwin)
 CPP_LD = g++ -framework CoreServices
 endif
 
+MISSING_AAFSDK_FILES:=$(shell for f in MXFLabels.h MXFMetaDictionary.h MXFDump.cpp AAFMetaDictionary.h; do if test ! -e $$f; then echo $$f; fi done)
+
+
 .PHONY: all
 all: MXFDump
 
-ifeq ($(AAFSDK),)
-MXFDump.cpp:
-	@echo "*** MXFDump.cpp does not exist and AAFSDK is not set"
-	@echo "*** libMXF tests cannot be run without MXFDump - install AAFSDK (see README.txt)"
-MXFDump: MXFDump.cpp
-	@echo "*** AAFSDK is not set"
-	true
 
-else
+ifeq ($(MISSING_AAFSDK_FILES),)
+
 MXFDump: MXFDump.o
 	$(CPP_LD) MXFDump.o -o $@
 
 MXFDump.o: MXFDump.cpp MXFLabels.h MXFMetaDictionary.h
 	$(CPP_CC) -c MXFDump.cpp
 
+else
+ifneq ($(AAFSDK),)
+.PHONY: MXFDump.cpp
 MXFDump.cpp:
 	cp $(AAFSDK)/DevUtils/MXFDump/MXFLabels.h .
 	cp $(AAFSDK)/DevUtils/MXFDump/MXFMetaDictionary.h .
 	cp $(AAFSDK)/DevUtils/MXFDump/MXFDump.cpp .
 	cp $(AAFSDK)/ref-impl/include/AAFMetaDictionary.h .
+
+MXFDump.o: MXFDump.cpp MXFLabels.h MXFMetaDictionary.h
+	$(CPP_CC) -c MXFDump.cpp
+
+MXFDump: MXFDump.o
+	$(CPP_LD) MXFDump.o -o $@
+
+else
+ifneq ($(MAKECMDGOALS),clean)
+.PHONY: MXFDump.cpp
+MXFDump.cpp:
+	@echo Warning: cannot build MXFDump. Missing AAF SDK files: $(MISSING_AAFSDK_FILES). Set the AAFSDK environment variable to reference the AAF SDK source tree or copy the files manually
+	
+MXFDump: MXFDump.cpp
+	true
+
+endif
+endif
 endif
 
 .PHONY: clean

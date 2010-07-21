@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.19 2009/11/25 17:16:20 john_f Exp $
+ * $Id: main.c,v 1.20 2010/07/21 16:29:33 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -708,16 +708,14 @@ static int parse_umid(const char* umidStr, mxfUMID* umid)
     return 1;
 }
 
-int parse_timecode(const char* timecodeStr, int isPAL, int isFilmRate, int64_t* frameCount)
+int parse_timecode(const char* timecodeStr, const mxfRational* videoSampleRate, int64_t* frameCount)
 {
     int result;
     int hour, min, sec, frame;
     int roundedTimecodeBase;
     const char* checkPtr;
     
-    roundedTimecodeBase = (isPAL) ? 25 : 30;
-    if (isFilmRate)
-        roundedTimecodeBase = 24;
+    roundedTimecodeBase = (int)(videoSampleRate->numerator / (double)videoSampleRate->denominator + 0.5);
 
     /* drop frame timecode */
     result = sscanf(timecodeStr, "d%d:%d:%d:%d", &hour, &min, &sec, &frame);
@@ -728,9 +726,9 @@ int parse_timecode(const char* timecodeStr, int isPAL, int isFilmRate, int64_t* 
             sec * roundedTimecodeBase +
             frame;
                 
-        if (isPAL)
+        if (roundedTimecodeBase == 25)
         {
-            /* no drop frame */
+            /* ignore 'd' - no drop frame for PAL */
             return 1;
         }
         
@@ -777,16 +775,16 @@ int parse_timecode(const char* timecodeStr, int isPAL, int isFilmRate, int64_t* 
     return 0;
 }
 
-int parse_position(int64_t startPosition, const char* positionStr, int isPAL, int isFilmRate, int64_t* position)
+int parse_position(int64_t startPosition, const char* positionStr, const mxfRational* videoSampleRate, int64_t* position)
 {
     if (positionStr[0] == 'o')
     {
-        return parse_timecode(positionStr + 1, isPAL, isFilmRate, position);
+        return parse_timecode(positionStr + 1, videoSampleRate, position);
     }
     else
     {
         int64_t abs_position;
-        if (!parse_timecode(positionStr, isPAL, isFilmRate, &abs_position))
+        if (!parse_timecode(positionStr, videoSampleRate, &abs_position))
         {
             return 0;
         }
@@ -917,6 +915,7 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --DNxHD1080p175X <filenam> DNxHD 1920x1080p24/23.976 175 Mbps 10bit (requires film frame rate)\n");
     fprintf(stderr, "  --unc <filename>           Uncompressed 8-bit UYVY SD\n");
     fprintf(stderr, "  --unc1080i <filename>      Uncompressed 8-bit UYVY HD 1920x1080i\n");
+    fprintf(stderr, "  --unc720p50 <filename>     Uncompressed 8-bit UYVY HD 1280x720p50\n");
     fprintf(stderr, "  --pcm <filename>           raw 48kHz PCM audio\n");
     fprintf(stderr, "       --bps <bits per sample>    # bits per sample. Default is 16\n");
     fprintf(stderr, "       --locked <bool>            true/false to indicate whether the number of audio samples is locked to the video (not set by default)\n");
@@ -989,6 +988,7 @@ int main(int argc, const char* argv[])
     int uctIndex;
     LocatorOption locators[MAX_LOCATORS];
     int numLocators = 0;
+    int haveP50Video = 0;
     
     memset(locators, 0, sizeof(locators));
     memset(userCommentTags, 0, sizeof(userCommentTags));
@@ -1425,6 +1425,7 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].essenceType = DNxHD720p120;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            haveP50Video = 1;
             inputIndex++;
             cmdlnIndex += 2;
         }
@@ -1443,6 +1444,7 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].essenceType = DNxHD720p185;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            haveP50Video = 1;
             inputIndex++;
             cmdlnIndex += 2;
         }
@@ -1610,6 +1612,23 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].essenceType = Unc1080iUYVY;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            inputIndex++;
+            cmdlnIndex += 2;
+        }
+        else if (strcmp(argv[cmdlnIndex], "--unc720p50") == 0)
+        {
+            if (cmdlnIndex + 1 >= argc)
+            {
+                usage(argv[0]);
+                fprintf(stderr, "Missing argument for %s\n", argv[cmdlnIndex]);
+                return 1;
+            }
+            init_essence_info(&inputs[inputIndex].essenceInfo);
+            inputs[inputIndex].isVideo = 1;
+            inputs[inputIndex].essenceType = Unc720p50UYVY;
+            inputs[inputIndex].filename = argv[cmdlnIndex + 1];
+            inputs[inputIndex].trackNumber = ++videoTrackNumber;
+            haveP50Video = 1;
             inputIndex++;
             cmdlnIndex += 2;
         }
@@ -1901,8 +1920,17 @@ int main(int argc, const char* argv[])
     /* set the video sample rate */
     if (isPAL)
     {
-        videoSampleRate.numerator = 25;
-        videoSampleRate.denominator = 1;
+        if (haveP50Video)
+        {
+            /* TODO: this is yet just another sample/edit rate hack! */
+            videoSampleRate.numerator = 50;
+            videoSampleRate.denominator = 1;
+        }
+        else
+        {
+            videoSampleRate.numerator = 25;
+            videoSampleRate.denominator = 1;
+        }
     }
     else /* NTSC */
     {
@@ -1940,7 +1968,7 @@ int main(int argc, const char* argv[])
     /* parse the start timecode now that we know whether it is PAL or NTSC */
     if (startTimecodeStr != NULL)
     {
-        if (!parse_timecode(startTimecodeStr, isPAL, (isFilm24 || isFilm23_976), &videoStartPosition))
+        if (!parse_timecode(startTimecodeStr, &videoSampleRate, &videoStartPosition))
         {
             usage(argv[0]);
             fprintf(stderr, "Failed to accept --start-tc timecode value '%s'\n", startTimecodeStr);
@@ -1951,7 +1979,7 @@ int main(int argc, const char* argv[])
     /* parse the locator positions now that we know what the start position and frame rate is */
     for (i = 0; i < numLocators; i++)
     {
-        if (!parse_position(videoStartPosition, locators[i].positionStr, isPAL, (isFilm24 || isFilm23_976), &locators[i].position))
+        if (!parse_position(videoStartPosition, locators[i].positionStr, &videoSampleRate, &locators[i].position))
         {
             usage(argv[0]);
             fprintf(stderr, "Failed to parse --locator <position> value '%s'\n", locators[i].positionStr);
@@ -2031,21 +2059,11 @@ int main(int argc, const char* argv[])
         }
         else if (inputs[i].essenceType == DNxHD720p120)
         {
-            if (isPAL)
-            {
-                videoSampleRate.numerator = 50;
-                videoSampleRate.denominator = 1;
-            }
             inputs[i].frameSize = 303104;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == DNxHD720p185)
         {
-            if (isPAL)
-            {
-                videoSampleRate.numerator = 50;
-                videoSampleRate.denominator = 1;
-            }
             inputs[i].frameSize = 458752;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
@@ -2088,6 +2106,16 @@ int main(int argc, const char* argv[])
                 fprintf(stderr, "Uncompressed 1080i NTSC not yet implemented\n");
                 return 1;
             }
+            CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
+        }
+        else if (inputs[i].essenceType == Unc720p50UYVY)
+        {
+            if (!isPAL)
+            {
+                fprintf(stderr, "Invalid use of --ntsc option for uncompressed 720p50\n");
+                return 1;
+            }
+            inputs[i].frameSize = 1280 * 720 * 2;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == PCM && !inputs[i].isWAVFile)
@@ -2410,7 +2438,9 @@ int main(int argc, const char* argv[])
                     goto fail;
                 }
             }
-            else if (inputs[i].essenceType == UncUYVY || inputs[i].essenceType == Unc1080iUYVY)
+            else if (inputs[i].essenceType == UncUYVY ||
+                     inputs[i].essenceType == Unc1080iUYVY ||
+                     inputs[i].essenceType == Unc720p50UYVY)
             {
                 if (fread(inputs[i].buffer, 1, inputs[i].frameSize, inputs[i].file) != inputs[i].frameSize)
                 {

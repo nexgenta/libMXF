@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.h,v 1.7 2009/10/12 15:25:57 philipn Exp $
+ * $Id: mxf_avid.h,v 1.8 2010/07/21 16:29:33 john_f Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -102,7 +102,11 @@ int mxf_avid_is_mjpeg_essence_element(const mxfKey* key);
 int mxf_avid_is_dnxhd_essence_element(const mxfKey* key);
 int mxf_avid_is_essence_element(const mxfKey* key);
 
-    
+
+void mxf_avid_set_auid(const mxfUL* ul, mxfAUID* auid);
+
+
+
 #ifdef __cplusplus
 }
 #endif

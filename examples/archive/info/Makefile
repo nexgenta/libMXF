@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.5 2010/07/14 13:06:35 john_f Exp $
+# $Id: Makefile,v 1.6 2010/07/21 16:29:33 john_f Exp $
 #
 # Makefile for building archive examples
 #
@@ -57,5 +57,10 @@ install: libarchivemxfinfo.a
 	cp archive_mxf_info $(MXF_INSTALL_PREFIX)/bin/
 	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive
 	cp archive_mxf_info_lib.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive/
-	cp ../archive_types.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive/
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(MXF_INSTALL_PREFIX)/bin/archive_mxf_info
+	rm -f $(MXF_INSTALL_PREFIX)/lib/libarchivemxfinfo.a
+	rm -f $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive/archive_mxf_info_lib.h
 

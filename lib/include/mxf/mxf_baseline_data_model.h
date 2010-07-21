@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_baseline_data_model.h,v 1.6 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_baseline_data_model.h,v 1.7 2010/07/21 16:29:33 john_f Exp $
  *
  * Baseline S377M MXF data model definitions
  *
@@ -837,6 +837,20 @@ MXF_SET_DEFINITION(FileDescriptor, GenericPictureEssenceDescriptor,
     MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, PictureEssenceCoding,
         MXF_LABEL(0x06,0x0e,0x2b,0x34,0x01,0x01,0x01,0x02,0x04,0x01,0x06,0x01,0x00,0x00,0x00,0x00),
         0x3201,
+        MXF_UL_TYPE,
+        0
+    );
+
+    MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, CodingEquations,
+        MXF_LABEL(0x06,0x0e,0x2b,0x34,0x01,0x01,0x01,0x02,0x04,0x01,0x02,0x01,0x01,0x03,0x01,0x00),
+        0x321A,
+        MXF_UL_TYPE,
+        0
+    );
+
+    MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, ColorPrimaries,
+        MXF_LABEL(0x06,0x0e,0x2b,0x34,0x01,0x01,0x01,0x09,0x04,0x01,0x02,0x01,0x01,0x06,0x01,0x00),
+        0x3219,
         MXF_UL_TYPE,
         0
     );

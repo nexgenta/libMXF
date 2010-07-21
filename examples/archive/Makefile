@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.4 2008/10/22 09:32:19 john_f Exp $
+# $Id: Makefile,v 1.5 2010/07/21 16:29:33 john_f Exp $
 #
 # Makefile for building archive examples
 #
@@ -55,9 +55,16 @@ timecode_index.o: timecode_index.c timecode_index.h archive_types.h
 
 .PHONY: install
 install:
+	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive
+	cp archive_types.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive/
 	$(MAKE) -C write $@
 	$(MAKE) -C info $@
-	$(MAKE) -C test $@
+
+.PHONY: uninstall
+uninstall:
+	$(MAKE) -C write $@
+	$(MAKE) -C info $@
+	rm -Rf $(MXF_INSTALL_PREFIX)/include/mxf/examples/archive
 
 .PHONY: clean
 clean:

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.4 2010/07/14 13:06:35 john_f Exp $
+# $Id: Makefile,v 1.5 2010/07/21 16:29:33 john_f Exp $
 #
 # Copyright (C) 2006  BBC Research, Philip de Nier <philipn@users.sourceforge.net>
 #
@@ -50,7 +50,13 @@ install: all
 	mkdir -p $(MXF_INSTALL_PREFIX)/lib
 	cp libavidmxfinfo.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf/examples/avidmxfinfo
-	cp *.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/avidmxfinfo/
+	cp avid_mxf_info.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/avidmxfinfo/
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(MXF_INSTALL_PREFIX)/bin/avidmxfinfo
+	rm -f $(MXF_INSTALL_PREFIX)/lib/libavidmxfinfo.a
+	rm -Rf $(MXF_INSTALL_PREFIX)/include/mxf/examples/avidmxfinfo
 
 .PHONY: clean
 clean:

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.2 2008/05/07 15:22:03 philipn Exp $
+# $Id: Makefile,v 1.3 2010/07/21 16:29:33 john_f Exp $
 #
 # Makefile for building archive test applications
 #
@@ -43,11 +43,6 @@ double_clapperboard.o: double_clapperboard.c avsync_eval.h
 
 avsync_eval.o: avsync_eval.c avsync_eval.h
 	$(CC) $(CFLAGS) -c avsync_eval.c
-
-
-.PHONY: install
-install: compare_d3_mxf double_clapperboard
-	cp compare_d3_mxf double_clapperboard $(MXF_INSTALL_PREFIX)/bin
 
 .PHONY: clean
 clean:

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.3 2008/10/08 09:38:51 philipn Exp $
+# $Id: Makefile,v 1.4 2010/07/21 16:29:33 john_f Exp $
 #
 # Makefile for building examples directory
 #
@@ -32,6 +32,13 @@ all:
 
 .PHONY: install
 install: all
+	$(MAKE) -C writeavidmxf $@
+	$(MAKE) -C archive $@
+	$(MAKE) -C reader $@
+	$(MAKE) -C avidmxfinfo $@
+
+.PHONY: uninstall
+uninstall:
 	$(MAKE) -C writeavidmxf $@
 	$(MAKE) -C archive $@
 	$(MAKE) -C reader $@

@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.h,v 1.6 2009/10/22 14:17:51 john_f Exp $
+ * $Id: write_avid_mxf.h,v 1.7 2010/07/21 16:29:33 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -68,6 +68,9 @@ int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
 
 /* returns num_samples written as a multiple of the file package track edit rate */
 int get_num_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, int64_t* num_samples);
+
+/* returns the stored dimensions for the given picture track */
+int get_stored_dimensions(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t* width, uint32_t* height);
 
 /* delete the output files and free the writer */
 void abort_writing(AvidClipWriter** clipWriter, int deleteFile);

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.5 2010/07/14 13:06:36 john_f Exp $
+# $Id: Makefile,v 1.6 2010/07/21 16:29:33 john_f Exp $
 #
 # Makefile for building writeavidmxf example
 #
@@ -54,7 +54,14 @@ install: all
 	mkdir -p $(MXF_INSTALL_PREFIX)/lib
 	cp libwriteavidmxf.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf/examples/writeavidmxf
-	cp *.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/writeavidmxf/
+	cp package_definitions.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/writeavidmxf/
+	cp write_avid_mxf.h $(MXF_INSTALL_PREFIX)/include/mxf/examples/writeavidmxf/
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(MXF_INSTALL_PREFIX)/bin/writeavidmxf
+	rm -f $(MXF_INSTALL_PREFIX)/lib/libwriteavidmxf.a
+	rm -fR $(MXF_INSTALL_PREFIX)/include/mxf/examples/writeavidmxf
 
 .PHONY: clean
 clean:

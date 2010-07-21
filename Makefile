@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.2 2008/11/07 14:12:59 philipn Exp $
+# $Id: Makefile,v 1.3 2010/07/21 16:29:33 john_f Exp $
 #
 # Makefile for building libMXf library, tools and examples
 #
@@ -31,6 +31,11 @@ all:
 # The only installable files are in lib/ and examples/
 .PHONY: install
 install: all
+	$(MAKE) -C lib $@
+	$(MAKE) -C examples $@
+
+.PHONY: uninstall
+uninstall:
 	$(MAKE) -C lib $@
 	$(MAKE) -C examples $@
 

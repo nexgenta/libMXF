@@ -1,5 +1,5 @@
 /*
- * $Id: avid_mxf_info.c,v 1.12 2010/06/02 10:59:20 philipn Exp $
+ * $Id: avid_mxf_info.c,v 1.13 2010/07/21 16:29:33 john_f Exp $
  *
  * Parse metadata from an Avid MXF file
  *
@@ -1188,6 +1188,7 @@ int ami_read_info(const char* filename, AvidMXFInfo* info, int printDebugError)
         }
     }
     else if (mxf_equals_ul(&info->essenceContainerLabel, &MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped)) ||
+        mxf_equals_ul(&info->essenceContainerLabel, &MXF_EC_L(HD_Unc_720_50p_422_ClipWrapped)) ||
         mxf_equals_ul(&info->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped)))
     {
         info->essenceType = UNC_ESSENCE_TYPE;

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.9 2010/02/12 13:46:27 philipn Exp $
+ * $Id: mxf_avid.c,v 1.10 2010/07/21 16:29:33 john_f Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -1063,5 +1063,10 @@ int mxf_avid_is_essence_element(const mxfKey* key)
 }
 
 
-
+void mxf_avid_set_auid(const mxfUL* ul, mxfAUID* auid)
+{
+    /* an AUID is an MXF UL half-swapped */
+    memcpy(&auid->octet0, &ul->octet8, 8);
+    memcpy(&auid->octet8, &ul->octet0, 8);
+}
 

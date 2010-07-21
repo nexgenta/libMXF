@@ -6,6 +6,7 @@ AAF/DevUtils/MXFDump/MXFLabels.h
 AAF/DevUtils/MXFDump/MXFMetaDictionary.h
 AAF/DevUtils/MXFDump/MXFDump.cpp
 
+and copy to this directory.
 
 2. Build:
 > make

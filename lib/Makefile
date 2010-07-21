@@ -28,6 +28,7 @@ OBJS = $(MXF_DIR)/mxf_version.o \
 INCLUDE_FILES = $(INCLUDES_DIR)/mxf/mxf_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_header_metadata.h \
 	$(INCLUDES_DIR)/mxf/mxf_baseline_data_model.h \
+	$(INCLUDES_DIR)/mxf/mxf_extensions_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_partition.h \
 	$(INCLUDES_DIR)/mxf/mxf_primer.h \
 	$(INCLUDES_DIR)/mxf/mxf_essence_container.h \
@@ -40,6 +41,8 @@ INCLUDE_FILES = $(INCLUDES_DIR)/mxf/mxf_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_file.h \
 	$(INCLUDES_DIR)/mxf/mxf_version.h \
 	$(INCLUDES_DIR)/mxf/mxf_types.h \
+	$(INCLUDES_DIR)/mxf/mxf_macros.h \
+	$(INCLUDES_DIR)/mxf/mxf.h \
 	$(INCLUDES_DIR)/mxf/mxf_avid.h \
 	$(INCLUDES_DIR)/mxf/mxf_avid_metadictionary.h \
 	$(INCLUDES_DIR)/mxf/mxf_avid_dictionary.h \
@@ -47,6 +50,7 @@ INCLUDE_FILES = $(INCLUDES_DIR)/mxf/mxf_data_model.h \
 	$(INCLUDES_DIR)/mxf/mxf_avid_labels_and_keys.h \
 	$(INCLUDES_DIR)/mxf/mxf_p2.h \
 	$(INCLUDES_DIR)/mxf/mxf_p2_extensions_data_model.h \
+	$(INCLUDES_DIR)/mxf/mxf_p2_labels_and_keys.h \
 	$(INCLUDES_DIR)/mxf/mxf_uu_metadata.h
 
 
@@ -124,12 +128,12 @@ install: libMXF.a
 	mkdir -p $(MXF_INSTALL_PREFIX)/lib
 	cp libMXF.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf
-	cp include/mxf/*.h $(MXF_INSTALL_PREFIX)/include/mxf/
+	cp $(INCLUDE_FILES) $(MXF_INSTALL_PREFIX)/include/mxf/
 
 .PHONY: uninstall
 uninstall:
-	@rm -f $(MXF_INSTALL_PREFIX)/lib/libMXF.a
-	@rm -fR $(MXF_INSTALL_PREFIX)/include/mxf
+	rm -f $(MXF_INSTALL_PREFIX)/lib/libMXF.a
+	rm -fR $(MXF_INSTALL_PREFIX)/include/mxf
 
 
 clean:

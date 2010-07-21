@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.5 2010/07/14 13:06:36 john_f Exp $
+# $Id: Makefile,v 1.6 2010/07/21 16:29:33 john_f Exp $
 #
 # Makefile for building MXF reader library
 #
@@ -63,7 +63,17 @@ install: libMXFReader.a
 	mkdir -p $(MXF_INSTALL_PREFIX)/lib
 	cp libMXFReader.a $(MXF_INSTALL_PREFIX)/lib
 	mkdir -p $(MXF_INSTALL_PREFIX)/include/mxf/examples/reader
-	cp *.h $(MXF_INSTALL_PREFIX)/include//mxf/examples/reader/
+	cp mxf_essence_helper.h $(MXF_INSTALL_PREFIX)/include//mxf/examples/reader/
+	cp mxf_index_helper.h $(MXF_INSTALL_PREFIX)/include//mxf/examples/reader/
+	cp mxf_op1a_reader.h $(MXF_INSTALL_PREFIX)/include//mxf/examples/reader/
+	cp mxf_opatom_reader.h $(MXF_INSTALL_PREFIX)/include//mxf/examples/reader/
+	cp mxf_reader.h $(MXF_INSTALL_PREFIX)/include//mxf/examples/reader/
+	cp mxf_reader_int.h $(MXF_INSTALL_PREFIX)/include//mxf/examples/reader/
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(MXF_INSTALL_PREFIX)/lib/libMXFReader.a
+	rm -Rf $(MXF_INSTALL_PREFIX)/include/mxf/examples/reader
 
 .PHONY: clean
 clean:

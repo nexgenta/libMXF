@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.21 2010/06/18 17:34:27 philipn Exp $
+ * $Id: write_avid_mxf.c,v 1.22 2010/07/21 16:29:33 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -107,6 +107,7 @@ typedef struct
     uint8_t colorSiting;
     uint32_t imageAlignmentOffset;
     uint32_t imageStartOffset;
+    mxfUL codingEquationsLabel;
     
     
     /* audio only */
@@ -246,6 +247,8 @@ static const uint32_t g_uncNTSCVBISize = 720 * 10 * 2;
 static const uint32_t g_uncAligned1080i50FrameSize = 4153344;    /* 0x3f6000 (6144 pad + 4147200 frame) */
 static const uint32_t g_unc1080i50StartOffsetSize = 6144;
 
+static const uint32_t g_unc720p50FrameSize = 1843200;   /* 720 * 1280 * 2 */
+
 
 static const uint32_t g_bodySID = 1;
 static const uint32_t g_indexSID = 2;
@@ -254,6 +257,10 @@ static const uint64_t g_fixedBodyPPOffset = 0x40020;
 
 
 
+static int is_picture(EssenceType essenceType)
+{
+    return essenceType != PCM;
+}
 
 static void free_offsets_array_in_list(void* data)
 {
@@ -786,6 +793,13 @@ static int create_header_metadata(AvidClipWriter* clipWriter, PackageDefinitions
         CHK_ORET(mxf_set_uint8_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FrameLayout), writer->frameLayout));
         CHK_ORET(mxf_set_rational_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, AspectRatio), &writer->imageAspectRatio));
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, ImageAlignmentOffset), 1));
+        if (!mxf_equals_ul(&writer->codingEquationsLabel, &g_Null_UL))
+        {
+            /* Avid stores this property as an AUID, where a UUID is stored as-is and a UL is half-swapped */
+            mxfAUID auid;
+            mxf_avid_set_auid(&writer->codingEquationsLabel, &auid);
+            CHK_ORET(mxf_set_auid_item(writer->cdciDescriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, CodingEquations), &auid));
+        }
         CHK_ORET(mxf_set_uint32_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ComponentDepth), writer->componentDepth));
         CHK_ORET(mxf_set_uint8_item(writer->cdciDescriptorSet, &MXF_ITEM_K(CDCIEssenceDescriptor, ColorSiting), writer->colorSiting));
         if (writer->componentDepth == 10)
@@ -2020,6 +2034,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             
         case Unc1080iUYVY:
             newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
+            newTrackWriter->codingEquationsLabel = ITUR_BT709_CODING_EQ;
             if (clipWriter->projectFormat == PAL_25i)
             {
                 newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped);
@@ -2050,6 +2065,34 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
                 assert(0);
                 return 0;
             }
+            newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
+            newTrackWriter->essenceElementKey = MXF_EE_K(UncClipWrapped);
+            newTrackWriter->sourceTrackNumber = MXF_UNC_TRACK_NUM(0x01, MXF_UNC_CLIP_WRAPPED_EE_TYPE, 0x01);
+            newTrackWriter->essenceElementLLen = 9;
+            CHK_ORET(memcmp(&track->editRate, &clipWriter->projectEditRate, sizeof(mxfRational)) == 0); /* why would it be different? */
+            newTrackWriter->sampleRate = track->editRate;
+            newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
+            break;
+            
+        case Unc720p50UYVY:
+            newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
+            newTrackWriter->codingEquationsLabel = ITUR_BT709_CODING_EQ;
+            newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_720_50p_422_ClipWrapped);
+            newTrackWriter->frameSize = g_unc720p50FrameSize;
+            newTrackWriter->storedHeight = 720;
+            newTrackWriter->storedWidth = 1280;
+            newTrackWriter->displayHeight = 720;
+            newTrackWriter->displayWidth = 1280;
+            newTrackWriter->displayYOffset = 0;
+            newTrackWriter->displayXOffset = 0;
+            newTrackWriter->videoLineMap[0] = 26;
+            newTrackWriter->videoLineMapLen = 1;
+            newTrackWriter->horizSubsampling = 2;
+            newTrackWriter->vertSubsampling = 1;
+            newTrackWriter->colorSiting = 4; /* Rec601 */
+            newTrackWriter->frameLayout = 0; /* FullFrame */
+            newTrackWriter->imageAlignmentOffset = g_uncImageAlignmentOffset;
+            newTrackWriter->imageStartOffset = 0;
             newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->essenceElementKey = MXF_EE_K(UncClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_UNC_TRACK_NUM(0x01, MXF_UNC_CLIP_WRAPPED_EE_TYPE, 0x01);
@@ -2271,6 +2314,7 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
         case DNxHD1080p120:
         case DNxHD1080p185:
         case DNxHD1080p185X:
+        case Unc720p50UYVY:
         case PCM:
             CHK_ORET(size == numSamples * writer->editUnitByteCount);
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
@@ -2421,7 +2465,7 @@ int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
             writer->duration += numSamples;
             break;
         case Unc1080iUYVY:
-            /* Avid uncompressed HD video requires padding and currently only accepts 1 sample at a time */
+            /* Avid uncompressed HD 1080i video requires padding and currently only accepts 1 sample at a time */
             CHK_ORET(numSamples == 1);
             CHK_ORET((writer->sampleDataSize + g_unc1080i50StartOffsetSize) == numSamples * writer->editUnitByteCount);
             writer->duration += numSamples;
@@ -2441,6 +2485,17 @@ int get_num_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, int64_
     CHK_ORET(get_track_writer(clipWriter, materialTrackID, &writer));
     
     *num_samples = writer->duration;
+    return 1;
+}
+
+int get_stored_dimensions(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t* width, uint32_t* height)
+{
+    TrackWriter* writer;
+    CHK_ORET(get_track_writer(clipWriter, materialTrackID, &writer));
+    CHK_ORET(is_picture(writer->essenceType));
+
+    *width = writer->storedWidth;
+    *height = writer->storedHeight;
     return 1;
 }
 
