@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.15 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_essence_helper.c,v 1.16 2010/07/23 17:57:23 philipn Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -281,7 +281,10 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         track->video.horizSubsampling = 2;
         track->video.vertSubsampling = 1;
     }
-    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_1080_50_I_ClipWrapped)))
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_1080_50_I_ClipWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_1080_50_I_FrameWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_1080_60_I_ClipWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_1080_60_I_FrameWrapped)))
     {
         track->video.frameWidth = 1440;
         track->video.frameHeight = 540 * 2;
@@ -293,7 +296,10 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         track->video.vertSubsampling = 1;
         essenceTrack->frameSize = 576000;
     }
-    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_720_50_P_ClipWrapped)))
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_720_50_P_ClipWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_720_50_P_FrameWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_720_60_P_ClipWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DVBased_100_720_60_P_FrameWrapped)))
     {
         track->video.frameWidth = 960;
         track->video.frameHeight = 720;
@@ -329,12 +335,36 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         track->video.vertSubsampling = 1;
         essenceTrack->frameSize = 917504;
     }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD1080p120ClipWrapped)))
+    {
+        track->video.frameWidth = 1920;
+        track->video.frameHeight = 1080;
+        track->video.displayWidth = 1920;
+        track->video.displayHeight = 1080;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 606208;
+    }
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD1080p185ClipWrapped)))
+    {
+        track->video.frameWidth = 1920;
+        track->video.frameHeight = 1080;
+        track->video.displayWidth = 1920;
+        track->video.displayHeight = 1080;
+        track->video.displayXOffset = 0;
+        track->video.displayYOffset = 0;
+        track->video.horizSubsampling = 2;
+        track->video.vertSubsampling = 1;
+        essenceTrack->frameSize = 917504;
+    }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(DNxHD1080p36ClipWrapped)))
     {
         track->video.frameWidth = 1920;
-        track->video.frameHeight = 540 * 2;
+        track->video.frameHeight = 1080;
         track->video.displayWidth = 1920;
-        track->video.displayHeight = 540 * 2;
+        track->video.displayHeight = 1080;
         track->video.displayXOffset = 0;
         track->video.displayYOffset = 0;
         track->video.horizSubsampling = 2;

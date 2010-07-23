@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.h,v 1.6 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_reader.h,v 1.7 2010/07/23 17:57:23 philipn Exp $
  *
  * Main functions for reading MXF files
  *
@@ -107,6 +107,7 @@ typedef struct _MXFTrack
 typedef struct
 {
     MXFTrack* tracks;
+    char* tracksString;
     mxfRational frameRate;
     int64_t duration; /* -1 indicates unknown */
     int64_t minDuration; /* duration thus far */
@@ -140,6 +141,7 @@ int64_t get_min_duration(MXFReader* reader);
 int get_num_tracks(MXFReader* reader);
 int clip_has_video(MXFReader* reader);
 int set_frame_rate(MXFReader* reader, const mxfRational* frameRate);
+const char* get_tracks_string(MXFReader* reader);
 
 MXFHeaderMetadata* get_header_metadata(MXFReader* reader);
 int have_footer_metadata(MXFReader* reader);

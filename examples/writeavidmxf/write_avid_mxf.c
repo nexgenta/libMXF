@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.22 2010/07/21 16:29:33 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.23 2010/07/23 17:57:24 philipn Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -1993,7 +1993,7 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             }
             else
             {
-                newTrackWriter->essenceContainerLabel = MXF_EC_L(SD_Unc_525_60i_422_135_ClipWrapped);
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(SD_Unc_525_5994i_422_135_ClipWrapped);
                 newTrackWriter->frameSize = g_uncAlignedNTSCFrameSize;
                 newTrackWriter->storedHeight = 496;
                 newTrackWriter->storedWidth = 720;

@@ -1,5 +1,5 @@
 /*
- * $Id: test_mxf_reader.c,v 1.4 2010/06/25 13:59:02 philipn Exp $
+ * $Id: test_mxf_reader.c,v 1.5 2010/07/23 17:57:23 philipn Exp $
  *
  * Test the MXF Reader 
  *
@@ -203,6 +203,7 @@ static int test1(const char* mxfFilename, MXFTimecode* startTimecode, int source
     }
     
     clip = get_mxf_clip(input);
+    printf("Clip tracks = %s\n", clip->tracksString);
     printf("Clip frame rate = %d/%d fps\n", clip->frameRate.numerator, clip->frameRate.denominator);
     printf("Clip duration = %"PFi64" frames\n", clip->duration);
     

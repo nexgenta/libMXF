@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.c,v 1.6 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_reader.c,v 1.7 2010/07/23 17:57:23 philipn Exp $
  *
  * Main functions for reading MXF files
  *
@@ -32,6 +32,231 @@
 #include <mxf_op1a_reader.h>
 #include <mxf/mxf_avid.h>
 
+
+typedef struct
+{
+    uint32_t first;
+    uint32_t last;
+} TrackNumberRange;
+
+
+
+static void insert_track_number(TrackNumberRange* trackNumbers, uint32_t trackNumber, int* numTrackNumberRanges)
+{
+    int i;
+    int j;
+    
+    for (i = 0; i < *numTrackNumberRanges; i++)
+    {
+        if (trackNumber < trackNumbers[i].first - 1)
+        {
+            /* insert new track range */
+            for (j = *numTrackNumberRanges - 1; j >= i; j--)
+            {
+                trackNumbers[j + 1] = trackNumbers[j];
+            }
+            trackNumbers[i].first = trackNumber;
+            trackNumbers[i].last = trackNumber;
+            
+            (*numTrackNumberRanges)++;
+            return;
+        }
+        else if (trackNumber == trackNumbers[i].first - 1)
+        {
+            /* extend range back one */
+            trackNumbers[i].first = trackNumber;
+            return;
+        }
+        else if (trackNumber == trackNumbers[i].last + 1)
+        {
+            if (i + 1 < *numTrackNumberRanges &&
+                trackNumber == trackNumbers[i + 1].first - 1)
+            {
+                /* merge range forwards */
+                trackNumbers[i + 1].first = trackNumbers[i].first;
+                for (j = i; j < *numTrackNumberRanges - 1; j++)
+                {
+                    trackNumbers[j] = trackNumbers[j + 1];
+                }
+                (*numTrackNumberRanges)--;
+            }
+            else
+            {
+                /* extend range forward one */
+                trackNumbers[i].last = trackNumber;
+            }
+
+            return;
+        }
+        else if (trackNumber == trackNumbers[i].first ||
+            trackNumber == trackNumbers[i].last)
+        {
+            /* duplicate */
+            return;
+        }
+    }
+
+    
+    /* append new track range */
+    trackNumbers[i].first = trackNumber;
+    trackNumbers[i].last = trackNumber;
+    
+    (*numTrackNumberRanges)++;
+    return;
+}
+
+static size_t get_range_string(char* buffer, size_t maxSize, int isFirst, int isVideo, const TrackNumberRange* range)
+{
+    size_t strLen = 0;
+    
+    if (isFirst)
+    {
+#if defined(_MSC_VER)
+        strLen = _snprintf(buffer, maxSize, "%s", (isVideo) ? "V" : "A");
+#else
+        strLen = snprintf(buffer, maxSize, "%s", (isVideo) ? "V" : "A");
+#endif
+        buffer += strLen;
+        maxSize -= strLen;
+    }
+    else
+    {
+#if defined(_MSC_VER)
+        strLen = _snprintf(buffer, maxSize, ",");
+#else
+        strLen = snprintf(buffer, maxSize, ",");
+#endif
+        buffer += strLen;
+        maxSize -= strLen;
+    }
+    
+    
+    if (range->first == range->last)
+    {
+#if defined(_MSC_VER)
+        strLen += _snprintf(buffer, maxSize, "%d", range->first);
+#else
+        strLen += snprintf(buffer, maxSize, "%d", range->first);
+#endif
+    }
+    else
+    {
+#if defined(_MSC_VER)
+        strLen += _snprintf(buffer, maxSize, "%d-%d", range->first, range->last);
+#else
+        strLen += snprintf(buffer, maxSize, "%d-%d", range->first, range->last);
+#endif
+    }
+    
+    return strLen;
+}
+
+static int create_tracks_string(MXFReader* reader)
+{
+    MXFTrack* track;
+    TrackNumberRange videoTrackNumberRanges[64];
+    int numVideoTrackNumberRanges = 0;
+    TrackNumberRange audioTrackNumberRanges[64];
+    int numAudioTrackNumberRanges = 0;
+    char tracksString[256] = {0};
+    int i;
+    uint32_t c;
+    size_t remSize;
+    char* tracksStringPtr;
+    size_t strLen;
+    int videoTrackNumber, audioTrackNumber;
+
+    /* create track number ranges for audio and video */
+    /* if the material track number is <= 0 or the audio is not 1 channel then this track number range method
+       is not used and a simple count is used instead */
+    track = reader->clip.tracks;
+    while (track != NULL)
+    {
+        if (track->materialTrackNumber <= 0 ||
+            (!track->isVideo && track->audio.channelCount != 1))
+        {
+            break;
+        }
+        
+        if (track->isVideo)
+        {
+            insert_track_number(videoTrackNumberRanges, track->materialTrackNumber, &numVideoTrackNumberRanges);
+        }
+        else
+        {
+            insert_track_number(audioTrackNumberRanges, track->materialTrackNumber, &numAudioTrackNumberRanges);
+        }
+        track = track->next;
+    }
+    if (track != NULL)
+    {
+        /* ignore material track numbers and use a simple count instead */
+        memset(&videoTrackNumberRanges, 0, sizeof(videoTrackNumberRanges));
+        numVideoTrackNumberRanges = 0;
+        memset(&audioTrackNumberRanges, 0, sizeof(audioTrackNumberRanges));
+        numAudioTrackNumberRanges = 0;
+        videoTrackNumber = 1;
+        audioTrackNumber = 1;
+        track = reader->clip.tracks;
+        while (track != NULL)
+        {
+            if (track->isVideo)
+            {
+                insert_track_number(videoTrackNumberRanges, videoTrackNumber++, &numVideoTrackNumberRanges);
+            }
+            else
+            {
+                for (c = 0; c < track->audio.channelCount; c++)
+                {
+                    insert_track_number(audioTrackNumberRanges, audioTrackNumber++, &numAudioTrackNumberRanges);
+                }
+            }
+            track = track->next;
+        }
+    }
+
+    /* create string representing each track range */
+    remSize = sizeof(tracksString);
+    tracksStringPtr = tracksString;
+    for (i = 0; i < numVideoTrackNumberRanges; i++)
+    {
+        if (remSize < 4)
+        {
+            break;
+        }
+        
+        strLen = get_range_string(tracksStringPtr, remSize, i == 0, 1, &videoTrackNumberRanges[i]);
+
+        tracksStringPtr += strLen;
+        remSize -= strLen;
+    }
+    if (numVideoTrackNumberRanges > 0 && numAudioTrackNumberRanges > 0)
+    {
+#if defined(_MSC_VER)
+        strLen = _snprintf(tracksStringPtr, remSize, " ");
+#else
+        strLen = snprintf(tracksStringPtr, remSize, " ");
+#endif
+        tracksStringPtr += strLen;
+        remSize -= strLen;
+    }
+    for (i = 0; i < numAudioTrackNumberRanges; i++)
+    {
+        if (remSize < 4)
+        {
+            break;
+        }
+        strLen = get_range_string(tracksStringPtr, remSize, i == 0, 0, &audioTrackNumberRanges[i]);
+
+        tracksStringPtr += strLen;
+        remSize -= strLen;
+    }
+
+    CHK_MALLOC_ARRAY_ORET(reader->clip.tracksString, char, strlen(tracksString) + 1);
+    strcpy(reader->clip.tracksString, tracksString);
+
+    return 1;
+}
 
 static int convert_timecode_to_position(TimecodeIndex* index, MXFTimecode* timecode, mxfPosition* position)
 {
@@ -300,7 +525,7 @@ int init_mxf_reader_2(MXFFile** mxfFile, MXFDataModel* dataModel, MXFReader** re
     MXFReader* newReader = NULL;
     MXFPartition* headerPartition = NULL;
 
-    
+
     /* create the reader */
     
     CHK_MALLOC_ORET(newReader, MXFReader);
@@ -344,6 +569,10 @@ int init_mxf_reader_2(MXFFile** mxfFile, MXFDataModel* dataModel, MXFReader** re
         mxf_log_error("MXF format not supported" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
         goto fail;
     }
+
+
+    CHK_OFAIL(create_tracks_string(newReader));
+
 
     *mxfFile = NULL; /* take ownership */
     *reader = newReader;
@@ -398,6 +627,7 @@ void close_mxf_reader(MXFReader** reader)
         track = nextTrack;
     }
     (*reader)->clip.tracks = NULL;
+    SAFE_FREE(&(*reader)->clip.tracksString);
     mxf_clear_list(&(*reader)->playoutTimecodeIndex.segments);
     mxf_clear_list(&(*reader)->sourceTimecodeIndexes);
     if ((*reader)->ownDataModel)
@@ -488,6 +718,11 @@ int set_frame_rate(MXFReader* reader, const mxfRational* frameRate)
 
     /* note: this will also update the clip duration and frame rate */
     return reader->essenceReader->set_frame_rate(reader, frameRate);
+}
+
+const char* get_tracks_string(MXFReader* reader)
+{
+    return reader->clip.tracksString;
 }
 
 MXFHeaderMetadata* get_header_metadata(MXFReader* reader)

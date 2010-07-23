@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.14 2010/07/21 16:29:33 john_f Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.15 2010/07/23 17:57:24 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -347,10 +347,12 @@ static const mxfUL MXF_EC_L(DVBased_100_720_50_P_ClipWrapped) =
 #define MXF_UNC_EC_L(regver, byte15, byte16) \
     MXF_GENERIC_CONTAINER_LABEL(regver, 0x02, 0x05, byte15, byte16)
 
-static const mxfUL MXF_EC_L(SD_Unc_525_60i_422_135_FrameWrapped) = 
+/* SD */
+    
+static const mxfUL MXF_EC_L(SD_Unc_525_5994i_422_135_FrameWrapped) = 
     MXF_UNC_EC_L(0x01, 0x01, 0x01);
 
-static const mxfUL MXF_EC_L(SD_Unc_525_60i_422_135_ClipWrapped) = 
+static const mxfUL MXF_EC_L(SD_Unc_525_5994i_422_135_ClipWrapped) = 
     MXF_UNC_EC_L(0x01, 0x01, 0x02);
 
 static const mxfUL MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped) = 
@@ -359,11 +361,99 @@ static const mxfUL MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped) =
 static const mxfUL MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped) = 
     MXF_UNC_EC_L(0x01, 0x01, 0x06);
 
+/* HD 1080 */
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_25p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x21);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_25p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x22);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_50i_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x29);
+
 static const mxfUL MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped) = 
     MXF_UNC_EC_L(0x01, 0x02, 0x2a);
 
+static const mxfUL MXF_EC_L(HD_Unc_1080_2997p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x31);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_2997p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x32);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_5994i_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x39);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_5994i_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x3a);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_30p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x41);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_30p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x42);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_60i_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x49);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_60i_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x4a);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_50p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x51);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_50p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x52);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_5994p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x59);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_5994p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x5a);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_60p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x61);
+
+static const mxfUL MXF_EC_L(HD_Unc_1080_60p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x02, 0x62);
+
+/* HD 720 */
+
+static const mxfUL MXF_EC_L(HD_Unc_720_25p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x09);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_25p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x0a);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_2997p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x11);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_2997p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x12);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_30p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x15);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_30p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x16);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_50p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x19);
+
 static const mxfUL MXF_EC_L(HD_Unc_720_50p_422_ClipWrapped) = 
     MXF_UNC_EC_L(0x01, 0x03, 0x1a);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_5994p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x21);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_5994p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x22);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_60p_422_FrameWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x25);
+
+static const mxfUL MXF_EC_L(HD_Unc_720_60p_422_ClipWrapped) = 
+    MXF_UNC_EC_L(0x01, 0x03, 0x26);
 
 
 /* D-10 mapping */

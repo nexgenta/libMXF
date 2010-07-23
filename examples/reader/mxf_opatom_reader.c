@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.10 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_opatom_reader.c,v 1.11 2010/07/23 17:57:23 philipn Exp $
  *
  * MXF OP-Atom reader
  *
@@ -819,6 +819,8 @@ int opa_is_supported(MXFPartition* headerPartition)
     else if (mxf_equals_ul(label, &MXF_EC_L(DNxHD1080i120ClipWrapped)) ||
         mxf_equals_ul(label, &MXF_EC_L(DNxHD1080i185ClipWrapped)) ||
         mxf_equals_ul(label, &MXF_EC_L(DNxHD1080p36ClipWrapped)) ||
+        mxf_equals_ul(label, &MXF_EC_L(DNxHD1080p120ClipWrapped)) ||
+        mxf_equals_ul(label, &MXF_EC_L(DNxHD1080p185ClipWrapped)) ||
         mxf_equals_ul(label, &MXF_EC_L(DNxHD720p120ClipWrapped)) ||
         mxf_equals_ul(label, &MXF_EC_L(DNxHD720p185ClipWrapped)))
     {
