@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_partition.c,v 1.7 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_partition.c,v 1.8 2010/07/26 16:02:37 philipn Exp $
  *
  * MXF file partitions
  *
@@ -448,7 +448,7 @@ int mxf_fill_to_kag(MXFFile* mxfFile, MXFPartition* partition)
 int mxf_fill_to_position(MXFFile* mxfFile, uint64_t position)
 {
     int64_t filePos;
-    int64_t fillSize;
+    uint64_t fillSize;
     uint8_t llen;
     
     CHK_ORET((filePos = mxf_file_tell(mxfFile)) >= 0);
@@ -527,7 +527,7 @@ int mxf_allocate_space_to_kag(MXFFile* mxfFile, MXFPartition* partition, uint32_
 
 int mxf_allocate_space(MXFFile* mxfFile, uint32_t size)
 {
-    int64_t fillSize;
+    uint64_t fillSize;
     uint8_t llen;
     
     CHK_ORET(size >= (uint32_t)(mxf_get_min_llen(mxfFile) + mxfKey_extlen));

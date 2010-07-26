@@ -69,6 +69,7 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalIncludeDirectories="$(AAFSDKINSTALL)\include;..\..\..\..\lib\include;..\..\..\..\examples\transfertop2"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="4"
 				UsePrecompiledHeader="0"
@@ -79,8 +80,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="libMXF.lib avidp2transfer.lib AAFD.lib AAFIIDD.lib"
 				OutputFile="$(OutDir)/test_avidp2transfer.exe"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="$(AAFSDKINSTALL)\lib;..\avidp2transfer\Release;..\..\..\lib\Release"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
 				OptimizeReferences="2"

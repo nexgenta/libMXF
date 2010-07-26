@@ -69,21 +69,26 @@
 			OutputDirectory="Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="1"
-			CharacterSet="2">
+			CharacterSet="1">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalIncludeDirectories="..\..\..\..\lib\include;..\..\..\..\examples\archive;..\..\..\..\examples\archive\info"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
-				RuntimeLibrary="4"
+				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
+				WarnAsError="TRUE"
 				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="3"/>
+				DebugInformationFormat="3"
+				CompileAs="1"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="libMXF.lib"
 				OutputFile="$(OutDir)/archivemxfinfo.exe"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="..\..\..\lib\Release"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -119,7 +124,7 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
 			<File
-				RelativePath="..\..\..\..\examples\archive\info\d3_mxf_info.c">
+				RelativePath="..\..\..\..\examples\archive\info\archive_mxf_info.c">
 			</File>
 		</Filter>
 		<Filter

@@ -60,6 +60,7 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalIncludeDirectories="$(AAFSDKINSTALL)\include;..\..\..\..\lib\include;..\..\..\..\examples\transfertop2"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
 				RuntimeLibrary="4"
 				UsePrecompiledHeader="0"

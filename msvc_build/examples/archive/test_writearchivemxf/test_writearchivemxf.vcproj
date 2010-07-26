@@ -15,7 +15,7 @@
 			OutputDirectory="Debug"
 			IntermediateDirectory="Debug"
 			ConfigurationType="1"
-			CharacterSet="2">
+			CharacterSet="1">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
@@ -35,10 +35,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="writearchivemxf.lib"
+				AdditionalDependencies="writearchivemxf.lib libMXF.lib"
 				OutputFile="$(OutDir)/test_writearchivemxf.exe"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="..\writearchivemxf\Debug\"
+				AdditionalLibraryDirectories="..\writearchivemxf\Debug;..\..\..\lib\Debug"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/test_writearchivemxf.pdb"
 				SubSystem="1"
@@ -69,21 +69,26 @@
 			OutputDirectory="Release"
 			IntermediateDirectory="Release"
 			ConfigurationType="1"
-			CharacterSet="2">
+			CharacterSet="1">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalIncludeDirectories="..\..\..\..\lib\include;..\..\..\..\examples\archive;..\..\..\..\examples\archive\write"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
-				RuntimeLibrary="4"
+				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
+				WarnAsError="TRUE"
 				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="3"/>
+				DebugInformationFormat="3"
+				CompileAs="1"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="writearchivemxf.lib  libMXF.lib"
 				OutputFile="$(OutDir)/test_writearchivemxf.exe"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="..\writearchivemxf\Release\;..\..\..\lib\Release"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
 				OptimizeReferences="2"

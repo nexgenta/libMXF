@@ -1,5 +1,5 @@
 /*
- * $Id: test_write_archive_mxf.c,v 1.9 2010/06/18 09:29:34 philipn Exp $
+ * $Id: test_write_archive_mxf.c,v 1.10 2010/07/26 16:02:37 philipn Exp $
  *
  * 
  *
@@ -24,6 +24,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+
+#if defined(_MSC_VER)
+#define _USE_MATH_DEFINES   /* for M_PI */
+#endif
 #include <math.h>
 
 #include <write_archive_mxf.h>
@@ -90,10 +94,10 @@ static void create_colour_bars(unsigned char *video_buffer, int depth_8Bit, int 
                 {
                     if ((i / ((double)width)) < UYVY_table[b].position)
                     {
-                        video_buffer[j*width*2 + i*2 + 0] = UYVY_table[b].colour[0];
-                        video_buffer[j*width*2 + i*2 + 1] = UYVY_table[b].colour[1];
-                        video_buffer[j*width*2 + i*2 + 2] = UYVY_table[b].colour[2];
-                        video_buffer[j*width*2 + i*2 + 3] = UYVY_table[b].colour[3];
+                        video_buffer[j*width*2 + i*2 + 0] = (unsigned char)UYVY_table[b].colour[0];
+                        video_buffer[j*width*2 + i*2 + 1] = (unsigned char)UYVY_table[b].colour[1];
+                        video_buffer[j*width*2 + i*2 + 2] = (unsigned char)UYVY_table[b].colour[2];
+                        video_buffer[j*width*2 + i*2 + 3] = (unsigned char)UYVY_table[b].colour[3];
 
                         break;
                     }
@@ -148,11 +152,11 @@ static void create_tone(unsigned char* pcmBuffer, int bufferSize)
     /* 1kHz, -18dbFS */
     for (i = 0; i < bufferSize; i += 3)
     {
-        sample = 270352173 * sin(i / 3 * 2 * M_PI * 1000.0/48000);
+        sample = (int32_t)(270352173 * sin(i / 3 * 2 * M_PI * 1000.0/48000));
         
-        (*pcmBufferPtr++) = (sample >> 8) & 0xff; 
-        (*pcmBufferPtr++) = (sample >> 16) & 0xff; 
-        (*pcmBufferPtr++) = (sample >> 24) & 0xff;
+        (*pcmBufferPtr++) = (unsigned char)((sample >> 8) & 0xff); 
+        (*pcmBufferPtr++) = (unsigned char)((sample >> 16) & 0xff); 
+        (*pcmBufferPtr++) = (unsigned char)((sample >> 24) & 0xff);
     }
 }
 
@@ -191,8 +195,8 @@ int main(int argc, const char* argv[])
     const char* mxfFilename;
     long numFrames;
     ArchiveMXFWriter* output;
-    unsigned char uncData[VIDEO_FRAME_SIZE_10BIT];
-    unsigned char pcmData[AUDIO_FRAME_SIZE];
+    unsigned char *uncData;
+    unsigned char *pcmData;
     long i;
     int j;
     int passed;
@@ -215,7 +219,10 @@ int main(int argc, const char* argv[])
     int numCRC32 = 0;
     int includeCRC32 = 0;
     int cmdlnIndex = 1;
-    
+
+    uncData = (unsigned char*)malloc(VIDEO_FRAME_SIZE_10BIT);
+    pcmData = (unsigned char*)malloc(AUDIO_FRAME_SIZE);
+
 
     while (cmdlnIndex + 2 < argc)
     {
@@ -591,6 +598,14 @@ int main(int argc, const char* argv[])
     if (timecodeBreaks != NULL)
     {
         free(timecodeBreaks);
+    }
+    if (uncData != NULL)
+    {
+        free(uncData);
+    }
+    if (pcmData != NULL)
+    {
+        free(pcmData);
     }
     return 0;
 }

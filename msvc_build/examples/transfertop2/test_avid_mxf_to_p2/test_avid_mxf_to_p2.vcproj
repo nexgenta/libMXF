@@ -70,6 +70,7 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalIncludeDirectories="..\..\..\..\lib\include;..\..\..\..\examples\transfertop2"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="4"
 				UsePrecompiledHeader="0"
@@ -80,8 +81,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="libMXF.lib avidp2transfer.lib"
 				OutputFile="$(OutDir)/test_avid_mxf_to_p2.exe"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="..\avidp2transfer\Release;..\..\..\lib\Release"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
 				OptimizeReferences="2"

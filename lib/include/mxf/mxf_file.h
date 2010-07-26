@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_file.h,v 1.5 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_file.h,v 1.6 2010/07/26 16:02:37 philipn Exp $
  *
  * Wraps a C-file and provides low-level MXF file functions
  *
@@ -136,7 +136,7 @@ int mxf_write_batch_header(MXFFile* mxfFile, uint32_t len, uint32_t eleLen);
 int mxf_read_array_header(MXFFile* mxfFile, uint32_t* len, uint32_t* eleLen);
 int mxf_write_array_header(MXFFile* mxfFile, uint32_t len, uint32_t eleLen);
 
-int mxf_write_zeros(MXFFile* mxfFile, uint32_t len);
+int mxf_write_zeros(MXFFile* mxfFile, uint64_t len);
 
 int mxf_equals_key(const mxfKey* keyA, const mxfKey* keyB);
 int mxf_equals_key_prefix(const mxfKey* keyA, const mxfKey* keyB, size_t cmpLen);
