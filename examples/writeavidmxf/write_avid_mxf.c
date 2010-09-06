@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.23 2010/07/23 17:57:24 philipn Exp $
+ * $Id: write_avid_mxf.c,v 1.24 2010/09/06 13:41:45 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -244,8 +244,8 @@ static const uint32_t g_uncAlignedNTSCFrameSize = 720896;
 static const uint32_t g_uncNTSCStartOffsetSize = 6656;
 static const uint32_t g_uncNTSCVBISize = 720 * 10 * 2;
 
-static const uint32_t g_uncAligned1080i50FrameSize = 4153344;    /* 0x3f6000 (6144 pad + 4147200 frame) */
-static const uint32_t g_unc1080i50StartOffsetSize = 6144;
+static const uint32_t g_uncAligned1080iFrameSize = 4153344;    /* 0x3f6000 (6144 pad + 4147200 frame) */
+static const uint32_t g_unc1080iStartOffsetSize = 6144;
 
 static const uint32_t g_unc720p50FrameSize = 1843200;   /* 720 * 1280 * 2 */
 
@@ -2038,33 +2038,31 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             if (clipWriter->projectFormat == PAL_25i)
             {
                 newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped);
-                newTrackWriter->frameSize = g_uncAligned1080i50FrameSize;
-                newTrackWriter->storedHeight = 1080;
-                newTrackWriter->storedWidth = 1920;
-                newTrackWriter->displayHeight = 1080;
-                newTrackWriter->displayWidth = 1920;
-                newTrackWriter->displayYOffset = 0;
-                newTrackWriter->displayXOffset = 0;
-                newTrackWriter->videoLineMap[0] = 21;
-                newTrackWriter->videoLineMap[1] = 584;
-                newTrackWriter->videoLineMapLen = 2;
-                newTrackWriter->horizSubsampling = 2;
-                newTrackWriter->vertSubsampling = 1;
-                newTrackWriter->colorSiting = 4; /* Rec601 */
-                newTrackWriter->frameLayout = 3; /* MixedFields */
-                newTrackWriter->imageAlignmentOffset = g_uncImageAlignmentOffset;
-                newTrackWriter->imageStartOffset = g_unc1080i50StartOffsetSize;
-
-                CHK_MALLOC_ARRAY_OFAIL(newTrackWriter->startOffsetData, uint8_t, g_unc1080i50StartOffsetSize);
-                memset(newTrackWriter->startOffsetData, 0, g_unc1080i50StartOffsetSize);
             }
             else
             {
-                /* TODO */
-                mxf_log_error("Uncompressed 1080i NTSC not yet implemented" LOG_LOC_FORMAT, LOG_LOC_PARAMS);
-                assert(0);
-                return 0;
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_1080_5994i_422_ClipWrapped);
             }
+            newTrackWriter->frameSize = g_uncAligned1080iFrameSize;
+            newTrackWriter->storedHeight = 1080;
+            newTrackWriter->storedWidth = 1920;
+            newTrackWriter->displayHeight = 1080;
+            newTrackWriter->displayWidth = 1920;
+            newTrackWriter->displayYOffset = 0;
+            newTrackWriter->displayXOffset = 0;
+            newTrackWriter->videoLineMap[0] = 21;
+            newTrackWriter->videoLineMap[1] = 584;
+            newTrackWriter->videoLineMapLen = 2;
+            newTrackWriter->horizSubsampling = 2;
+            newTrackWriter->vertSubsampling = 1;
+            newTrackWriter->colorSiting = 4; /* Rec601 */
+            newTrackWriter->frameLayout = 3; /* MixedFields */
+            newTrackWriter->imageAlignmentOffset = g_uncImageAlignmentOffset;
+            newTrackWriter->imageStartOffset = g_unc1080iStartOffsetSize;
+
+            CHK_MALLOC_ARRAY_OFAIL(newTrackWriter->startOffsetData, uint8_t, g_unc1080iStartOffsetSize);
+            memset(newTrackWriter->startOffsetData, 0, g_unc1080iStartOffsetSize);
+
             newTrackWriter->imageAspectRatio = filePackage->essenceInfo.imageAspectRatio;
             newTrackWriter->essenceElementKey = MXF_EE_K(UncClipWrapped);
             newTrackWriter->sourceTrackNumber = MXF_UNC_TRACK_NUM(0x01, MXF_UNC_CLIP_WRAPPED_EE_TYPE, 0x01);
@@ -2367,10 +2365,10 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
             CHK_ORET(numSamples == 1);
             if (size != numSamples * writer->editUnitByteCount)
             {
-                CHK_ORET((size + g_unc1080i50StartOffsetSize) == numSamples * writer->editUnitByteCount);
+                CHK_ORET((size + g_unc1080iStartOffsetSize) == numSamples * writer->editUnitByteCount);
                 /* write start offset for alignment */
                 CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, writer->startOffsetData, 
-                    g_unc1080i50StartOffsetSize));
+                    g_unc1080iStartOffsetSize));
             }
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));
             writer->duration += numSamples;
@@ -2467,7 +2465,7 @@ int end_write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint
         case Unc1080iUYVY:
             /* Avid uncompressed HD 1080i video requires padding and currently only accepts 1 sample at a time */
             CHK_ORET(numSamples == 1);
-            CHK_ORET((writer->sampleDataSize + g_unc1080i50StartOffsetSize) == numSamples * writer->editUnitByteCount);
+            CHK_ORET((writer->sampleDataSize + g_unc1080iStartOffsetSize) == numSamples * writer->editUnitByteCount);
             writer->duration += numSamples;
             break;
         default:

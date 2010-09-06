@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.20 2010/07/21 16:29:33 john_f Exp $
+ * $Id: main.c,v 1.21 2010/09/06 13:41:45 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -1610,6 +1610,8 @@ int main(int argc, const char* argv[])
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
             inputs[inputIndex].essenceType = Unc1080iUYVY;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
             inputIndex++;
@@ -1626,6 +1628,8 @@ int main(int argc, const char* argv[])
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
             inputs[inputIndex].essenceType = Unc720p50UYVY;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
+            inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
             haveP50Video = 1;
@@ -2097,15 +2101,7 @@ int main(int argc, const char* argv[])
         }
         else if (inputs[i].essenceType == Unc1080iUYVY)
         {
-            if (isPAL)
-            {
-                inputs[i].frameSize = 1920 * 1080 * 2;
-            }
-            else
-            {
-                fprintf(stderr, "Uncompressed 1080i NTSC not yet implemented\n");
-                return 1;
-            }
+            inputs[i].frameSize = 1920 * 1080 * 2;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == Unc720p50UYVY)

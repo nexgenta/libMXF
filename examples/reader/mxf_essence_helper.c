@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.16 2010/07/23 17:57:23 philipn Exp $
+ * $Id: mxf_essence_helper.c,v 1.17 2010/09/06 13:41:45 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -396,7 +396,9 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
         essenceTrack->frameSize = 458752;
     }
     else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_FrameWrapped)) ||
-        mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped)))
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_625_50i_422_135_ClipWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_525_5994i_422_135_ClipWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(SD_Unc_525_5994i_422_135_FrameWrapped)))
     {
         CHK_ORET(mxf_get_uint32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, StoredHeight), &fieldHeight));
         if (fieldHeight == 0) /* best effort distinguished value */
@@ -486,7 +488,10 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
             }
         }
     }
-    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped)))
+    else if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(HD_Unc_1080_50i_422_FrameWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(HD_Unc_1080_5994i_422_FrameWrapped)) ||
+             mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(HD_Unc_1080_5994i_422_ClipWrapped)))
     {
         /* only 8-bit supported */
         CHK_ORET(track->video.componentDepth == 8);
