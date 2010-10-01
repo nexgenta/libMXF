@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.12 2010/09/06 13:41:45 john_f Exp $
+ * $Id: mxf_opatom_reader.c,v 1.13 2010/10/01 15:51:10 john_f Exp $
  *
  * MXF OP-Atom reader
  *
@@ -920,7 +920,7 @@ int opa_initialise_reader(MXFReader* reader, MXFPartition** headerPartition)
     data->essenceDataSize = len;
         
     CHK_OFAIL((filePos = mxf_file_tell(mxfFile)) >= 0);
-    data->essenceStartPos = filePos;
+    data->essenceStartPos = filePos + essenceTrack->avidFirstFrameOffset;
     data->currentPosition = 0;
 
     

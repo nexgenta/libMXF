@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_essence_helper.c,v 1.17 2010/09/06 13:41:45 john_f Exp $
+ * $Id: mxf_essence_helper.c,v 1.18 2010/10/01 15:51:10 john_f Exp $
  *
  * Utilities for processing essence data and associated metadata
  *
@@ -117,6 +117,12 @@ int process_cdci_descriptor(MXFMetadataSet* descriptorSet, MXFTrack* track, Esse
     if (mxf_have_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, PictureEssenceCoding)))
     {
         CHK_ORET(mxf_get_ul_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, PictureEssenceCoding), &track->pictureEssenceCodingLabel));
+    }
+
+    /* Avid extension: FirstFrameOffset is the offset from the start of the essence data element to the first frame */
+    if (mxf_have_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FirstFrameOffset)))
+    {
+        CHK_ORET(mxf_get_int32_item(descriptorSet, &MXF_ITEM_K(GenericPictureEssenceDescriptor, FirstFrameOffset), &essenceTrack->avidFirstFrameOffset));
     }
     
     if (mxf_equals_ul(&track->essenceContainerLabel, &MXF_EC_L(IECDV_25_525_60_ClipWrapped)) ||

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_extensions_data_model.h,v 1.10 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_avid_extensions_data_model.h,v 1.11 2010/10/01 15:51:10 john_f Exp $
  *
  * Avid data model extension definitions
  *
@@ -788,6 +788,13 @@ MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, FrameSampleSize,
 					
 MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, ImageSize,
     MXF_LABEL(0xa0, 0x24, 0x0, 0x60, 0x94, 0xeb, 0x75, 0xcb, 0xce, 0x2a, 0xca, 0x4f, 0x51, 0xab, 0x11, 0xd3),
+    0x0000,
+    MXF_INT32_TYPE,
+    0
+);
+
+MXF_ITEM_DEFINITION(GenericPictureEssenceDescriptor, FirstFrameOffset,
+    MXF_LABEL(0xa0, 0x24, 0x0, 0x60, 0x94, 0xeb, 0x75, 0xcb, 0xce, 0x2a, 0xca, 0x4e, 0x51, 0xab, 0x11, 0xd3),
     0x0000,
     MXF_INT32_TYPE,
     0

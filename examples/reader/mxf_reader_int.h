@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader_int.h,v 1.4 2010/06/02 10:59:20 philipn Exp $
+ * $Id: mxf_reader_int.h,v 1.5 2010/10/01 15:51:10 john_f Exp $
  *
  * Internal functions for reading MXF files
  *
@@ -48,6 +48,8 @@ typedef struct _EssenceTrack
     int64_t containerDuration;
     
     uint32_t imageStartOffset; /* used for Avid unc frames which are aligned to 8k boundaries */
+    
+    int32_t avidFirstFrameOffset; /* Avid extension: offset to first frame in clip-wrapped container */
     
     uint32_t bodySID;
     uint32_t indexSID;
