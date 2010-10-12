@@ -1,5 +1,5 @@
 /*
- * $Id: package_definitions.h,v 1.12 2010/07/21 16:29:33 john_f Exp $
+ * $Id: package_definitions.h,v 1.13 2010/10/12 17:44:12 john_f Exp $
  *
  * Defines MXF package data structures and functions to create them
  *
@@ -63,7 +63,7 @@ typedef enum
     DNxHD1080i185X,    /* identical format to "DNxHD1080i175X" */
     UncUYVY,
     Unc1080iUYVY,
-    Unc720p50UYVY,
+    Unc720pUYVY,
     PCM
 } EssenceType;
 

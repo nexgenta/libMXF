@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_op1a_reader.c,v 1.7 2010/09/06 13:41:45 john_f Exp $
+ * $Id: mxf_op1a_reader.c,v 1.8 2010/10/12 17:44:12 john_f Exp $
  *
  * MXF OP-1A reader
  *
@@ -1022,6 +1022,11 @@ int op1a_is_supported(MXFPartition* headerPartition)
         }
         else if (mxf_equals_ul(label, &MXF_EC_L(HD_Unc_1080_50i_422_FrameWrapped)) ||
                  mxf_equals_ul(label, &MXF_EC_L(HD_Unc_1080_5994i_422_FrameWrapped)))
+        {
+            continue;
+        }
+        else if (mxf_equals_ul(label, &MXF_EC_L(HD_Unc_720_50p_422_FrameWrapped)) ||
+                 mxf_equals_ul(label, &MXF_EC_L(HD_Unc_720_5994p_422_FrameWrapped)))
         {
             continue;
         }

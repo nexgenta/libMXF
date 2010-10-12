@@ -1,5 +1,5 @@
 /*
- * $Id: write_avid_mxf.c,v 1.24 2010/09/06 13:41:45 john_f Exp $
+ * $Id: write_avid_mxf.c,v 1.25 2010/10/12 17:44:12 john_f Exp $
  *
  * Write video and audio to MXF files supported by Avid editing software
  *
@@ -247,7 +247,7 @@ static const uint32_t g_uncNTSCVBISize = 720 * 10 * 2;
 static const uint32_t g_uncAligned1080iFrameSize = 4153344;    /* 0x3f6000 (6144 pad + 4147200 frame) */
 static const uint32_t g_unc1080iStartOffsetSize = 6144;
 
-static const uint32_t g_unc720p50FrameSize = 1843200;   /* 720 * 1280 * 2 */
+static const uint32_t g_unc720pFrameSize = 1843200;   /* 720 * 1280 * 2 */
 
 
 static const uint32_t g_bodySID = 1;
@@ -2072,11 +2072,18 @@ static int create_track_writer(AvidClipWriter* clipWriter, PackageDefinitions* p
             newTrackWriter->editUnitByteCount = newTrackWriter->frameSize;
             break;
             
-        case Unc720p50UYVY:
+        case Unc720pUYVY:
             newTrackWriter->cdciEssenceContainerLabel = MXF_EC_L(AvidAAFKLVEssenceContainer);
             newTrackWriter->codingEquationsLabel = ITUR_BT709_CODING_EQ;
-            newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_720_50p_422_ClipWrapped);
-            newTrackWriter->frameSize = g_unc720p50FrameSize;
+            if (clipWriter->projectFormat == PAL_25i)
+            {
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_720_50p_422_ClipWrapped);
+            }
+            else
+            {
+                newTrackWriter->essenceContainerLabel = MXF_EC_L(HD_Unc_720_5994p_422_ClipWrapped);
+            }
+            newTrackWriter->frameSize = g_unc720pFrameSize;
             newTrackWriter->storedHeight = 720;
             newTrackWriter->storedWidth = 1280;
             newTrackWriter->displayHeight = 720;
@@ -2312,7 +2319,7 @@ int write_samples(AvidClipWriter* clipWriter, uint32_t materialTrackID, uint32_t
         case DNxHD1080p120:
         case DNxHD1080p185:
         case DNxHD1080p185X:
-        case Unc720p50UYVY:
+        case Unc720pUYVY:
         case PCM:
             CHK_ORET(size == numSamples * writer->editUnitByteCount);
             CHK_ORET(mxf_write_essence_element_data(writer->mxfFile, writer->essenceElement, data, size));

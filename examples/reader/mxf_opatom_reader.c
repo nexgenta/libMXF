@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_opatom_reader.c,v 1.13 2010/10/01 15:51:10 john_f Exp $
+ * $Id: mxf_opatom_reader.c,v 1.14 2010/10/12 17:44:12 john_f Exp $
  *
  * MXF OP-Atom reader
  *
@@ -260,12 +260,15 @@ static int opatom_set_frame_rate(MXFReader* reader, const mxfRational* frameRate
     }
     else
     {
-        CHK_ORET(mxfr_is_pal_frame_rate(frameRate) || mxfr_is_ntsc_frame_rate(frameRate));
+        CHK_ORET((frameRate->numerator == 25 && frameRate->denominator == 1) ||
+                 (frameRate->numerator == 50 && frameRate->denominator == 1) ||
+                 (frameRate->numerator == 30000 && frameRate->denominator == 1001));
         
         essenceTrack->playoutDuration = mxfr_convert_length(&essenceTrack->frameRate, essenceTrack->playoutDuration, frameRate);
         essenceTrack->frameRate = *frameRate;
     
-        if (mxfr_is_pal_frame_rate(&essenceTrack->frameRate))
+        if ((essenceTrack->frameRate.numerator == 25 && essenceTrack->frameRate.denominator == 1) ||
+            (essenceTrack->frameRate.numerator == 50 && essenceTrack->frameRate.denominator == 1))
         {
             essenceTrack->frameSize = (uint32_t)(track->audio.blockAlign * 
                 track->audio.samplingRate.numerator * essenceTrack->frameRate.denominator / 
@@ -806,6 +809,11 @@ int opa_is_supported(MXFPartition* headerPartition)
     }
     else if (mxf_equals_ul(label, &MXF_EC_L(HD_Unc_1080_50i_422_ClipWrapped)) ||
              mxf_equals_ul(label, &MXF_EC_L(HD_Unc_1080_5994i_422_ClipWrapped)))
+    {
+        return 1;
+    }
+    else if (mxf_equals_ul(label, &MXF_EC_L(HD_Unc_720_50p_422_ClipWrapped)) ||
+             mxf_equals_ul(label, &MXF_EC_L(HD_Unc_720_5994p_422_ClipWrapped)))
     {
         return 1;
     }

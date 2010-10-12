@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.15 2010/07/23 17:57:24 philipn Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.16 2010/10/12 17:44:12 john_f Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -210,6 +210,15 @@ static const mxfUL MXF_CMDEF_L(AVCI_100_720_60_P) =
 
 static const mxfUL MXF_CMDEF_L(AVCI_100_720_50_P) =
     MXF_AVCI_CMDEV_L(0x31, 0x09);
+
+
+/* MPEG-2 Long GOP */
+
+static const mxfUL MXF_CMDEF_L(MPEG2_MP_HL_LONGGOP) =
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x03, 0x04, 0x01, 0x02, 0x02, 0x01, 0x03, 0x03, 0x00};
+
+static const mxfUL MXF_CMDEF_L(MPEG2_422P_HL_LONGGOP) =
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x03, 0x04, 0x01, 0x02, 0x02, 0x01, 0x04, 0x03, 0x00};
 
 
 /* DNxHD */
@@ -544,6 +553,16 @@ static const mxfUL MXF_EC_L(AVCIFrameWrapped) =
 
 static const mxfUL MXF_EC_L(AVCIClipWrapped) =
     MXF_MPEG_EC_L(0x0A, 0x10, 0x60, 0x02);
+
+
+/* MPEG ES VideoStream-0 SID */
+
+static const mxfUL MXF_EC_L(MPEGES0FrameWrapped) =
+    MXF_MPEG_EC_L(0x02, 0x04, 0x60, 0x01);
+
+static const mxfUL MXF_EC_L(MPEGES0ClipWrapped) =
+    MXF_MPEG_EC_L(0x02, 0x04, 0x60, 0x02);
+
 
 
 /* DNxHD */
@@ -908,6 +927,9 @@ static const mxfUL MXF_DM_L(DMS1_Scene_Extensions) =
 
 static const mxfUL ITUR_BT470_TRANSFER_CH =
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x04, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00};
+
+static const mxfUL ITUR_BT709_TRANSFER_CH =
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x00, 0x00};
 
 
 /* Coding equation labels */

@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.21 2010/09/06 13:41:45 john_f Exp $
+ * $Id: main.c,v 1.22 2010/10/12 17:44:12 john_f Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -915,7 +915,7 @@ static void usage(const char* cmd)
     fprintf(stderr, "  --DNxHD1080p175X <filenam> DNxHD 1920x1080p24/23.976 175 Mbps 10bit (requires film frame rate)\n");
     fprintf(stderr, "  --unc <filename>           Uncompressed 8-bit UYVY SD\n");
     fprintf(stderr, "  --unc1080i <filename>      Uncompressed 8-bit UYVY HD 1920x1080i\n");
-    fprintf(stderr, "  --unc720p50 <filename>     Uncompressed 8-bit UYVY HD 1280x720p50\n");
+    fprintf(stderr, "  --unc720p <filename>       Uncompressed 8-bit UYVY HD 1280x720p\n");
     fprintf(stderr, "  --pcm <filename>           raw 48kHz PCM audio\n");
     fprintf(stderr, "       --bps <bits per sample>    # bits per sample. Default is 16\n");
     fprintf(stderr, "       --locked <bool>            true/false to indicate whether the number of audio samples is locked to the video (not set by default)\n");
@@ -988,7 +988,7 @@ int main(int argc, const char* argv[])
     int uctIndex;
     LocatorOption locators[MAX_LOCATORS];
     int numLocators = 0;
-    int haveP50Video = 0;
+    int haveProgressive2Video = 0;
     
     memset(locators, 0, sizeof(locators));
     memset(userCommentTags, 0, sizeof(userCommentTags));
@@ -1425,7 +1425,7 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].essenceType = DNxHD720p120;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
-            haveP50Video = 1;
+            haveProgressive2Video = 1;
             inputIndex++;
             cmdlnIndex += 2;
         }
@@ -1444,7 +1444,7 @@ int main(int argc, const char* argv[])
             inputs[inputIndex].essenceType = DNxHD720p185;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
-            haveP50Video = 1;
+            haveProgressive2Video = 1;
             inputIndex++;
             cmdlnIndex += 2;
         }
@@ -1617,7 +1617,7 @@ int main(int argc, const char* argv[])
             inputIndex++;
             cmdlnIndex += 2;
         }
-        else if (strcmp(argv[cmdlnIndex], "--unc720p50") == 0)
+        else if (strcmp(argv[cmdlnIndex], "--unc720p") == 0)
         {
             if (cmdlnIndex + 1 >= argc)
             {
@@ -1627,12 +1627,12 @@ int main(int argc, const char* argv[])
             }
             init_essence_info(&inputs[inputIndex].essenceInfo);
             inputs[inputIndex].isVideo = 1;
-            inputs[inputIndex].essenceType = Unc720p50UYVY;
+            inputs[inputIndex].essenceType = Unc720pUYVY;
             inputs[inputIndex].essenceInfo.imageAspectRatio.numerator = 16;
             inputs[inputIndex].essenceInfo.imageAspectRatio.denominator = 9;
             inputs[inputIndex].filename = argv[cmdlnIndex + 1];
             inputs[inputIndex].trackNumber = ++videoTrackNumber;
-            haveP50Video = 1;
+            haveProgressive2Video = 1;
             inputIndex++;
             cmdlnIndex += 2;
         }
@@ -1924,7 +1924,7 @@ int main(int argc, const char* argv[])
     /* set the video sample rate */
     if (isPAL)
     {
-        if (haveP50Video)
+        if (haveProgressive2Video)
         {
             /* TODO: this is yet just another sample/edit rate hack! */
             videoSampleRate.numerator = 50;
@@ -1938,8 +1938,17 @@ int main(int argc, const char* argv[])
     }
     else /* NTSC */
     {
-        videoSampleRate.numerator = 30000;
-        videoSampleRate.denominator = 1001;
+        if (haveProgressive2Video)
+        {
+            /* TODO: this is yet just another sample/edit rate hack! */
+            videoSampleRate.numerator = 60000;
+            videoSampleRate.denominator = 1001;
+        }
+        else
+        {
+            videoSampleRate.numerator = 30000;
+            videoSampleRate.denominator = 1001;
+        }
     }
 
     if (isFilm24)
@@ -2104,13 +2113,8 @@ int main(int argc, const char* argv[])
             inputs[i].frameSize = 1920 * 1080 * 2;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
-        else if (inputs[i].essenceType == Unc720p50UYVY)
+        else if (inputs[i].essenceType == Unc720pUYVY)
         {
-            if (!isPAL)
-            {
-                fprintf(stderr, "Invalid use of --ntsc option for uncompressed 720p50\n");
-                return 1;
-            }
             inputs[i].frameSize = 1280 * 720 * 2;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
@@ -2436,7 +2440,7 @@ int main(int argc, const char* argv[])
             }
             else if (inputs[i].essenceType == UncUYVY ||
                      inputs[i].essenceType == Unc1080iUYVY ||
-                     inputs[i].essenceType == Unc720p50UYVY)
+                     inputs[i].essenceType == Unc720pUYVY)
             {
                 if (fread(inputs[i].buffer, 1, inputs[i].frameSize, inputs[i].file) != inputs[i].frameSize)
                 {
