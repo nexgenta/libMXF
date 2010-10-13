@@ -1,5 +1,5 @@
 /*
- * $Id: main.c,v 1.22 2010/10/12 17:44:12 john_f Exp $
+ * $Id: main.c,v 1.23 2010/10/13 12:32:41 philipn Exp $
  *
  * Test writing video and audio to MXF files supported by Avid editing software
  *
@@ -265,7 +265,7 @@ static int get_dv_stream_info(const char* filename, Input* input)
         }
         input->essenceType = DV1080i50;
     }
-    else if (byte == 0x15)
+    else if (byte == 0x18)
     {
         if (!input->isPAL)
         {
@@ -2052,7 +2052,7 @@ int main(int argc, const char* argv[])
         }
         else if (inputs[i].essenceType == DV720p50)
         {
-            inputs[i].frameSize = 576000;
+            inputs[i].frameSize = 288000;
             CHK_MALLOC_ARRAY_OFAIL(inputs[i].buffer, unsigned char, inputs[i].frameSize);
         }
         else if (inputs[i].essenceType == IMX30)
