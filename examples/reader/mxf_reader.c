@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_reader.c,v 1.7 2010/07/23 17:57:23 philipn Exp $
+ * $Id: mxf_reader.c,v 1.8 2010/10/13 12:31:33 philipn Exp $
  *
  * Main functions for reading MXF files
  *
@@ -304,18 +304,20 @@ static int convert_timecode_to_position(TimecodeIndex* index, MXFTimecode* timec
 
 static int convert_position_to_timecode(TimecodeIndex* index, mxfPosition position, MXFTimecode* timecode)
 {
-    int64_t workFrameCount;
-    int64_t numFramesSkipped;
     MXFListIterator iter;
     TimecodeSegment* segment;
     mxfPosition segmentStartPosition;
     int64_t frameCount = 0;
     int foundTimecodeSegment;
+    int hour, min;
+    int64_t prev_skipped_count = -1;
+    int64_t skipped_count = 0;
+    int64_t work_frame_count;
     
     CHK_ORET(position >= 0);
     
-    /* drop frame compensation only supported for NTSC */
-    CHK_ORET(!index->isDropFrame || index->roundedTimecodeBase == 30);
+    /* drop frame compensation only supported for 30/60Hz */
+    CHK_ORET(!index->isDropFrame || index->roundedTimecodeBase == 30 || index->roundedTimecodeBase == 60);
     
     
     /* find the timecode segment that the position is within */
@@ -342,38 +344,35 @@ static int convert_position_to_timecode(TimecodeIndex* index, mxfPosition positi
     CHK_ORET(foundTimecodeSegment);    
     
     
-    /* first calculate timecode without regard for drop frames */
-    workFrameCount = frameCount;
-    timecode->hour = workFrameCount / (60 * 60 * index->roundedTimecodeBase);
-    workFrameCount %= 60 * 60 * index->roundedTimecodeBase;
-    timecode->min = workFrameCount / (60 * index->roundedTimecodeBase);
-    workFrameCount %= 60 * index->roundedTimecodeBase;
-    timecode->sec = workFrameCount / index->roundedTimecodeBase;
-    timecode->frame = workFrameCount % index->roundedTimecodeBase;
-        
-    /* then take drop frames into account */
+    work_frame_count = frameCount;
+
     timecode->isDropFrame = index->isDropFrame;
     if (index->isDropFrame)
     {
-        /* first 2 frame numbers shall be omitted at the start of each minute,
-           except minutes 0, 10, 20, 30, 40 and 50 */
+        // first 2 frame numbers shall be omitted at the start of each minute,
+        //   except minutes 0, 10, 20, 30, 40 and 50
 
-        /* calculate number frames skipped */
-        numFramesSkipped = (60-6) * 2 * timecode->hour; /* every whole hour */
-        numFramesSkipped += (timecode->min / 10) * 9 * 2; /* every whole 10 min */
-        numFramesSkipped += (timecode->min % 10) * 2; /* every whole min, except min 0 */
-        
-        /* re-calculate with skipped frames */
-        workFrameCount = frameCount + numFramesSkipped;
-        
-        timecode->hour = workFrameCount / (60 * 60 * index->roundedTimecodeBase);
-        workFrameCount %= 60 * 60 * index->roundedTimecodeBase;
-        timecode->min = workFrameCount / (60 * index->roundedTimecodeBase);
-        workFrameCount %= 60 * index->roundedTimecodeBase;
-        timecode->sec = workFrameCount / index->roundedTimecodeBase;
-        timecode->frame = workFrameCount % index->roundedTimecodeBase;
+        while (prev_skipped_count != skipped_count)
+        {
+            prev_skipped_count = skipped_count;
+
+            hour = (int)((frameCount + skipped_count) / (60 * 60 * index->roundedTimecodeBase));
+            min = (int)(((frameCount + skipped_count) % (60 * 60 * index->roundedTimecodeBase)) / (60 * index->roundedTimecodeBase));
+
+            // add frames skipped
+            skipped_count = (60-6) * 2 * hour;      // every whole hour
+            skipped_count += (min / 10) * 9 * 2;    // every whole 10 min
+            skipped_count += (min % 10) * 2;        // every whole min, except min 0
+        }
+
+        work_frame_count += skipped_count;
     }
     
+    timecode->hour = (int)(work_frame_count / (60 * 60 * index->roundedTimecodeBase));
+    timecode->min = (int)((work_frame_count % (60 * 60 * index->roundedTimecodeBase)) / (60 * index->roundedTimecodeBase));
+    timecode->sec = (int)(((work_frame_count % (60 * 60 * index->roundedTimecodeBase)) % (60 * index->roundedTimecodeBase)) / index->roundedTimecodeBase);
+    timecode->frame = (int)(((work_frame_count % (60 * 60 * index->roundedTimecodeBase)) % (60 * index->roundedTimecodeBase)) % index->roundedTimecodeBase);
+
     return 1;
 }
 
