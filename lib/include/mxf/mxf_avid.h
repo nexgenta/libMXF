@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.h,v 1.8 2010/07/21 16:29:33 john_f Exp $
+ * $Id: mxf_avid.h,v 1.9 2010/10/18 17:54:08 john_f Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -55,6 +55,11 @@ typedef struct
 } RGBColor;
 
 
+typedef void (*mxf_generate_aafsdk_umid_func)(mxfUMID* umid);
+typedef void (*mxf_generate_old_aafsdk_umid_func)(mxfUMID* umid);
+
+
+
 int mxf_avid_load_extensions(MXFDataModel* dataModel);
 
 
@@ -64,8 +69,12 @@ int mxf_avid_read_filtered_header_metadata(MXFFile* mxfFile, int skipDataDefs, M
 int mxf_avid_write_header_metadata(MXFFile* mxfFile, MXFHeaderMetadata* headerMetadata, MXFPartition* headerPartition);
 
 
-void mxf_generate_aafsdk_umid(mxfUMID* umid);
-void mxf_generate_old_aafsdk_umid(mxfUMID* umid);
+extern mxf_generate_aafsdk_umid_func mxf_generate_aafsdk_umid;
+extern mxf_generate_old_aafsdk_umid_func mxf_generate_old_aafsdk_umid;
+
+void mxf_default_generate_aafsdk_umid(mxfUMID* umid);
+void mxf_default_generate_old_aafsdk_umid(mxfUMID* umid);
+
 
 int mxf_avid_set_indirect_string_item(MXFMetadataSet* set, const mxfKey* itemKey, const mxfUTF16Char* value);
 

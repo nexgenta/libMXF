@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_utils.c,v 1.5 2010/02/12 13:46:27 philipn Exp $
+ * $Id: mxf_utils.c,v 1.6 2010/10/18 17:54:08 john_f Exp $
  *
  * General purpose utilities
  *
@@ -41,6 +41,13 @@
 
 
 #include <mxf/mxf.h>
+
+
+mxf_generate_uuid_func mxf_generate_uuid = mxf_default_generate_uuid;
+mxf_get_timestamp_now_func mxf_get_timestamp_now = mxf_default_get_timestamp_now;
+mxf_generate_umid_func mxf_generate_umid = mxf_default_generate_umid;
+mxf_generate_key_func mxf_generate_key = mxf_default_generate_key;
+
 
 
 void mxf_print_key(const mxfKey* key)
@@ -103,7 +110,7 @@ void mxf_sprint_umid(char* str, const mxfUMID* umid)
         umid->octet28, umid->octet29, umid->octet30, umid->octet31);
 }
 
-void mxf_generate_uuid(mxfUUID* uuid)
+void mxf_default_generate_uuid(mxfUUID* uuid)
 {
 #if defined(_WIN32)
 
@@ -120,7 +127,7 @@ void mxf_generate_uuid(mxfUUID* uuid)
 #endif
 }
 
-void mxf_get_timestamp_now(mxfTimestamp* now)
+void mxf_default_get_timestamp_now(mxfTimestamp* now)
 {
 #if (defined(_MSC_VER) && _MSC_VER < 1400) || (defined(_WIN32) && defined(__GNUC__))
     /* MSVC 7 or MinGW */
@@ -187,7 +194,7 @@ void mxf_get_timestamp_now(mxfTimestamp* now)
 }
 
 
-void mxf_generate_umid(mxfUMID* umid)
+void mxf_default_generate_umid(mxfUMID* umid)
 {
     mxfUUID uuid;
     
@@ -214,7 +221,7 @@ void mxf_generate_umid(mxfUMID* umid)
     memcpy(&umid->octet16, &uuid, 16);
 }
 
-void mxf_generate_key(mxfKey* key)
+void mxf_default_generate_key(mxfKey* key)
 {
     mxfUUID uuid;
     

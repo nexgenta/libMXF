@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: test_writeavidmxf.sh,v 1.4 2010/07/21 16:29:33 john_f Exp $
+# $Id: test_writeavidmxf.sh,v 1.5 2010/10/18 17:54:08 john_f Exp $
 #
 # Simple test script
 #
@@ -35,7 +35,7 @@ for format in IMX30 IMX40 IMX50 \
 	DNxHD720p120 DNxHD720p185 \
 	DNxHD1080i120 DNxHD1080i185 DNxHD1080i185X \
 	DNxHD1080p36 DNxHD1080p120 DNxHD1080p185 DNxHD1080p185X \
-	unc unc1080i unc720p50
+	unc unc1080i unc720p
 do
 	command="$VALGRIND_CMD ./writeavidmxf --prefix test_$format --$format essence.dat --pcm essence.dat"
 	echo $command

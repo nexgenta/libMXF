@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_utils.h,v 1.2 2007/09/11 13:24:54 stuart_hc Exp $
+ * $Id: mxf_utils.h,v 1.3 2010/10/18 17:54:08 john_f Exp $
  *
  * General purpose utilities
  *
@@ -36,6 +36,13 @@ extern "C"
 #define UMID_STR_SIZE       96
 
 
+typedef void (*mxf_generate_uuid_func)(mxfUUID* uuid);
+typedef void (*mxf_get_timestamp_now_func)(mxfTimestamp* now);
+typedef void (*mxf_generate_umid_func)(mxfUMID* umid);
+typedef void (*mxf_generate_key_func)(mxfKey* key);
+
+
+
 void mxf_print_key(const mxfKey* key);
 void mxf_sprint_key(char* str, const mxfKey* key);
 
@@ -45,13 +52,16 @@ void mxf_sprint_label(char* str, const mxfUL* label);
 void mxf_print_umid(const mxfUMID* umid);
 void mxf_sprint_umid(char* str, const mxfUMID* umid);
 
-void mxf_generate_uuid(mxfUUID* uuid);
 
-void mxf_get_timestamp_now(mxfTimestamp* now);
+extern mxf_generate_uuid_func mxf_generate_uuid;
+extern mxf_get_timestamp_now_func mxf_get_timestamp_now;
+extern mxf_generate_umid_func mxf_generate_umid;
+extern mxf_generate_key_func mxf_generate_key;
 
-void mxf_generate_umid(mxfUMID* umid);
-
-void mxf_generate_key(mxfKey* key);
+void mxf_default_generate_uuid(mxfUUID* uuid);
+void mxf_default_get_timestamp_now(mxfTimestamp* now);
+void mxf_default_generate_umid(mxfUMID* umid);
+void mxf_default_generate_key(mxfKey* key);
 
 
 #ifdef __cplusplus

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.c,v 1.10 2010/07/21 16:29:33 john_f Exp $
+ * $Id: mxf_avid.c,v 1.11 2010/10/18 17:54:08 john_f Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -77,7 +77,11 @@ typedef struct
     
     MXFReadFilter filter;
 } MXFAvidReadFilter;
-    
+
+
+
+mxf_generate_aafsdk_umid_func mxf_generate_aafsdk_umid = mxf_default_generate_aafsdk_umid;
+mxf_generate_old_aafsdk_umid_func mxf_generate_old_aafsdk_umid = mxf_default_generate_old_aafsdk_umid;
 
 
 
@@ -560,7 +564,7 @@ fail:
 
 /* MobID generation code following the same algorithm as implemented in the AAF SDK */
 /* NOTE: this function is not guaranteed to create a unique UMID in multi-threaded environment */
-void mxf_generate_aafsdk_umid(mxfUMID* umid)
+void mxf_default_generate_aafsdk_umid(mxfUMID* umid)
 {
     uint32_t major, minor;
     static uint32_t last_part2 = 0;
@@ -622,7 +626,7 @@ void mxf_generate_aafsdk_umid(mxfUMID* umid)
 
 /* MobID generation code following the same algorithm as implemented in the older AAF SDK versions
   - see revision 1.47 of AAF/ref-impl/src/impl/AAFUtils.c */
-void mxf_generate_old_aafsdk_umid(mxfUMID* umid)
+void mxf_default_generate_old_aafsdk_umid(mxfUMID* umid)
 {
     uint32_t major, minor;
     static uint32_t last_part2 = 0;
