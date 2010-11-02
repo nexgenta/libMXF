@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid.h,v 1.9 2010/10/18 17:54:08 john_f Exp $
+ * $Id: mxf_avid.h,v 1.10 2010/11/02 13:10:04 philipn Exp $
  *
  * Avid data model extensions and utilities
  *
@@ -109,6 +109,7 @@ int mxf_avid_read_index_table_segment_2(MXFFile* mxfFile, uint64_t segmentLen,
 
 int mxf_avid_is_mjpeg_essence_element(const mxfKey* key);
 int mxf_avid_is_dnxhd_essence_element(const mxfKey* key);
+int mxf_avid_is_mpeg_essence_element(const mxfKey* key);
 int mxf_avid_is_essence_element(const mxfKey* key);
 
 
