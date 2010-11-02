@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.c,v 1.3 2010/06/25 13:59:02 philipn Exp $
+ * $Id: mxf_labels_and_keys.c,v 1.4 2010/11/02 13:08:56 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc.
  *
@@ -59,6 +59,23 @@ int mxf_is_data(const mxfUL* label)
 int mxf_is_descriptive_metadata(const mxfUL* label)
 {
     return memcmp(label, &MXF_DDEF_L(DescriptiveMetadata), sizeof(mxfUL)) == 0;
+}
+
+
+int mxf_is_generic_container_label(const mxfUL *label)
+{
+    return (label->octet0 == 0x06 &&
+            label->octet1 == 0x0e &&
+            label->octet2 == 0x2b &&
+            label->octet3 == 0x34 &&
+            label->octet4 == 0x04 &&
+            label->octet5 == 0x01 &&
+            label->octet6 == 0x01 &&
+            /* octet7 - reg version */
+            label->octet8 == 0x0d &&
+            label->octet9 == 0x01 &&
+            label->octet10 == 0x03 &&
+            label->octet11 == 0x01);
 }
 
 

@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_labels_and_keys.h,v 1.16 2010/10/12 17:44:12 john_f Exp $
+ * $Id: mxf_labels_and_keys.h,v 1.17 2010/11/02 13:12:38 philipn Exp $
  *
  * MXF labels, keys, track numbers, etc
  *
@@ -252,7 +252,12 @@ static const mxfUL MXF_CMDEF_L(UNC_10B_422_INTERLEAVED) =
     
 #define MXF_GENERIC_CONTAINER_LABEL(regver, eckind, mappingkind, byte15, byte16) \
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, regver, 0x0d, 0x01, 0x03, 0x01, eckind, mappingkind, byte15, byte16}
-    
+
+
+int mxf_is_generic_container_label(const mxfUL *label);
+
+
+
 /* Multiple wrappings for interleaved essence */
 
 static const mxfUL MXF_EC_L(MultipleWrappings) = 
