@@ -1,5 +1,5 @@
 /*
- * $Id: mxf_avid_labels_and_keys.h,v 1.8 2010/03/29 15:15:57 philipn Exp $
+ * $Id: mxf_avid_labels_and_keys.h,v 1.9 2010/11/02 13:07:45 philipn Exp $
  *
  * Avid labels, keys, etc.
  *
@@ -160,6 +160,9 @@ static const mxfUL MXF_EC_L(DV720p50ClipWrapped) =
 static const mxfUL MXF_EC_L(AvidMPEG4) =
     {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x03, 0x00, 0x00};
 
+/* Label observed in XDCAM HD422 files produced by Media Composer 3.0 */
+static const mxfUL MXF_EC_L(AvidMPEGClipWrapped) =
+    {0x06, 0x0e, 0x2b, 0x34, 0x04, 0x01, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x02, 0x03, 0x00, 0x00};
 
 
 /*
@@ -170,6 +173,9 @@ static const mxfUL MXF_EC_L(AvidMPEG4) =
  
 static const mxfKey MXF_EE_K(AvidMJPEGClipWrapped) = 
     {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x01, 0x01};
+
+#define MXF_AVID_MJPEG_PICT_TRACK_NUM   MXF_TRACK_NUM(0x15, 0x01, 0x01, 0x01)
+
 
 /* DV100 labels observed in files by Media Composer 2.6 */
 static const mxfKey MXF_EE_K(DV1080i50) = 
@@ -191,6 +197,13 @@ static const mxfKey MXF_EE_K(UncClipWrapped) = MXF_UNC_EE_K(0x01, MXF_UNC_CLIP_W
 
 /* IMX (D10) labels observed in files by Media Composer 2.6 */
 static const mxfKey MXF_EE_K(IMX) = MXF_D10_PICTURE_EE_K(0x01);
+
+
+/* Label observed in XDCAM HD422 files produced by Media Composer 3.0 */
+static const mxfKey MXF_EE_K(AvidMPEGClipWrapped) =
+    {0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0x0e, 0x04, 0x03, 0x01, 0x15, 0x01, 0x03, 0x01};
+
+#define MXF_AVID_MPEG_PICT_TRACK_NUM  MXF_TRACK_NUM(0x15, 0x01, 0x03, 0x01)
 
 
 
@@ -222,6 +235,9 @@ static const uint32_t g_AvidMJPEG31m_ResolutionID = 0x71;  /* 113 */
 static const uint32_t g_AvidMJPEG81m_ResolutionID = 0x70;  /* 112 */
 
 static const uint32_t g_AvidMPEG4_ResolutionID = 0x05df; /* 1503 */
+
+static const uint32_t g_AvidMPEG_PAL_ResolutionID   = 0x0fea; /* 4074 */
+static const uint32_t g_AvidMPEG_NTSC_ResolutionID  = 0x0fe9; /* 4073 */
 
 /*
  *
